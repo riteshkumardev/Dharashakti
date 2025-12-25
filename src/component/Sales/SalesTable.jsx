@@ -1,55 +1,77 @@
 import React, { useState, useEffect } from "react";
 import "./Sales.css";
-// 1. Firebase imports
 import { getDatabase, ref, onValue, remove, update } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
 
 const SalesTable = () => {
   const db = getDatabase(app);
-  const [salesList, setSalesList] = useState([]); // State for Firebase data
+  const [salesList, setSalesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState("All");
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({});
 
-  // 2. Fetch Data from Firebase on Mount
+  const [sortBy, setSortBy] = useState("dateNewest");
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 5;
+
   useEffect(() => {
     const salesRef = ref(db, "sales");
-    
-    // onValue real-time updates sunta hai
     const unsubscribe = onValue(salesRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        // Firebase object ko array mein convert karna (taaki map chal sake)
         const list = Object.keys(data).map((key) => ({
           id: key,
           ...data[key],
         }));
-        setSalesList(list.reverse()); // Latest entries upar dikhane ke liye
+        setSalesList(list); 
       } else {
         setSalesList([]);
       }
       setLoading(false);
     });
-
-    return () => unsubscribe(); // Cleanup listener
+    return () => unsubscribe();
   }, [db]);
 
-  const filteredList = salesList.filter(s =>
-    s.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-    s.billNo?.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    if (editId) {
+      const total = (Number(editData.quantity) || 0) * (Number(editData.rate) || 0);
+      const due = total - (Number(editData.amountReceived) || 0);
+      setEditData(prev => ({ ...prev, totalPrice: total, paymentDue: due }));
+    }
+  }, [editData.quantity, editData.rate, editData.amountReceived, editId]);
 
-  // 🗑️ Delete from Firebase
+  const getProcessedList = () => {
+    let list = salesList.filter(s => {
+      const matchesSearch = s.customerName?.toLowerCase().includes(search.toLowerCase()) ||
+                           s.billNo?.toLowerCase().includes(search.toLowerCase());
+      const matchesProduct = selectedProduct === "All" || s.productName === selectedProduct;
+      return matchesSearch && matchesProduct;
+    });
+
+    list.sort((a, b) => {
+      if (sortBy === "dateNewest") return new Date(b.date) - new Date(a.date);
+      if (sortBy === "dateOldest") return new Date(a.date) - new Date(b.date);
+      if (sortBy === "billAsc") return a.billNo.localeCompare(b.billNo, undefined, {numeric: true});
+      if (sortBy === "billDesc") return b.billNo.localeCompare(a.billNo, undefined, {numeric: true});
+      return 0;
+    });
+    return list;
+  };
+
+  const processedList = getProcessedList();
+  const indexOfLastRow = currentPage * rowsPerPage;
+  const indexOfFirstRow = indexOfLastRow - rowsPerPage;
+  const currentRows = processedList.slice(indexOfFirstRow, indexOfLastRow);
+  const totalPages = Math.ceil(processedList.length / rowsPerPage);
+
   const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this record?")) {
-      remove(ref(db, `sales/${id}`))
-        .then(() => alert("Record Deleted!"))
-        .catch((err) => console.error("Delete Error:", err));
+    if (window.confirm("Delete this record?")) {
+      remove(ref(db, `sales/${id}`)).catch(err => console.error(err));
     }
   };
 
-  // ✏️ Edit Functions
   const startEdit = (sale) => {
     setEditId(sale.id);
     setEditData({ ...sale });
@@ -60,89 +82,107 @@ const SalesTable = () => {
     setEditData(prev => ({ ...prev, [name]: value }));
   };
 
-  // ✅ Save Changes to Firebase
   const handleSave = () => {
-    const updates = {};
-    updates[`/sales/${editId}`] = editData;
-
-    update(ref(db), updates)
-      .then(() => {
-        alert("Update Successful!");
-        setEditId(null);
-      })
-      .catch((err) => console.error("Update Error:", err));
+    update(ref(db), { [`/sales/${editId}`]: editData })
+      .then(() => { alert("Updated!"); setEditId(null); })
+      .catch(err => console.error(err));
   };
 
-  if (loading) return <div className="no-records-box">Loading Sales Data...</div>;
+  if (loading) return <div className="no-records-box">Loading...</div>;
 
   return (
     <div className="table-container-wide">
       <div className="table-card-wide">
-        <div className="table-header-row">
-          <h2 className="table-title">SALES MANAGEMENT (LIVE)</h2>
-          <div className="search-wrapper">
-            <span className="search-icon">🔍</span>
-            <input
-              className="table-search-box"
-              placeholder="Search Customer or Bill No..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+        
+        {/* Updated Header with Side-by-Side Controls */}
+        <div className="table-header-flex">
+          <h2 className="table-title">SALES RECORDS</h2>
+          
+          <div className="table-controls-row">
+            <select className="table-select-custom" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              <option value="dateNewest">Newest Date</option>
+              <option value="dateOldest">Oldest Date</option>
+              <option value="billAsc">Bill No (Low to High)</option>
+              <option value="billDesc">Bill No (High to Low)</option>
+            </select>
+
+            <select className="table-select-custom" value={selectedProduct} onChange={(e) => {setSelectedProduct(e.target.value); setCurrentPage(1);}}>
+              <option value="All">All Products</option>
+              <option value="Corn Grit">Corn Grit</option>
+              <option value="Cattle Feed">Cattle Feed</option>
+              <option value="Rice Grit">Rice Grit</option>
+              <option value="Corn Flour">Corn Flour</option>
+              
+            </select>
+
+            <div className="search-input-wrapper">
+              <input 
+                className="table-search-input" 
+                placeholder="Search Customer/Bill..." 
+                value={search} 
+                onChange={e => {setSearch(e.target.value); setCurrentPage(1);}} 
+              />
+            </div>
           </div>
         </div>
 
         <div className="table-responsive-wrapper">
-          {filteredList.length === 0 ? (
-            <div className="no-records-box">No sales records found</div>
-          ) : (
-            <table className="modern-sales-table">
-              <thead>
-                <tr>
-                  <th>SI No</th>
-                  <th>Date</th>
-                  <th>Bill No</th>
-                  <th>Customer Name</th>
-                  <th>Qty</th>
-                  <th>Rate</th>
-                  <th>Total</th>
-                  <th>Received</th>
-                  <th>Due</th>
-                  <th>Actions</th>
+          <table className="modern-sales-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Bill No</th>
+                <th>Product</th>
+                <th>Customer</th>
+                <th>Qty</th>
+                <th>Rate</th>
+                <th>Total</th>
+                <th>Received</th>
+                <th>Due</th>
+                <th>Due Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {currentRows.map((sale) => (
+                <tr key={sale.id} className={editId === sale.id ? "active-edit" : ""}>
+                  <td>{editId === sale.id ? <input type="date" name="date" value={editData.date} onChange={handleEditChange} className="edit-input-field" /> : sale.date}</td>
+                  <td>{editId === sale.id ? <input name="billNo" value={editData.billNo} onChange={handleEditChange} className="edit-input-field" /> : <span className="bill-tag">{sale.billNo}</span>}</td>
+                  <td>
+                    {editId === sale.id ? (
+                      <select name="productName" value={editData.productName} onChange={handleEditChange} className="edit-input-field">
+                        <option value="Corn Grit">Corn Grit</option>
+                        <option value="Cattle Feed">Cattle Feed</option>
+                        <option value="Rice Grit">Rice Grit</option>
+                        <option value="Corn Flour">Corn Flour</option>
+                      </select>
+                    ) : <strong>{sale.productName}</strong>}
+                  </td>
+                  <td>{editId === sale.id ? <input name="customerName" value={editData.customerName} onChange={handleEditChange} className="edit-input-field" /> : sale.customerName}</td>
+                  <td>{editId === sale.id ? <input type="number" name="quantity" value={editData.quantity} onChange={handleEditChange} className="edit-input-field small-input" /> : sale.quantity}</td>
+                  <td>₹{sale.rate}</td>
+                  <td className="bold-cell">₹{editId === sale.id ? editData.totalPrice : sale.totalPrice}</td>
+                  <td>₹{editId === sale.id ? <input type="number" name="amountReceived" value={editData.amountReceived} onChange={handleEditChange} className="edit-input-field small-input" /> : sale.amountReceived}</td>
+                  <td className="danger-text">₹{editId === sale.id ? editData.paymentDue : sale.paymentDue}</td>
+                  <td>{editId === sale.id ? <input type="date" name="billDueDate" value={editData.billDueDate} onChange={handleEditChange} className="edit-input-field" /> : sale.billDueDate}</td>
+                  <td className="action-btns-cell">
+                    {editId === sale.id ? (
+                      <><button className="save-btn-ui" onClick={handleSave}>💾</button><button className="cancel-btn-ui" onClick={() => setEditId(null)}>✖</button></>
+                    ) : (
+                      <><button className="row-edit-btn" onClick={() => startEdit(sale)}>✏️</button><button className="row-delete-btn" onClick={() => handleDelete(sale.id)}>🗑️</button></>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredList.map((sale, index) => (
-                  <tr key={sale.id} className={editId === sale.id ? "active-edit" : ""}>
-                    <td>{index + 1}</td>
-                    <td>{editId === sale.id ? <input type="date" name="date" value={editData.date} onChange={handleEditChange} className="edit-input-field" /> : sale.date}</td>
-                    <td><span className="bill-tag">{sale.billNo}</span></td>
-                    <td className="cust-name-cell">
-                      {editId === sale.id ? <input name="customerName" value={editData.customerName} onChange={handleEditChange} className="edit-input-field" /> : sale.customerName}
-                    </td>
-                    <td>{editId === sale.id ? <input type="number" name="quantity" value={editData.quantity} onChange={handleEditChange} className="edit-input-field small-input" /> : sale.quantity}</td>
-                    <td>₹{sale.rate}</td>
-                    <td className="bold-cell">₹{sale.totalPrice}</td>
-                    <td className="success-text">₹{sale.amountReceived}</td>
-                    <td className="danger-text">₹{sale.paymentDue}</td>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-                    <td className="action-btns-cell">
-                      {editId === sale.id ? (
-                        <>
-                          <button className="save-btn-ui" onClick={handleSave}>💾 Save</button>
-                          <button className="cancel-btn-ui" onClick={() => setEditId(null)}>✖</button>
-                        </>
-                      ) : (
-                        <>
-                          <button className="row-edit-btn" onClick={() => startEdit(sale)}>✏️</button>
-                          <button className="row-delete-btn" onClick={() => handleDelete(sale.id)}>🗑️</button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+        {/* Pagination */}
+        <div className="pagination-container">
+          <button disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)} className="pg-btn">◀ Prev</button>
+          <span className="pg-info">Page {currentPage} of {totalPages || 1}</span>
+          <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(prev => prev + 1)} className="pg-btn">Next ▶</button>
         </div>
       </div>
     </div>

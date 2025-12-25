@@ -124,167 +124,231 @@
 
 
 /* saletable */
-/* Table CSS */
 
-@media (max-width: 1024px) {
-  .sales-form-grid {
-    grid-template-columns: repeat(2, 1fr); /* Tablet par 2 column */
-  }
-}
-
-@media (max-width: 600px) {
-  .sales-form-grid {
-    grid-template-columns: 1fr; /* Mobile par 1 column */
-  }
-  
-  .input-group.span-4, .button-container-full {
-    grid-column: span 1 !important; /* Remarks aur Buttons ko bhi 1 column karein */
-  }
-}
-.responsive-table {
-  width: 100%;
-  overflow-x: auto; /* Side scroll enable karega */
-  -webkit-overflow-scrolling: touch;
-}
-
-.modern-sales-table {
-  min-width: 800px; /* Force table to maintain width so it scrolls */
-}
-
-/* 🔹 Table Main Layout */
+/* 🌍 Main Container Layout */
 .table-container-wide {
   width: 98%;
-  margin: 10px auto;
+  margin: 15px auto;
+  /* height: calc(80vh); */
   display: flex;
   justify-content: center;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .table-card-wide {
   background: #ffffff;
   width: 100%;
-  max-width: 1350px; /* Form ke barabar ki width */
-  padding: 20px 25px;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  max-width: 1400px;
+  padding: 25px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
-.table-header-row {
+/* 🛠️ Header Logic (Title + Controls Side-by-Side) */
+.table-header-flex {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
-  border-bottom: 2px solid #f3f4f6;
-  padding-bottom: 10px;
+  gap: 20px;
+  margin-bottom: 25px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #f1f5f9;
+  flex-wrap: wrap;
 }
 
 .table-title {
-  font-size: 20px;
-  color: #134e4a;
+  font-size: 22px;
+  color: #134e4a; /* Dark Agro Green */
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
+  margin: 0;
 }
 
-/* 🔍 Search Box Styling */
-.search-wrapper {
-  position: relative;
-  width: 300px;
+/* 🎛️ 3D Controls Row */
+.table-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f8fafc;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
 }
 
-.table-search-box {
-  width: 100%;
-  padding: 8px 15px 8px 35px;
+/* 📥 3D Styled Professional Select & Search Box */
+.table-select-custom, .table-search-input {
+  appearance: none;
+  background-color: #ffffff;
   border: 1px solid #d1d5db;
-  border-radius: 20px;
+  border-bottom: 4px solid #cbd5e1; /* 3D Depth */
+  border-radius: 10px;
+  height: 42px;
   font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  transition: all 0.1s ease;
   outline: none;
-  transition: 0.3s;
 }
 
-.table-search-box:focus {
-  border-color: #10b981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+/* Dropdown Arrow for Select */
+.table-select-custom {
+  min-width: 180px;
+  padding: 0 35px 0 15px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px;
+  cursor: pointer;
 }
 
-.search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 14px;
+/* Search Input Specifics */
+.table-search-input {
+  width: 250px;
+  padding: 0 15px;
+  cursor: text;
 }
 
-/* 📊 Table Styling */
+/* 3D Interaction: Hover & Click */
+.table-select-custom:hover, .table-search-input:hover {
+  transform: translateY(-1px);
+  border-bottom-width: 5px;
+}
+
+.table-select-custom:focus, .table-search-input:focus {
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+  border-color: #10b981; /* Focus Green */
+  background-color: #fff;
+}
+
+/* 📊 Modern Table Core Styling */
 .table-responsive-wrapper {
   width: 100%;
-  overflow-x: auto; /* Table agar zyada wide ho to scroll kare */
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
 }
 
 .modern-sales-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px; /* Compact font for professional look */
+  font-size: 13.5px;
 }
 
 .modern-sales-table th {
   background: #f8fafc;
   color: #475569;
   font-weight: 700;
-  text-align: left;
-  padding: 12px 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 14px 12px;
   border-bottom: 2px solid #e2e8f0;
-  white-space: nowrap;
+  text-align: left;
 }
 
 .modern-sales-table td {
-  padding: 10px;
+  padding: 14px 12px;
   border-bottom: 1px solid #f1f5f9;
-  color: #1e293b;
+  color: #334155;
 }
 
 .modern-sales-table tr:hover {
-  background-color: #f0fdf4; /* Hover effect to track rows */
+  background-color: #f0fdf4; /* Agro Green Hover */
 }
 
-/* 🔹 Column Specific Styles */
+/* 🎨 Badges & Text Colors */
 .bill-tag {
   background: #eff6ff;
   color: #2563eb;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 12px;
 }
 
-.cust-name-cell { font-weight: 600; color: #334155; }
-.bold-cell { font-weight: 800; color: #0f172a; }
-.success-text { color: #10b981; font-weight: 700; }
-.danger-text { color: #ef4444; font-weight: 700; }
+.cust-name-cell { font-weight: 600; }
+.bold-cell { font-weight: 800; color: #1e293b; }
+.success-text { color: #16a34a; font-weight: 700; }
+.danger-text { color: #dc2626; font-weight: 700; }
 
-/* ⚙️ Action Buttons */
-.action-btns-cell {
+/* 🔢 3D Pagination Styling */
+.pagination-container {
   display: flex;
-  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-top: 30px;
 }
 
-.row-edit-btn, .row-delete-btn {
-  background: none;
-  border: none;
+.pg-btn {
+  padding: 10px 22px;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #d1d5db;
+  border-bottom: 4px solid #cbd5e1;
+  border-radius: 10px;
+  font-weight: 700;
   cursor: pointer;
-  font-size: 16px;
-  transition: 0.2s;
+  transition: all 0.1s ease;
 }
 
-.row-edit-btn:hover { transform: scale(1.2); }
-.row-delete-btn:hover { transform: scale(1.2); }
-
-.no-records-box {
-  padding: 30px;
-  text-align: center;
-  color: #94a3b8;
-  font-style: italic;
+.pg-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  transform: translateY(-1px);
 }
-/* Sales.css ya Form CSS */
-.sales-form-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr); /* Desktop par 4 column */
-  gap: 20px;
+
+.pg-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+}
+
+.pg-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-bottom-width: 1px;
+}
+
+.pg-info {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+/* ⚙️ Action & Edit Buttons */
+.active-edit {
+  background-color: #f0fdfa !important;
+}
+
+.edit-input-field {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #10b981;
+  border-radius: 6px;
+  outline: none;
+}
+
+.save-btn-ui, .cancel-btn-ui {
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.save-btn-ui { background: #10b981; color: white; margin-right: 5px; }
+.cancel-btn-ui { background: #ef4444; color: white; }
+
+/* 📱 Responsive */
+@media (max-width: 768px) {
+  .table-header-flex {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .table-controls-row {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .table-select-custom, .table-search-input {
+    width: 100%;
+  }
 }
