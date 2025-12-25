@@ -1,219 +1,168 @@
 import React, { useState, useEffect } from "react";
 import "./Sales.css";
-import { getDatabase, ref, onValue, remove, update } from "firebase/database";
-import { app } from "../../redux/api/firebase/firebase";
+import { getDatabase, ref, push, set, query, limitToLast, onValue } from "firebase/database";
+import { app } from "../../redux/api/firebase/firebase"; 
 
-const SalesTable = () => {
+const SalesEntry = () => {
   const db = getDatabase(app);
-  const [salesList, setSalesList] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [selectedProduct, setSelectedProduct] = useState("All");
-  const [editId, setEditId] = useState(null);
-  const [editData, setEditData] = useState({});
 
-  // Sorting & Pagination States
-  const [sortBy, setSortBy] = useState("dateNewest");
-  const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 5;
+  const initialState = {
+    date: new Date().toISOString().split("T")[0],
+    customerName: "",
+    productName: "",
+    billNo: "",
+    quantity: "",
+    rate: "",
+    totalPrice: 0,
+    amountReceived: "",
+    paymentDue: 0,
+    remarks: "",
+    billDueDate: "",
+  };
 
+  const [formData, setFormData] = useState(initialState);
+  const [nextSi, setNextSi] = useState(1); // SI No. state
+  const [loading, setLoading] = useState(false);
+
+  // 1. Firebase se Last SI No. fetch karna
   useEffect(() => {
-    const salesRef = ref(db, "sales");
+    const salesRef = query(ref(db, "sales"), limitToLast(1));
     const unsubscribe = onValue(salesRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        const list = Object.keys(data).map((key) => ({
-          id: key,
-          ...data[key],
-        }));
-        setSalesList(list);
+        const lastEntry = Object.values(data)[0];
+        const lastSi = Number(lastEntry.si) || 0;
+        setNextSi(lastSi + 1);
       } else {
-        setSalesList([]);
+        setNextSi(1); // Agar koi data nahi hai toh 1 se start hoga
       }
-      setLoading(false);
     });
     return () => unsubscribe();
   }, [db]);
 
-  // Auto-calculate Total and Due during Edit
+  // 2. Auto-Calculation logic
   useEffect(() => {
-    if (editId) {
-      const total = (Number(editData.quantity) || 0) * (Number(editData.rate) || 0);
-      const due = total - (Number(editData.amountReceived) || 0);
-      setEditData((prev) => ({ ...prev, totalPrice: total, paymentDue: due }));
-    }
-  }, [editData.quantity, editData.rate, editData.amountReceived, editId]);
+    const total = (Number(formData.quantity) || 0) * (Number(formData.rate) || 0);
+    const due = total - (Number(formData.amountReceived) || 0);
 
-  // Filter and Sort Logic
-  const getProcessedList = () => {
-    let list = salesList.filter((s) => {
-      const matchesSearch =
-        s.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-        s.billNo?.toLowerCase().includes(search.toLowerCase());
-      const matchesProduct = selectedProduct === "All" || s.productName === selectedProduct;
-      return matchesSearch && matchesProduct;
-    });
+    setFormData((prev) => ({
+      ...prev,
+      totalPrice: total,
+      paymentDue: due,
+    }));
+  }, [formData.quantity, formData.rate, formData.amountReceived]);
 
-    list.sort((a, b) => {
-      if (sortBy === "dateNewest") return new Date(b.date) - new Date(a.date);
-      if (sortBy === "dateOldest") return new Date(a.date) - new Date(b.date);
-      if (sortBy === "billAsc") return a.billNo.localeCompare(b.billNo, undefined, { numeric: true });
-      if (sortBy === "billDesc") return b.billNo.localeCompare(a.billNo, undefined, { numeric: true });
-      return 0;
-    });
-    return list;
-  };
-
-  const processedList = getProcessedList();
-  const indexOfLastRow = currentPage * rowsPerPage;
-  const indexOfFirstRow = indexOfLastRow - rowsPerPage;
-  const currentRows = processedList.slice(indexOfFirstRow, indexOfLastRow);
-  const totalPages = Math.ceil(processedList.length / rowsPerPage);
-
-  const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this record?")) {
-      remove(ref(db, `sales/${id}`)).catch((err) => console.error(err));
-    }
-  };
-
-  const startEdit = (sale) => {
-    setEditId(sale.id);
-    setEditData({ ...sale });
-  };
-
-  const handleEditChange = (e) => {
+  const handleChange = (e) => {
     const { name, value } = e.target;
-    setEditData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = () => {
-    update(ref(db), { [`/sales/${editId}`]: editData })
-      .then(() => {
-        alert("Record Updated Successfully!");
-        setEditId(null);
-      })
-      .catch((err) => console.error(err));
-  };
+  const handleReset = () => setFormData(initialState);
 
-  if (loading) return <div className="no-records-box">Loading Dashboard...</div>;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const salesRef = ref(db, "sales");
+      const newSaleRef = push(salesRef);
+
+      await set(newSaleRef, {
+        ...formData,
+        si: nextSi, // Auto-incremented SI No. yahan save hoga
+        timestamp: new Date().getTime()
+      });
+
+      alert(`🎉 Sale Entry Saved! SI No: ${nextSi}`);
+      handleReset();
+    } catch (error) {
+      console.error("Error saving sale:", error);
+      alert("❌ Error: Data save nahi ho paya.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="table-container-wide">
-      <div className="table-card-wide">
-        {/* --- PRO HEADER SECTION --- */}
-        <div className="table-header-row">
-          <h2 className="table-title">SALES MANAGEMENT</h2>
+    <div className="sales-container">
+      <div className="sales-card-wide">
+        <div className="form-header-flex" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+           <h2 className="form-title">Sales Entry (Cloud)</h2>
+           <div className="si-badge" style={{padding: '5px 15px', background: '#e0f0ff', borderRadius: '20px', fontWeight: 'bold', color: '#007bff'}}>
+              SI No: {nextSi}
+           </div>
+        </div>
 
-          <div className="controls-group">
-            {/* Professional Sort Select */}
-            <select className="table-search-box pro-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-              <option value="dateNewest">📅 Sort: Newest First</option>
-              <option value="dateOldest">📅 Sort: Oldest First</option>
-              <option value="billAsc">🔢 Bill: Low to High</option>
-              <option value="billDesc">🔢 Bill: High to Low</option>
-            </select>
+        <form onSubmit={handleSubmit} className="sales-form-grid">
+          {/* Row 1 */}
+          <div className="input-group">
+            <label>Date</label>
+            <input type="date" name="date" value={formData.date} onChange={handleChange} />
+          </div>
 
-            {/* Professional Product Filter */}
-            <select
-              className="table-search-box pro-select"
-              value={selectedProduct}
-              onChange={(e) => {
-                setSelectedProduct(e.target.value);
-                setCurrentPage(1);
-              }}
-            >
-              <option value="All">📦 All Products</option>
+          <div className="input-group">
+            <label>Product Name</label>
+            <select name="productName" value={formData.productName} onChange={handleChange} required className="select-input">
+              <option value="">Select Product</option>
               <option value="Corn Grit">Corn Grit</option>
               <option value="Cattle Feed">Cattle Feed</option>
               <option value="Rice Grit">Rice Grit</option>
               <option value="Corn Flour">Corn Flour</option>
             </select>
-
-            {/* Professional Search Box */}
-            <div className="search-wrapper">
-              <span className="search-icon">🔍</span>
-              <input
-                type="text"
-                className="table-search-box pro-input"
-                placeholder="Search customers or bills..."
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setCurrentPage(1);
-                }}
-              />
-            </div>
           </div>
-        </div>
 
-        {/* --- TABLE SECTION --- */}
-        <div className="table-responsive-wrapper">
-          <table className="modern-sales-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Bill No</th>
-                <th>Product</th>
-                <th>Customer</th>
-                <th>Qty</th>
-                <th>Rate</th>
-                <th>Total</th>
-                <th>Received</th>
-                <th>Due</th>
-                <th>Due Date</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentRows.map((sale) => (
-                <tr key={sale.id} className={editId === sale.id ? "active-edit" : ""}>
-                  <td>{editId === sale.id ? <input type="date" name="date" value={editData.date} onChange={handleEditChange} className="edit-input-field" /> : sale.date}</td>
-                  <td>{editId === sale.id ? <input name="billNo" value={editData.billNo} onChange={handleEditChange} className="edit-input-field" /> : <span className="bill-tag">{sale.billNo}</span>}</td>
-                  <td>
-                    {editId === sale.id ? (
-                      <select name="productName" value={editData.productName} onChange={handleEditChange} className="edit-input-field">
-                        <option value="Corn Grit">Corn Grit</option>
-                        <option value="Cattle Feed">Cattle Feed</option>
-                        <option value="Rice Grit">Rice Grit</option>
-                        <option value="Corn Flour">Corn Flour</option>
-                      </select>
-                    ) : <strong>{sale.productName}</strong>}
-                  </td>
-                  <td>{editId === sale.id ? <input name="customerName" value={editData.customerName} onChange={handleEditChange} className="edit-input-field" /> : sale.customerName}</td>
-                  <td>{editId === sale.id ? <input type="number" name="quantity" value={editData.quantity} onChange={handleEditChange} className="edit-input-field small-input" /> : sale.quantity}</td>
-                  <td>₹{sale.rate}</td>
-                  <td className="bold-cell">₹{editId === sale.id ? editData.totalPrice : sale.totalPrice}</td>
-                  <td>₹{editId === sale.id ? <input type="number" name="amountReceived" value={editData.amountReceived} onChange={handleEditChange} className="edit-input-field small-input" /> : sale.amountReceived}</td>
-                  <td className="danger-text">₹{editId === sale.id ? editData.paymentDue : sale.paymentDue}</td>
-                  <td>{editId === sale.id ? <input type="date" name="billDueDate" value={editData.billDueDate} onChange={handleEditChange} className="edit-input-field" /> : (sale.billDueDate || "N/A")}</td>
-                  <td className="action-btns-cell">
-                    {editId === sale.id ? (
-                      <><button className="save-btn-ui" onClick={handleSave}>💾</button><button className="cancel-btn-ui" onClick={() => setEditId(null)}>✖</button></>
-                    ) : (
-                      <><button className="row-edit-btn" onClick={() => startEdit(sale)}>✏️</button><button className="row-delete-btn" onClick={() => handleDelete(sale.id)}>🗑️</button></>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+          <div className="input-group">
+            <label>Bill No</label>
+            <input name="billNo" value={formData.billNo} onChange={handleChange} required />
+          </div>
 
-        {/* --- PROFESSIONAL PAGINATION --- */}
-        <div className="pagination-footer">
-          <button disabled={currentPage === 1} onClick={() => setCurrentPage((prev) => prev - 1)} className="btn-pagination">
-            ◀ Previous
-          </button>
-          <span className="page-info">
-            Page <strong>{currentPage}</strong> of {totalPages || 1}
-          </span>
-          <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage((prev) => prev + 1)} className="btn-pagination">
-            Next ▶
-          </button>
-        </div>
+          <div className="input-group">
+            <label>Customer Name</label>
+            <input name="customerName" value={formData.customerName} onChange={handleChange} required />
+          </div>
+
+          {/* Row 2 */}
+          <div className="input-group">
+            <label>Quantity</label>
+            <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} />
+          </div>
+          <div className="input-group">
+            <label>Rate</label>
+            <input type="number" name="rate" value={formData.rate} onChange={handleChange} />
+          </div>
+          <div className="input-group readonly-group">
+            <label>Total Price</label>
+            <input value={formData.totalPrice} readOnly className="readonly-input" />
+          </div>
+          <div className="input-group">
+            <label>Amount Received</label>
+            <input type="number" name="amountReceived" value={formData.amountReceived} onChange={handleChange} />
+          </div>
+
+          {/* Row 3 */}
+          <div className="input-group readonly-group">
+            <label>Payment Due</label>
+            <input value={formData.paymentDue} readOnly className="readonly-input highlight-due" />
+          </div>
+          <div className="input-group">
+            <label>Due Date</label>
+            <input type="date" name="billDueDate" value={formData.billDueDate} onChange={handleChange} />
+          </div>
+          <div className="input-group span-2">
+            <label>Remarks</label>
+            <input name="remarks" value={formData.remarks} onChange={handleChange} placeholder="Any notes..." />
+          </div>
+
+          <div className="button-container-full">
+            <button type="button" onClick={handleReset} className="btn-reset-3d">Reset</button>
+            <button type="submit" className="btn-submit-colored" disabled={loading}>
+              {loading ? "Saving..." : "✅ Save Sale"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
 };
 
-export default SalesTable;
+export default SalesEntry;
