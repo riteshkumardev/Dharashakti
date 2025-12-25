@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from "react";
 import "./Sales.css";
-import { getDatabase, ref, push, set, query, limitToLast, onValue } from "firebase/database";
-import { app } from "../../redux/api/firebase/firebase"; 
+import {
+  getDatabase,
+  ref,
+  push,
+  set,
+  query,
+  limitToLast,
+  onValue,
+} from "firebase/database";
+import { app } from "../../redux/api/firebase/firebase";
+import Alert from "../Alert/Alert"; // 👈 Advanced Alert import
 
 const SalesEntry = () => {
   const db = getDatabase(app);
@@ -17,14 +26,29 @@ const SalesEntry = () => {
     amountReceived: "",
     paymentDue: 0,
     remarks: "",
-    billDueDate: "", // Background mein calculate hoga
+    billDueDate: "",
   };
 
   const [formData, setFormData] = useState(initialState);
-  const [nextSi, setNextSi] = useState(1); 
+  const [nextSi, setNextSi] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // 1. Firebase se Last SI No. fetch karna
+  /* 🔔 Alert State */
+  const [alertData, setAlertData] = useState({
+    show: false,
+    title: "",
+    message: "",
+  });
+
+  const showAlert = (title, message) => {
+    setAlertData({ show: true, title, message });
+  };
+
+  const closeAlert = () => {
+    setAlertData((prev) => ({ ...prev, show: false }));
+  };
+
+  /* 1️⃣ Fetch Last SI No */
   useEffect(() => {
     const salesRef = query(ref(db, "sales"), limitToLast(1));
     const unsubscribe = onValue(salesRef, (snapshot) => {
@@ -40,27 +64,32 @@ const SalesEntry = () => {
     return () => unsubscribe();
   }, [db]);
 
-  // 2. Auto-Calculation: Total Price, Payment Due, aur Date + 15 Days logic
+  /* 2️⃣ Auto Calculations */
   useEffect(() => {
-    // Total aur Due calculation
-    const total = (Number(formData.quantity) || 0) * (Number(formData.rate) || 0);
+    const total =
+      (Number(formData.quantity) || 0) *
+      (Number(formData.rate) || 0);
     const due = total - (Number(formData.amountReceived) || 0);
 
-    // Date mein 15 din add karne ka logic
     let calculatedDueDate = "";
     if (formData.date) {
-      const selectedDate = new Date(formData.date);
-      selectedDate.setDate(selectedDate.getDate() + 15); // 15 din add kiye
-      calculatedDueDate = selectedDate.toISOString().split("T")[0];
+      const d = new Date(formData.date);
+      d.setDate(d.getDate() + 15);
+      calculatedDueDate = d.toISOString().split("T")[0];
     }
 
     setFormData((prev) => ({
       ...prev,
       totalPrice: total,
       paymentDue: due,
-      billDueDate: calculatedDueDate, // Background state update
+      billDueDate: calculatedDueDate,
     }));
-  }, [formData.quantity, formData.rate, formData.amountReceived, formData.date]);
+  }, [
+    formData.quantity,
+    formData.rate,
+    formData.amountReceived,
+    formData.date,
+  ]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -69,6 +98,7 @@ const SalesEntry = () => {
 
   const handleReset = () => setFormData(initialState);
 
+  /* 3️⃣ Submit */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -80,100 +110,174 @@ const SalesEntry = () => {
       await set(newSaleRef, {
         ...formData,
         si: nextSi,
-        timestamp: new Date().getTime()
+        timestamp: Date.now(),
       });
 
-      alert(`🎉 Sale Entry Saved! SI No: ${nextSi}\nDue Date set to: ${formData.billDueDate}`);
+      showAlert(
+        "Sale Saved Successfully 🎉",
+        `SI No: ${nextSi}\nDue Date: ${formData.billDueDate}`
+      );
+
       handleReset();
     } catch (error) {
-      console.error("Error saving sale:", error);
-      alert("❌ Error: Data save nahi ho paya.");
+      console.error(error);
+      showAlert(
+        "Error ❌",
+        "Data save nahi ho paya. Please try again."
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="sales-container">
-      <div className="sales-card-wide">
-        <div className="form-header-flex" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-           <h2 className="form-title">Sales Entry (Cloud)</h2>
-           <div style={{display: 'flex', gap: '10px'}}>
-              <div className="si-badge" style={{padding: '5px 15px', background: '#e0f0ff', borderRadius: '20px', fontWeight: 'bold', color: '#007bff'}}>
+    <>
+      <div className="sales-container">
+        <div className="sales-card-wide">
+          <div
+            className="form-header-flex"
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <h2 className="form-title">Sales Entry (Cloud)</h2>
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <div className="si-badge">
                 SI No: {nextSi}
               </div>
-              {/* Optional: User ko dikhane ke liye ki Due Date kya set ho rahi hai */}
-              <div className="due-badge" style={{padding: '5px 15px', background: '#fff3cd', borderRadius: '20px', fontWeight: 'bold', color: '#856404'}}>
+              <div className="due-badge">
                 Due: {formData.billDueDate}
               </div>
-           </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="sales-form-grid">
+            <div className="input-group">
+              <label>Date</label>
+              <input
+                type="date"
+                name="date"
+                value={formData.date}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="input-group">
+              <label>Product Name</label>
+              <select
+                name="productName"
+                value={formData.productName}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select Product</option>
+                <option value="Corn Grit">Corn Grit</option>
+                <option value="Cattle Feed">Cattle Feed</option>
+                <option value="Rice Grit">Rice Grit</option>
+                <option value="Corn Flour">Corn Flour</option>
+              </select>
+            </div>
+
+            <div className="input-group">
+              <label>Bill No</label>
+              <input
+                name="billNo"
+                value={formData.billNo}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div className="input-group">
+              <label>Customer Name</label>
+              <input
+                name="customerName"
+                value={formData.customerName}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div className="input-group">
+              <label>Quantity</label>
+              <input
+                type="number"
+                name="quantity"
+                value={formData.quantity}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="input-group">
+              <label>Rate</label>
+              <input
+                type="number"
+                name="rate"
+                value={formData.rate}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="input-group readonly-group">
+              <label>Total Price</label>
+              <input value={formData.totalPrice} readOnly />
+            </div>
+
+            <div className="input-group">
+              <label>Amount Received</label>
+              <input
+                type="number"
+                name="amountReceived"
+                value={formData.amountReceived}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="input-group readonly-group">
+              <label>Payment Due</label>
+              <input value={formData.paymentDue} readOnly />
+            </div>
+
+            <div className="input-group span-2">
+              <label>Remarks</label>
+              <input
+                name="remarks"
+                value={formData.remarks}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="button-container-full">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="btn-reset-3d"
+              >
+                Reset
+              </button>
+              <button
+                type="submit"
+                className="btn-submit-colored"
+                disabled={loading}
+              >
+                {loading ? "Saving..." : "✅ Save Sale"}
+              </button>
+            </div>
+          </form>
         </div>
-
-        <form onSubmit={handleSubmit} className="sales-form-grid">
-          <div className="input-group">
-            <label>Date</label>
-            <input type="date" name="date" value={formData.date} onChange={handleChange} />
-          </div>
-
-          <div className="input-group">
-            <label>Product Name</label>
-            <select name="productName" value={formData.productName} onChange={handleChange} required className="select-input">
-              <option value="">Select Product</option>
-              <option value="Corn Grit">Corn Grit</option>
-              <option value="Cattle Feed">Cattle Feed</option>
-              <option value="Rice Grit">Rice Grit</option>
-              <option value="Corn Flour">Corn Flour</option>
-            </select>
-          </div>
-
-          <div className="input-group">
-            <label>Bill No</label>
-            <input name="billNo" value={formData.billNo} onChange={handleChange} required />
-          </div>
-
-          <div className="input-group">
-            <label>Customer Name</label>
-            <input name="customerName" value={formData.customerName} onChange={handleChange} required />
-          </div>
-
-          <div className="input-group">
-            <label>Quantity</label>
-            <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} />
-          </div>
-          <div className="input-group">
-            <label>Rate</label>
-            <input type="number" name="rate" value={formData.rate} onChange={handleChange} />
-          </div>
-          <div className="input-group readonly-group">
-            <label>Total Price</label>
-            <input value={formData.totalPrice} readOnly className="readonly-input" />
-          </div>
-          <div className="input-group">
-            <label>Amount Received</label>
-            <input type="number" name="amountReceived" value={formData.amountReceived} onChange={handleChange} />
-          </div>
-
-          <div className="input-group readonly-group">
-            <label>Payment Due</label>
-            <input value={formData.paymentDue} readOnly className="readonly-input highlight-due" />
-          </div>
-
-          {/* Due Date Field ko yahan se remove kar diya gaya hai */}
-
-          <div className="input-group span-2">
-            <label>Remarks</label>
-            <input name="remarks" value={formData.remarks} onChange={handleChange} placeholder="Any notes..." />
-          </div>
-
-          <div className="button-container-full">
-            <button type="button" onClick={handleReset} className="btn-reset-3d">Reset</button>
-            <button type="submit" className="btn-submit-colored" disabled={loading}>
-              {loading ? "Saving..." : "✅ Save Sale"}
-            </button>
-          </div>
-        </form>
       </div>
-    </div>
+
+      {/* 🔔 Advanced Alert */}
+      <Alert
+        show={alertData.show}
+        title={alertData.title}
+        message={alertData.message}
+        onClose={closeAlert}
+      />
+    </>
   );
 };
 

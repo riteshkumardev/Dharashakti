@@ -1,26 +1,66 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { getDatabase, ref, update, onValue, off } from "firebase/database";
+import { app } from "../redux/api/firebase/firebase";
 import "../App.css";
 import dharasakti from "../component/dharasakti.png";
 import DashboardSidebar from "./Dashboard/DashboardSidebar";
 
-// ✅ Redux hata diya gaya hai, user props ke zariye aa raha hai
 export default function Navbar({ user, setUser }) {
   const [showSidebar, setShowSidebar] = useState(false);
   const navigate = useNavigate();
+  const db = getDatabase(app);
 
-  // ✅ Manual Logout Logic (LocalStorage + State Clear)
-  const handleLogout = () => {
+  // 🔓 COMMON LOGOUT (used everywhere)
+  const forceLogout = (reason) => {
+    if (reason) alert(reason);
     localStorage.removeItem("user");
-    setUser(null); // App.js ki state ko null karega, jisse button turant badlega
+    setUser(null);
     setShowSidebar(false);
     navigate("/login");
+  };
+
+  // 🔐 SESSION LISTENER (ONE ID → ONE LOGIN)
+  useEffect(() => {
+    if (!user?.firebaseId || !user?.currentSessionId) return;
+
+    const sessionRef = ref(
+      db,
+      `employees/${user.firebaseId}/currentSessionId`
+    );
+
+    onValue(sessionRef, (snapshot) => {
+      const activeSessionId = snapshot.val();
+
+      // 🔥 Same ID logged in somewhere else
+      if (activeSessionId && activeSessionId !== user.currentSessionId) {
+        forceLogout("⚠️ This ID was logged in on another device.");
+      }
+    });
+
+    return () => off(sessionRef);
+  }, [user]);
+
+  // 🔐 MANUAL LOGOUT
+  const handleLogout = async () => {
+    try {
+      if (user?.firebaseId) {
+        await update(ref(db, `employees/${user.firebaseId}`), {
+          currentSessionId: null,
+          lastLogoutAt: new Date().toISOString(),
+        });
+      }
+    } catch (err) {
+      console.error("Logout session clear failed:", err.message);
+    } finally {
+      forceLogout();
+    }
   };
 
   return (
     <>
       <nav className="navbar">
-        {/* LEFT: Logo or Dashboard Trigger */}
+        {/* LEFT */}
         <div className="nav-left">
           {user ? (
             <div
@@ -41,31 +81,35 @@ export default function Navbar({ user, setUser }) {
           )}
         </div>
 
-        {/* CENTER: Navigation Links */}
+        {/* CENTER */}
         <ul className="nav-links">
-          <li><Link to="/">Home</Link></li>
-          
-          {/* ⭐ Admin Only: Master Panel Link */}
-          {user?.role === 'Admin' && (
+          <li>
+            <Link to="/">Home</Link>
+          </li>
+
+          {user?.role === "Admin" && (
             <li>
-              <Link to="/master-panel" style={{ color: '#fbbf24', fontWeight: 'bold' }}>
+              <Link
+                to="/master-panel"
+                style={{ color: "#fbbf24", fontWeight: "bold" }}
+              >
                 🛡️ Master Control
               </Link>
             </li>
           )}
         </ul>
 
-        {/* RIGHT: Auth Buttons (Desktop) */}
+        {/* RIGHT */}
         <div className="nav-right desktop-only">
           {user ? (
-            <div className="user-nav-box">
-              
-              <button className="nav-btn logout" onClick={handleLogout}>
-                Logout
-              </button>
-            </div>
+            <button className="nav-btn logout" onClick={handleLogout}>
+              Logout
+            </button>
           ) : (
-            <button className="nav-btn login" onClick={() => navigate("/login")}>
+            <button
+              className="nav-btn login"
+              onClick={() => navigate("/login")}
+            >
               Login
             </button>
           )}
@@ -83,9 +127,17 @@ export default function Navbar({ user, setUser }) {
         >
           <div className="sidebar-header">
             <h3 className="DharashaktiH3">Dharashakti</h3>
-            <button className="close-btn" onClick={() => setShowSidebar(false)}>✖</button>
+            <button
+              className="close-btn"
+              onClick={() => setShowSidebar(false)}
+            >
+              ✖
+            </button>
           </div>
-          <DashboardSidebar closeSidebar={() => setShowSidebar(false)} />
+
+          <DashboardSidebar
+            closeSidebar={() => setShowSidebar(false)}
+          />
         </div>
       </div>
     </>

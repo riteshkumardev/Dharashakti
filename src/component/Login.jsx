@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { getDatabase, ref, get } from "firebase/database";
+import { getDatabase, ref, get, update } from "firebase/database";
 import { app } from "../redux/api/firebase/firebase";
 import { useNavigate } from "react-router-dom";
 import "../App.css";
+
+// 🔑 Unique session id (ID-based single login)
+const generateSessionId = () =>
+  "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10);
 
 function Login({ setUser }) {
   const [employeeId, setEmployeeId] = useState("");
@@ -12,7 +16,7 @@ function Login({ setUser }) {
   const navigate = useNavigate();
   const db = getDatabase(app);
 
-  // Agar user pehle se login hai, toh use Home par bhej do
+  // 🔁 Agar already valid login hai to home
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
     if (savedUser) {
@@ -25,8 +29,10 @@ function Login({ setUser }) {
     setError("");
     setLoading(true);
 
-    if (employeeId.length < 8) {
-      setError("Please enter a valid 8-digit ID.");
+    const cleanId = employeeId.trim();
+
+    if (!/^\d{8}$/.test(cleanId)) {
+      setError("Please enter a valid 8-digit numeric ID.");
       setLoading(false);
       return;
     }
@@ -35,36 +41,50 @@ function Login({ setUser }) {
       const usersRef = ref(db, "employees");
       const snapshot = await get(usersRef);
 
-      if (snapshot.exists()) {
-        const usersData = snapshot.val();
-        
-        // Database mein 8-digit ID dhoondna
-        const foundUserKey = Object.keys(usersData).find(
-          (key) => usersData[key].employeeId === employeeId
-        );
-
-        if (foundUserKey) {
-          const userData = { firebaseId: foundUserKey, ...usersData[foundUserKey] };
-
-          // 1. Check karein Account Block toh nahi hai
-          if (userData.isBlocked) {
-            setError("🚫 Your account is blocked by Admin.");
-          } else {
-            // 2. LocalStorage mein save karein (Redux ki zarurat nahi)
-            localStorage.setItem("user", JSON.stringify(userData));
-            
-            // 3. App.js ki user state update karein
-            setUser(userData);
-            
-            // 4. Navigate to Home
-            navigate("/", { replace: true });
-          }
-        } else {
-          setError("❌ Invalid Employee ID. Please check and try again.");
-        }
-      } else {
-        setError("No employees registered in the system.");
+      if (!snapshot.exists()) {
+        setError("No employees registered.");
+        return;
       }
+
+      const usersData = snapshot.val();
+
+      const foundKey = Object.keys(usersData).find(
+        (key) => usersData[key].employeeId === cleanId
+      );
+
+      if (!foundKey) {
+        setError("❌ Invalid Employee ID.");
+        return;
+      }
+
+      const userData = usersData[foundKey];
+
+      if (userData.isBlocked) {
+        setError("🚫 Your account is blocked by Admin.");
+        return;
+      }
+
+      // 🔐 NEW SESSION (overwrites old → auto logout on other device)
+      const sessionId = generateSessionId();
+
+      await update(ref(db, `employees/${foundKey}`), {
+        currentSessionId: sessionId,
+        lastLoginAt: new Date().toISOString(),
+      });
+
+      // 🧹 Purana user clear (safety)
+      localStorage.removeItem("user");
+
+      const finalUser = {
+        firebaseId: foundKey,
+        ...userData,
+        currentSessionId: sessionId,
+      };
+
+      localStorage.setItem("user", JSON.stringify(finalUser));
+      setUser(finalUser);
+
+      navigate("/", { replace: true });
     } catch (err) {
       setError("Login failed: " + err.message);
     } finally {
@@ -75,11 +95,10 @@ function Login({ setUser }) {
   return (
     <div className="login-box">
       <h2>Dharashakti Login</h2>
-      <p style={{ fontSize: '12px', color: '#666', marginBottom: '20px' }}>
-        Please enter your 8-digit unique ID to access the dashboard.
-      </p>
 
-      {error && <p className="error-msg" style={{ color: 'red', fontWeight: 'bold' }}>{error}</p>}
+      {error && (
+        <p style={{ color: "red", fontWeight: "bold" }}>{error}</p>
+      )}
 
       <form onSubmit={handleSubmit}>
         <input
@@ -88,6 +107,7 @@ function Login({ setUser }) {
           value={employeeId}
           onChange={(e) => setEmployeeId(e.target.value)}
           maxLength="8"
+          inputMode="numeric"
           required
         />
 
@@ -95,8 +115,6 @@ function Login({ setUser }) {
           {loading ? "Verifying..." : "Login Now"}
         </button>
       </form>
-
-      
     </div>
   );
 }

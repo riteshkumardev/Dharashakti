@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { getDatabase, ref, onValue } from "firebase/database";
+import { getDatabase, ref, onValue, off } from "firebase/database";
 import { app } from "./redux/api/firebase/firebase";
 import "./App.css";
-import { initializeApp } from "firebase/app";
 
-// 📦 Saare Components ka sahi import
+// Components
 import Navbar from "./component/Navhtml";
 import Login from "./component/Login";
 import Home from "./component/Home";
@@ -25,63 +24,99 @@ import MasterPanel from "./component/MasterPanel/MasterPanel";
 import ProfitLoss from "./component/ProfitLoss/ProfitLoss";
 
 function App() {
-  // 1. LocalStorage se user uthana
-  const [user, setUser] = useState(JSON.parse(localStorage.getItem("user")) || null);
+  // 🔐 User state
+  const [user, setUser] = useState(
+    JSON.parse(localStorage.getItem("user")) || null
+  );
+
   const db = getDatabase(app);
 
-  // 2. 🛡️ Live Security & Block Check
+  // ======================================================
+  // 🔥 GLOBAL SESSION GUARD (ONE ID → ONE LOGIN)
+  // ======================================================
   useEffect(() => {
-    if (user?.firebaseId) {
-      const userStatusRef = ref(db, `employees/${user.firebaseId}`);
-      
-      // Live listener jo database mein kisi bhi badlav (Role change or Block) ko track karega
-      const unsubscribe = onValue(userStatusRef, (snapshot) => {
-        const liveData = snapshot.val();
-        
-        if (liveData?.isBlocked) {
-          handleLogout();
-          alert("🚫 Your account is deactivated by Admin.");
-        } else if (liveData) {
-          // Sync live changes (like role or name changes) to state and localstorage
-          const updatedUser = { firebaseId: user.firebaseId, ...liveData };
-          setUser(updatedUser);
-          localStorage.setItem("user", JSON.stringify(updatedUser));
-        }
-      });
-      
-      return () => unsubscribe();
-    }
-  }, [user?.firebaseId, db]); // ✅ added db dependency
+    if (!user?.firebaseId || !user?.currentSessionId) return;
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    setUser(null);
-  };
+    const sessionRef = ref(
+      db,
+      `employees/${user.firebaseId}/currentSessionId`
+    );
 
-  // 🔐 Security Wrapper (Protected Route)
+    onValue(sessionRef, (snapshot) => {
+      const activeSessionId = snapshot.val();
+
+      // 🔥 SAME ID logged in somewhere else
+      if (activeSessionId !== user.currentSessionId) {
+        alert("⚠️ This ID was logged in on another device.");
+        localStorage.removeItem("user");
+        setUser(null);
+        window.location.href = "/login"; // hard redirect (important)
+      }
+    });
+
+    return () => off(sessionRef);
+  }, [user, db]);
+
+  // ======================================================
+  // 🛡️ LIVE BLOCK / ROLE CHANGE CHECK
+  // ======================================================
+  useEffect(() => {
+    if (!user?.firebaseId) return;
+
+    const userStatusRef = ref(db, `employees/${user.firebaseId}`);
+
+    onValue(userStatusRef, (snapshot) => {
+      const liveData = snapshot.val();
+
+      if (!liveData) return;
+
+      if (liveData.isBlocked) {
+        alert("🚫 Your account is deactivated by Admin.");
+        localStorage.removeItem("user");
+        setUser(null);
+        window.location.href = "/login";
+      } else {
+        // 🔁 Sync live updates (role, name, etc.)
+        const updatedUser = {
+          firebaseId: user.firebaseId,
+          ...liveData,
+          currentSessionId: user.currentSessionId, // preserve session
+        };
+
+        setUser(updatedUser);
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+      }
+    });
+
+    return () => off(userStatusRef);
+  }, [user?.firebaseId, db]);
+
+  // 🔐 Protected Route Wrapper
   const ProtectedRoute = ({ children, adminOnly = false }) => {
     if (!user) return <Navigate to="/login" replace />;
-    
-    if (adminOnly && user.role !== 'Admin') {
-      alert("⚠️ Access Denied: This area is for Admins only.");
+
+    if (adminOnly && user.role !== "Admin") {
+      alert("⚠️ Access Denied: Admins only.");
       return <Navigate to="/" replace />;
     }
-    
+
     return children;
   };
 
   return (
     <Router>
       <div className="app-container">
-        {/* Navbar ko user state pass kar rahe hain taaki login/logout button sync rahe */}
         <Navbar user={user} setUser={setUser} />
 
         <div className="page-content">
           <Routes>
-            {/* 🟢 Public Route: Agar login hai toh home pe bhej do */}
-            <Route path="/login" element={!user ? <Login setUser={setUser} /> : <Navigate to="/" />} />
+            {/* PUBLIC */}
+            <Route
+              path="/login"
+              element={!user ? <Login setUser={setUser} /> : <Navigate to="/" />}
+            />
 
-            {/* 🔵 Staff & Workers Routes (Login Required) */}
+            {/* PROTECTED */}
             <Route path="/" element={<ProtectedRoute><Home user={user} /></ProtectedRoute>} />
             <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
             <Route path="/profit-loss" element={<ProtectedRoute><ProfitLoss /></ProtectedRoute>} />
@@ -96,21 +131,25 @@ function App() {
             <Route path="/stock-management" element={<ProtectedRoute><StockManagement /></ProtectedRoute>} />
             <Route path="/stock-add" element={<ProtectedRoute><StockAddForm /></ProtectedRoute>} />
 
-            {/* 🔴 Admin ONLY Routes (Master Panel & Registration) */}
-            <Route path="/master-panel" element={
-              <ProtectedRoute adminOnly={true}>
-                <MasterPanel user={user} />
-              </ProtectedRoute>
-            } />
-            
-            {/* Ab naya staff register karna sirf admin ke control mein hai */}
-            <Route path="/employee-add" element={
-              <ProtectedRoute adminOnly={true}>
-                <EmployeeAdd />
-              </ProtectedRoute>
-            } />
+            {/* ADMIN ONLY */}
+            <Route
+              path="/master-panel"
+              element={
+                <ProtectedRoute adminOnly>
+                  <MasterPanel user={user} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/employee-add"
+              element={
+                <ProtectedRoute adminOnly>
+                  <EmployeeAdd />
+                </ProtectedRoute>
+              }
+            />
 
-            {/* 🛡️ Fallback: Agar galat URL ho toh home pe bhej do */}
+            {/* FALLBACK */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
