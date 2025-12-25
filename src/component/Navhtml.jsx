@@ -59,7 +59,7 @@ export default function Navbar({ user, setUser }) {
         <div className="nav-right desktop-only">
           {user ? (
             <div className="user-nav-box">
-              <span className="user-role-text">{user.name.split(' ')[0]} ({user.role})</span>
+              
               <button className="nav-btn logout" onClick={handleLogout}>
                 Logout
               </button>
