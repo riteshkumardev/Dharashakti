@@ -307,7 +307,17 @@ background: linear-gradient(
   letter-spacing: 1px;
   box-shadow: 0 4px 0px rgba(0, 0, 0, 0.2); /* 3D Depth */
 }
-
+/* Navbar.css */
+@media (max-width: 768px) {
+  .nav-right.desktop-only {
+    display: none; /* Desktop buttons chhupayein */
+  }
+  
+  .menu-btn {
+    display: block; /* Hamburger menu icon dikhayein */
+    font-size: 24px;
+  }
+}
 .nav-btn:active {
   transform: translateY(2px);
   box-shadow: 0 2px 0px rgba(0, 0, 0, 0.2);
@@ -493,4 +503,15 @@ background: linear-gradient(
   margin: auto;
   text-align: center;
   
+}
+/* App.css ya Main Layout CSS */
+.dashboard-wrapper {
+  display: flex;
+  min-height: 100vh;
+}
+
+@media (max-width: 768px) {
+  .dashboard-wrapper {
+    flex-direction: column; /* Mobile par sidebar upar aur content niche */
+  }
 }

@@ -124,6 +124,32 @@
 
 
 /* saletable */
+/* Table CSS */
+
+@media (max-width: 1024px) {
+  .sales-form-grid {
+    grid-template-columns: repeat(2, 1fr); /* Tablet par 2 column */
+  }
+}
+
+@media (max-width: 600px) {
+  .sales-form-grid {
+    grid-template-columns: 1fr; /* Mobile par 1 column */
+  }
+  
+  .input-group.span-4, .button-container-full {
+    grid-column: span 1 !important; /* Remarks aur Buttons ko bhi 1 column karein */
+  }
+}
+.responsive-table {
+  width: 100%;
+  overflow-x: auto; /* Side scroll enable karega */
+  -webkit-overflow-scrolling: touch;
+}
+
+.modern-sales-table {
+  min-width: 800px; /* Force table to maintain width so it scrolls */
+}
 
 /* 🔹 Table Main Layout */
 .table-container-wide {
@@ -255,4 +281,10 @@
   text-align: center;
   color: #94a3b8;
   font-style: italic;
+}
+/* Sales.css ya Form CSS */
+.sales-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); /* Desktop par 4 column */
+  gap: 20px;
 }

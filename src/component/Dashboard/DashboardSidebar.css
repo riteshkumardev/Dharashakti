@@ -136,3 +136,21 @@
 .sidebar-list li:active {
   transform: scale(0.97); /* 3D Click effect */
 }
+/* DashboardSidebar.css */
+@media (max-width: 768px) {
+  .dashboard-sidebar {
+    position: fixed;
+    left: -100%; /* Default hidden */
+    top: 0;
+    width: 280px;
+    height: 100vh;
+    z-index: 10000;
+    transition: 0.4s;
+    background: linear-gradient(135deg, #6a11cb, #2575fc); /* Screenshot theme */
+  }
+
+  /* Jab sidebar open ho */
+  .dashboard-sidebar.active {
+    left: 0;
+  }
+}
