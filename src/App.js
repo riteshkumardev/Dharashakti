@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { getDatabase, ref, onValue } from "firebase/database";
 import { app } from "./redux/api/firebase/firebase";
 import "./App.css";
+import { initializeApp } from "firebase/app";
 
 // 📦 Saare Components ka sahi import
 import Navbar from "./component/Navhtml";
