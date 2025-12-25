@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getDatabase, ref, onValue } from "firebase/database";
-// ✅ Sahi path: Ye src/firebase/firebase.js se file uthayega
+
 import { app } from "../redux/api/firebase/firebase";
 import "../App.css";
 
