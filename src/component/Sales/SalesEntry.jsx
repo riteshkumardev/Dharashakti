@@ -17,11 +17,11 @@ const SalesEntry = () => {
     amountReceived: "",
     paymentDue: 0,
     remarks: "",
-    billDueDate: "",
+    billDueDate: "", // Background mein calculate hoga
   };
 
   const [formData, setFormData] = useState(initialState);
-  const [nextSi, setNextSi] = useState(1); // SI No. state
+  const [nextSi, setNextSi] = useState(1); 
   const [loading, setLoading] = useState(false);
 
   // 1. Firebase se Last SI No. fetch karna
@@ -34,23 +34,33 @@ const SalesEntry = () => {
         const lastSi = Number(lastEntry.si) || 0;
         setNextSi(lastSi + 1);
       } else {
-        setNextSi(1); // Agar koi data nahi hai toh 1 se start hoga
+        setNextSi(1);
       }
     });
     return () => unsubscribe();
   }, [db]);
 
-  // 2. Auto-Calculation logic
+  // 2. Auto-Calculation: Total Price, Payment Due, aur Date + 15 Days logic
   useEffect(() => {
+    // Total aur Due calculation
     const total = (Number(formData.quantity) || 0) * (Number(formData.rate) || 0);
     const due = total - (Number(formData.amountReceived) || 0);
+
+    // Date mein 15 din add karne ka logic
+    let calculatedDueDate = "";
+    if (formData.date) {
+      const selectedDate = new Date(formData.date);
+      selectedDate.setDate(selectedDate.getDate() + 15); // 15 din add kiye
+      calculatedDueDate = selectedDate.toISOString().split("T")[0];
+    }
 
     setFormData((prev) => ({
       ...prev,
       totalPrice: total,
       paymentDue: due,
+      billDueDate: calculatedDueDate, // Background state update
     }));
-  }, [formData.quantity, formData.rate, formData.amountReceived]);
+  }, [formData.quantity, formData.rate, formData.amountReceived, formData.date]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -69,11 +79,11 @@ const SalesEntry = () => {
 
       await set(newSaleRef, {
         ...formData,
-        si: nextSi, // Auto-incremented SI No. yahan save hoga
+        si: nextSi,
         timestamp: new Date().getTime()
       });
 
-      alert(`🎉 Sale Entry Saved! SI No: ${nextSi}`);
+      alert(`🎉 Sale Entry Saved! SI No: ${nextSi}\nDue Date set to: ${formData.billDueDate}`);
       handleReset();
     } catch (error) {
       console.error("Error saving sale:", error);
@@ -88,13 +98,18 @@ const SalesEntry = () => {
       <div className="sales-card-wide">
         <div className="form-header-flex" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
            <h2 className="form-title">Sales Entry (Cloud)</h2>
-           <div className="si-badge" style={{padding: '5px 15px', background: '#e0f0ff', borderRadius: '20px', fontWeight: 'bold', color: '#007bff'}}>
-              SI No: {nextSi}
+           <div style={{display: 'flex', gap: '10px'}}>
+              <div className="si-badge" style={{padding: '5px 15px', background: '#e0f0ff', borderRadius: '20px', fontWeight: 'bold', color: '#007bff'}}>
+                SI No: {nextSi}
+              </div>
+              {/* Optional: User ko dikhane ke liye ki Due Date kya set ho rahi hai */}
+              <div className="due-badge" style={{padding: '5px 15px', background: '#fff3cd', borderRadius: '20px', fontWeight: 'bold', color: '#856404'}}>
+                Due: {formData.billDueDate}
+              </div>
            </div>
         </div>
 
         <form onSubmit={handleSubmit} className="sales-form-grid">
-          {/* Row 1 */}
           <div className="input-group">
             <label>Date</label>
             <input type="date" name="date" value={formData.date} onChange={handleChange} />
@@ -121,7 +136,6 @@ const SalesEntry = () => {
             <input name="customerName" value={formData.customerName} onChange={handleChange} required />
           </div>
 
-          {/* Row 2 */}
           <div className="input-group">
             <label>Quantity</label>
             <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} />
@@ -139,15 +153,13 @@ const SalesEntry = () => {
             <input type="number" name="amountReceived" value={formData.amountReceived} onChange={handleChange} />
           </div>
 
-          {/* Row 3 */}
           <div className="input-group readonly-group">
             <label>Payment Due</label>
             <input value={formData.paymentDue} readOnly className="readonly-input highlight-due" />
           </div>
-          <div className="input-group">
-            <label>Due Date</label>
-            <input type="date" name="billDueDate" value={formData.billDueDate} onChange={handleChange} />
-          </div>
+
+          {/* Due Date Field ko yahan se remove kar diya gaya hai */}
+
           <div className="input-group span-2">
             <label>Remarks</label>
             <input name="remarks" value={formData.remarks} onChange={handleChange} placeholder="Any notes..." />
