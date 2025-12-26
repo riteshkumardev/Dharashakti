@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import "./Stock.css";
 import { getDatabase, ref, push, set } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase"; 
-import Alert from "../Alert/Alert"; // 👈 Alert Import karein
+import Alert from "../Core_Component/Alert/Alert"; // 👈 Alert Import karein
 
 const StockAddForm = ({ onCancel }) => {
   const db = getDatabase(app);

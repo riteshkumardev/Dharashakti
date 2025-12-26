@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getDatabase, ref, onValue, push } from "firebase/database";
-import { app } from "../../redux/api/firebase/firebase";
+import { app } from "../../../redux/api/firebase/firebase";
 import Calendar from 'react-calendar'; // ✅ Import Calendar
 import 'react-calendar/dist/Calendar.css'; // ✅ Import Calendar CSS
 import './EmployeeLedger.css';

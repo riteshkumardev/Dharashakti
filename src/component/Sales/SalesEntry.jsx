@@ -10,7 +10,7 @@ import {
   onValue,
 } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
-import Alert from "../Alert/Alert"; // 👈 Advanced Alert import
+import Alert from "../Core_Component/Alert/Alert"; // 👈 Advanced Alert import
 
 const SalesEntry = () => {
   const db = getDatabase(app);

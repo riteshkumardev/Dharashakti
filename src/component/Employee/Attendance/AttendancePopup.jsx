@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Calendar from 'react-calendar'; // Install: npm install react-calendar
 import 'react-calendar/dist/Calendar.css';
 import { getDatabase, ref, onValue } from "firebase/database";
-import { app } from "../../redux/api/firebase/firebase";
+import { app } from "../../../redux/api/firebase/firebase";
 import './AttendancePopup.css';
 const AttendancePopup = ({ employeeId, onClose }) => {
   const [attendanceData, setAttendanceData] = useState({});

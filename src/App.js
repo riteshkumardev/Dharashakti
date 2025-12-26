@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { getDatabase, ref, onValue, off } from "firebase/database";
 import { app } from "./redux/api/firebase/firebase";
@@ -15,83 +15,83 @@ import PurchaseForm from "./component/Purchase/PurchaseForm";
 import EmployeeTable from "./component/Employee/EmployeeTable";
 import EmployeeAdd from "./component/Employee/EmployeeAdd";
 import EmployeeDetails from "./component/Employee/EmployeeDetails";
-import EmployeeLedger from "./component/EmployeeLedger/EmployeeLedger";
+import EmployeeLedger from "./component/Employee/EmployeeLedger/EmployeeLedger";
 import StockManagement from "./component/Stocks/StockManagement";
 import StockAddForm from "./component/Stocks/StockAddForm";
-import Attendance from "./component/Attendance/Attendance";
-import ExpenseManager from "./component/ExpenseManager/ExpenseManager";
+import Attendance from "./component/Employee/Attendance/Attendance";
+import ExpenseManager from "./component/Employee/ExpenseManager/ExpenseManager";
 import MasterPanel from "./component/MasterPanel/MasterPanel";
 import ProfitLoss from "./component/ProfitLoss/ProfitLoss";
+import { SnackBar } from "./component/Core_Component/Snackbar/SnackBar";
 
 function App() {
-  // 🔐 User state
   const [user, setUser] = useState(
     JSON.parse(localStorage.getItem("user")) || null
   );
+console.log(user, "<<<<< App.js user state");
+
+  const [snack, setSnack] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   const db = getDatabase(app);
+  const effectRan = useRef(false); // 🔒 React 18 guard
 
   // ======================================================
-  // 🔥 GLOBAL SESSION GUARD (ONE ID → ONE LOGIN)
-  // ======================================================
-  useEffect(() => {
-    if (!user?.firebaseId || !user?.currentSessionId) return;
-
-    const sessionRef = ref(
-      db,
-      `employees/${user.firebaseId}/currentSessionId`
-    );
-
-    onValue(sessionRef, (snapshot) => {
-      const activeSessionId = snapshot.val();
-
-      // 🔥 SAME ID logged in somewhere else
-      if (activeSessionId !== user.currentSessionId) {
-        alert("⚠️ This ID was logged in on another device.");
-        localStorage.removeItem("user");
-        setUser(null);
-        window.location.href = "/login"; // hard redirect (important)
-      }
-    });
-
-    return () => off(sessionRef);
-  }, [user, db]);
-
-  // ======================================================
-  // 🛡️ LIVE BLOCK / ROLE CHANGE CHECK
+  // 🔥 SINGLE GLOBAL FIREBASE LISTENER (SAFE)
   // ======================================================
   useEffect(() => {
+    if (effectRan.current) return;
+    effectRan.current = true;
+
     if (!user?.firebaseId) return;
 
-    const userStatusRef = ref(db, `employees/${user.firebaseId}`);
+    const userRef = ref(db, `employees/${user.firebaseId}`);
 
-    onValue(userStatusRef, (snapshot) => {
+    onValue(userRef, (snapshot) => {
       const liveData = snapshot.val();
-
       if (!liveData) return;
 
+      // 🚫 BLOCK CHECK
       if (liveData.isBlocked) {
         alert("🚫 Your account is deactivated by Admin.");
         localStorage.removeItem("user");
         setUser(null);
         window.location.href = "/login";
-      } else {
-        // 🔁 Sync live updates (role, name, etc.)
-        const updatedUser = {
-          firebaseId: user.firebaseId,
-          ...liveData,
-          currentSessionId: user.currentSessionId, // preserve session
-        };
-
-        setUser(updatedUser);
-        localStorage.setItem("user", JSON.stringify(updatedUser));
+        return;
       }
+
+      // 🔐 SESSION CHECK
+      if (
+        liveData.currentSessionId &&
+        liveData.currentSessionId !== user.currentSessionId
+      ) {
+        alert("⚠️ This ID was logged in on another device.");
+        localStorage.removeItem("user");
+        setUser(null);
+        window.location.href = "/login";
+        return;
+      }
+
+      // 🔁 SYNC USER DATA (ROLE / NAME / ETC)
+      const updatedUser = {
+        firebaseId: user.firebaseId,
+        ...liveData,
+        currentSessionId: user.currentSessionId,
+      };
+
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
     });
 
-    return () => off(userStatusRef);
-  }, [user?.firebaseId, db]);
-
-  // 🔐 Protected Route Wrapper
+    return () => off(userRef);
+  }, []); // ✅ EMPTY dependency (important)
+console.log(user, "<<<<< App.js user state after listener");
+  // ======================================================
+  // 🔐 Protected Route
+  // ======================================================
   const ProtectedRoute = ({ children, adminOnly = false }) => {
     if (!user) return <Navigate to="/login" replace />;
 
@@ -106,6 +106,8 @@ function App() {
   return (
     <Router>
       <div className="app-container">
+     
+
         <Navbar user={user} setUser={setUser} />
 
         <div className="page-content">

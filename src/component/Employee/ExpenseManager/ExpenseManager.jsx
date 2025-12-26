@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getDatabase, ref, push, set, onValue } from "firebase/database";
-import { app } from "../../redux/api/firebase/firebase";
+import { app } from "../../../redux/api/firebase/firebase";
 import './ExpenseManager.css';
 
 const ExpenseManager = () => {

@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import "./Sales.css";
 import { getDatabase, ref, onValue, remove, update } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
-import Loader from "../Loader/Loader";
-import Alert from "../Alert/Alert"; // 👈 Custom Alert Import
+import Loader from "../Core_Component/Loader/Loader";
+import Alert from "../Core_Component/Alert/Alert"; // 👈 Custom Alert Import
 
 const SalesTable = () => {
   const db = getDatabase(app);

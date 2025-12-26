@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import "./Stock.css";
 import { getDatabase, ref, onValue, remove, update } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
-import Alert from "../Alert/Alert"; 
+import Alert from "../Core_Component/Alert/Alert"; 
 
 const StockManagement = () => {
   const db = getDatabase(app);

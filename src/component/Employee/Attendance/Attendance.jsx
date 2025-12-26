@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getDatabase, ref, onValue, set } from "firebase/database";
-import { app } from "../../redux/api/firebase/firebase";
+import { app } from "../../../redux/api/firebase/firebase";
 import './Attendanc.css'; // Ensure path is correct
 
 

@@ -3,6 +3,7 @@ import { getDatabase, ref, get, update } from "firebase/database";
 import { app } from "../redux/api/firebase/firebase";
 import { useNavigate } from "react-router-dom";
 import "../App.css";
+import { SnackBar } from "./Core_Component/Snackbar/SnackBar";
 
 // 🔑 Unique session id (ID-based single login)
 const generateSessionId = () =>
@@ -115,7 +116,9 @@ function Login({ setUser }) {
           {loading ? "Verifying..." : "Login Now"}
         </button>
       </form>
+      
     </div>
+    
   );
 }
 

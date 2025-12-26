@@ -3,6 +3,7 @@ import { getDatabase, ref, onValue } from "firebase/database";
 
 import { app } from "../redux/api/firebase/firebase";
 import "../App.css";
+import { SnackBar } from "./Core_Component/Snackbar/SnackBar";
 
 const Home = ({ user }) => {
   const db = getDatabase(app);
@@ -94,7 +95,7 @@ const Home = ({ user }) => {
           <small>System Role</small>
         </div>
       </section>
-
+  
     </div>
   );
 };
