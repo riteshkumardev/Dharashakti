@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { getDatabase, ref, update, onValue, off } from "firebase/database";
+import { getDatabase, ref, onValue, off } from "firebase/database";
 import { app } from "../redux/api/firebase/firebase";
 import "../App.css";
 import dharasakti from "../component/dharasakti.png";
@@ -11,7 +11,7 @@ export default function Navbar({ user, setUser }) {
   const navigate = useNavigate();
   const db = getDatabase(app);
 
-  // 🔓 COMMON LOGOUT (used everywhere)
+  // 🔓 FORCE LOGOUT (SESSION HIJACK / BLOCK CASE)
   const forceLogout = (reason) => {
     if (reason) alert(reason);
     localStorage.removeItem("user");
@@ -29,36 +29,23 @@ export default function Navbar({ user, setUser }) {
       `employees/${user.firebaseId}/currentSessionId`
     );
 
-    onValue(sessionRef, (snapshot) => {
+    const unsubscribe = onValue(sessionRef, (snapshot) => {
       const activeSessionId = snapshot.val();
 
-      // 🔥 Same ID logged in somewhere else
-      if (activeSessionId && activeSessionId !== user.currentSessionId) {
+      if (
+        activeSessionId &&
+        activeSessionId !== user.currentSessionId
+      ) {
         forceLogout("⚠️ This ID was logged in on another device.");
       }
     });
 
     return () => off(sessionRef);
-  }, [user]);
-
-  // 🔐 MANUAL LOGOUT
-  const handleLogout = async () => {
-    try {
-      if (user?.firebaseId) {
-        await update(ref(db, `employees/${user.firebaseId}`), {
-          currentSessionId: null,
-          lastLogoutAt: new Date().toISOString(),
-        });
-      }
-    } catch (err) {
-      console.error("Logout session clear failed:", err.message);
-    } finally {
-      forceLogout();
-    }
-  };
+  }, [user?.firebaseId, user?.currentSessionId]);
 
   return (
     <>
+      {/* 🔷 NAVBAR */}
       <nav className="navbar">
         {/* LEFT */}
         <div className="nav-left">
@@ -100,11 +87,22 @@ export default function Navbar({ user, setUser }) {
         </ul>
 
         {/* RIGHT */}
-        <div className="nav-right desktop-only">
+        <div className="nav-right">
           {user ? (
-            <button className="nav-btn logout" onClick={handleLogout}>
-              Logout
-            </button>
+            <div
+              className="nav-profile"
+              onClick={() => navigate("/profile")}
+              title="My Profile"
+              style={{ cursor: "pointer" }}
+            >
+              <img
+                src={
+                  user.photoURL ||
+                  "https://i.imgur.com/6VBx3io.png"
+                }
+                alt="profile"
+              />
+            </div>
           ) : (
             <button
               className="nav-btn login"
@@ -116,7 +114,7 @@ export default function Navbar({ user, setUser }) {
         </div>
       </nav>
 
-      {/* SIDEBAR OVERLAY */}
+      {/* 🔷 SIDEBAR OVERLAY */}
       <div
         className={`sidebar-overlay ${showSidebar ? "active" : ""}`}
         onClick={() => setShowSidebar(false)}

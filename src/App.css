@@ -494,3 +494,20 @@ background: linear-gradient(
   text-align: center;
   
 }
+
+
+
+.nav-profile {
+  width: 38px;
+  height: 38px;
+  margin-right: 12px;
+}
+
+.nav-profile img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #38bdf8;
+  box-shadow: 0 0 8px rgba(56,189,248,.6);
+}

@@ -22,13 +22,14 @@ import Attendance from "./component/Employee/Attendance/Attendance";
 import ExpenseManager from "./component/Employee/ExpenseManager/ExpenseManager";
 import MasterPanel from "./component/MasterPanel/MasterPanel";
 import ProfitLoss from "./component/ProfitLoss/ProfitLoss";
+import Profile from "./component/Profile/Profile";
 import { SnackBar } from "./component/Core_Component/Snackbar/SnackBar";
 
 function App() {
   const [user, setUser] = useState(
     JSON.parse(localStorage.getItem("user")) || null
   );
-console.log(user, "<<<<< App.js user state");
+
 
   const [snack, setSnack] = useState({
     open: false,
@@ -88,7 +89,7 @@ console.log(user, "<<<<< App.js user state");
 
     return () => off(userRef);
   }, []); // ✅ EMPTY dependency (important)
-console.log(user, "<<<<< App.js user state after listener");
+
   // ======================================================
   // 🔐 Protected Route
   // ======================================================
@@ -120,6 +121,7 @@ console.log(user, "<<<<< App.js user state after listener");
 
             {/* PROTECTED */}
             <Route path="/" element={<ProtectedRoute><Home user={user} /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile user={user} setUser={setUser} /></ProtectedRoute>} />
             <Route path="/attendance" element={<ProtectedRoute><Attendance role={user?user.role:"" }/></ProtectedRoute>} />
             <Route path="/profit-loss" element={<ProtectedRoute><ProfitLoss role={user?user.role:"" } /></ProtectedRoute>} />
             <Route path="/expenses" element={<ProtectedRoute><ExpenseManager role={user?user.role:"" } /></ProtectedRoute>} />
