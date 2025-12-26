@@ -10,10 +10,14 @@ import {
   onValue,
 } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
-import Alert from "../Core_Component/Alert/Alert"; // 👈 Advanced Alert import
+import Alert from "../Core_Component/Alert/Alert";
 
-const SalesEntry = () => {
+// 👈 role prop add kiya gaya hai
+const SalesEntry = ({ role }) => {
   const db = getDatabase(app);
+
+  // 🔐 Permission Check: Sirf Admin aur Accountant submit kar sakte hain
+  const isAuthorized = role === "Admin" || role === "Accountant";
 
   const initialState = {
     date: new Date().toISOString().split("T")[0],
@@ -33,7 +37,6 @@ const SalesEntry = () => {
   const [nextSi, setNextSi] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  /* 🔔 Alert State */
   const [alertData, setAlertData] = useState({
     show: false,
     title: "",
@@ -48,7 +51,6 @@ const SalesEntry = () => {
     setAlertData((prev) => ({ ...prev, show: false }));
   };
 
-  /* 1️⃣ Fetch Last SI No */
   useEffect(() => {
     const salesRef = query(ref(db, "sales"), limitToLast(1));
     const unsubscribe = onValue(salesRef, (snapshot) => {
@@ -64,7 +66,6 @@ const SalesEntry = () => {
     return () => unsubscribe();
   }, [db]);
 
-  /* 2️⃣ Auto Calculations */
   useEffect(() => {
     const total =
       (Number(formData.quantity) || 0) *
@@ -98,9 +99,15 @@ const SalesEntry = () => {
 
   const handleReset = () => setFormData(initialState);
 
-  /* 3️⃣ Submit */
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Extra security check
+    if (!isAuthorized) {
+      showAlert("Unauthorized ❌", "Aapko data save karne ki permission nahi hai.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -155,27 +162,19 @@ const SalesEntry = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="sales-form-grid">
+            {/* ... Sare input fields same rahenge jaise pehle the ... */}
             <div className="input-group">
               <label>Date</label>
-              <input
-                type="date"
-                name="date"
-                value={formData.date}
-                onChange={handleChange}
-              />
+              <input type="date" name="date" value={formData.date} onChange={handleChange} />
             </div>
 
             <div className="input-group">
               <label>Product Name</label>
-              <select
-                name="productName"
-                value={formData.productName}
-                onChange={handleChange}
-                required
-              >
+              <select name="productName" value={formData.productName} onChange={handleChange} required>
                 <option value="">Select Product</option>
                 <option value="Corn Grit">Corn Grit</option>
                 <option value="Cattle Feed">Cattle Feed</option>
+                <option value="Rice Grit">Rice Grit</option>
                 <option value="Rice Grit">Rice Grit</option>
                 <option value="Corn Flour">Corn Flour</option>
               </select>
@@ -183,42 +182,22 @@ const SalesEntry = () => {
 
             <div className="input-group">
               <label>Bill No</label>
-              <input
-                name="billNo"
-                value={formData.billNo}
-                onChange={handleChange}
-                required
-              />
+              <input name="billNo" value={formData.billNo} onChange={handleChange} required />
             </div>
 
             <div className="input-group">
               <label>Customer Name</label>
-              <input
-                name="customerName"
-                value={formData.customerName}
-                onChange={handleChange}
-                required
-              />
+              <input name="customerName" value={formData.customerName} onChange={handleChange} required />
             </div>
 
             <div className="input-group">
               <label>Quantity</label>
-              <input
-                type="number"
-                name="quantity"
-                value={formData.quantity}
-                onChange={handleChange}
-              />
+              <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} />
             </div>
 
             <div className="input-group">
               <label>Rate</label>
-              <input
-                type="number"
-                name="rate"
-                value={formData.rate}
-                onChange={handleChange}
-              />
+              <input type="number" name="rate" value={formData.rate} onChange={handleChange} />
             </div>
 
             <div className="input-group readonly-group">
@@ -228,12 +207,7 @@ const SalesEntry = () => {
 
             <div className="input-group">
               <label>Amount Received</label>
-              <input
-                type="number"
-                name="amountReceived"
-                value={formData.amountReceived}
-                onChange={handleChange}
-              />
+              <input type="number" name="amountReceived" value={formData.amountReceived} onChange={handleChange} />
             </div>
 
             <div className="input-group readonly-group">
@@ -243,11 +217,7 @@ const SalesEntry = () => {
 
             <div className="input-group span-2">
               <label>Remarks</label>
-              <input
-                name="remarks"
-                value={formData.remarks}
-                onChange={handleChange}
-              />
+              <input name="remarks" value={formData.remarks} onChange={handleChange} />
             </div>
 
             <div className="button-container-full">
@@ -255,22 +225,27 @@ const SalesEntry = () => {
                 type="button"
                 onClick={handleReset}
                 className="btn-reset-3d"
+                disabled={!isAuthorized} // 👈 Disable if not Admin/Accountant
+                title={!isAuthorized ? "Aapko Reset karne ki permission nahi hai" : ""}
+                style={{ opacity: isAuthorized ? 1 : 0.6, cursor: isAuthorized ? "pointer" : "not-allowed" }}
               >
                 Reset
               </button>
+              
               <button
                 type="submit"
                 className="btn-submit-colored"
-                disabled={loading}
+                disabled={loading || !isAuthorized} // 👈 Disable if not Admin/Accountant
+                title={!isAuthorized ? "Sirf Admin aur Accountant hi entry save kar sakte hain" : ""}
+                style={{ opacity: isAuthorized ? 1 : 0.6, cursor: isAuthorized ? "pointer" : "not-allowed" }}
               >
-                {loading ? "Saving..." : "✅ Save Sale"}
+                {loading ? "Saving..." : !isAuthorized ? "🔒 Read Only" : "✅ Save Sale"}
               </button>
             </div>
           </form>
         </div>
       </div>
 
-      {/* 🔔 Advanced Alert */}
       <Alert
         show={alertData.show}
         title={alertData.title}

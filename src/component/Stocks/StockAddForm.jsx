@@ -1,85 +1,64 @@
-import React, { useState } from 'react';
-import "./Stock.css";
+import React, { useState } from "react";
 import { getDatabase, ref, push, set } from "firebase/database";
-import { app } from "../../redux/api/firebase/firebase"; 
-import Alert from "../Core_Component/Alert/Alert"; // 👈 Alert Import karein
+import { app } from "../../redux/api/firebase/firebase";
+import Alert from "../Core_Component/Alert/Alert";
 
-const StockAddForm = ({ onCancel }) => {
+const  StockAddForm= ({ role }) => { // 👈 Prop received
   const db = getDatabase(app);
-  const [loading, setLoading] = useState(false);
 
-  const [formData, setFormData] = useState({
-    item: "",
+  // 🔐 Permission Guard
+  const isAuthorized = role === "Admin" || role === "Accountant";
+
+  const initialState = {
+    date: new Date().toISOString().split("T")[0],
+    supplierName: "",
+    itemName: "",
+    billNo: "",
     quantity: "",
-    unit: "kg",
+    rate: "",
+    totalAmount: 0,
+    paidAmount: "",
+    balanceAmount: 0,
     remarks: "",
-  });
-
-  /* 🔔 Alert State */
-  const [alertData, setAlertData] = useState({
-    show: false,
-    title: "",
-    message: "",
-  });
-
-  const showAlert = (title, message) => {
-    setAlertData({ show: true, title, message });
   };
 
-  const closeAlert = () => {
-    setAlertData((prev) => ({ ...prev, show: false }));
-    // Agar success ke baad form band karna hai toh yahan logic daal sakte hain
-  };
+  const [formData, setFormData] = useState(initialState);
+  const [loading, setLoading] = useState(false);
+  const [alertData, setAlertData] = useState({ show: false, title: "", message: "" });
 
-  const productList = [
-    "Corn",
-    "Corn Greet",
-    "Cattlefeed",
-    "Aatarice",
-    "Rice Greet",
-    "Packing Bag",
-  ];
+  const showAlert = (title, message) => setAlertData({ show: true, title, message });
+  const closeAlert = () => setAlertData((prev) => ({ ...prev, show: false }));
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    const updatedData = { ...formData, [name]: value };
+
+    if (name === "quantity" || name === "rate" || name === "paidAmount") {
+      const total = (Number(updatedData.quantity) || 0) * (Number(updatedData.rate) || 0);
+      const balance = total - (Number(updatedData.paidAmount) || 0);
+      updatedData.totalAmount = total;
+      updatedData.balanceAmount = balance;
+    }
+    setFormData(updatedData);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!formData.item || !formData.quantity) {
-      showAlert("Validation ⚠️", "Please select an item and enter quantity");
+    
+    // 🛑 Logic Guard
+    if (!isAuthorized) {
+      showAlert("Denied ❌", "Aapko purchase entry karne ki permission nahi hai.");
       return;
     }
 
     setLoading(true);
-
     try {
-      const stockRef = ref(db, "stocks");
-      const newStockRef = push(stockRef);
-
-      const stockEntry = {
-        ...formData,
-        quantity: Number(formData.quantity),
-        updatedDate: new Date().toISOString().split("T")[0],
-        createdAt: new Date().toISOString(),
-      };
-
-      await set(newStockRef, stockEntry);
-
-      // Reset Form
-      setFormData({
-        item: "",
-        quantity: "",
-        unit: "kg",
-        remarks: "",
-      });
-
-      // Show Success Alert
-      showAlert("Success 🎉", "Stock Entry Updated Successfully!");
-
-      // Optional: thodi der baad onCancel() call karein ya Alert close hone par
-      // if (onCancel) setTimeout(onCancel, 2000); 
-
+      const purchaseRef = ref(db, "purchases");
+      await push(purchaseRef, { ...formData, timestamp: Date.now() });
+      showAlert("Success ✅", "Purchase record save ho gaya.");
+      setFormData(initialState);
     } catch (error) {
-      console.error("Firebase Error:", error);
-      showAlert("Error ❌", "Stock update nahi ho paya. Please try again.");
+      showAlert("Error ❌", "Data save nahi ho saka.");
     } finally {
       setLoading(false);
     }
@@ -87,105 +66,71 @@ const StockAddForm = ({ onCancel }) => {
 
   return (
     <>
-      <div className="table-container-wide">
-        <div className="table-card-wide no-scroll-card">
-          <div className="form-header-row">
-            <h2 className="table-title">STOCK ENTRY FORM (FIREBASE)</h2>
-            <p className="subtitle">Update your inventory levels efficiently</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="stock-form-grid">
+      <div className="sales-container">
+        <div className="sales-card-wide">
+          <h2 className="form-title">Purchase Entry</h2>
+          <form onSubmit={handleSubmit} className="sales-form-grid">
+            
+            {/* Inputs - Sabhi ko disabled={!isAuthorized} kar sakte hain agar form touch bhi nahi karne dena */}
             <div className="input-group">
-              <label>Select Product</label>
-              <select
-                value={formData.item}
-                onChange={(e) => setFormData({ ...formData, item: e.target.value })}
-                required
-                className="styled-select"
-                disabled={loading}
-              >
-                <option value="">-- Choose Product --</option>
-                {productList.map((product, index) => (
-                  <option key={index} value={product}>{product}</option>
-                ))}
-              </select>
+              <label>Date</label>
+              <input type="date" name="date" value={formData.date} onChange={handleChange} disabled={!isAuthorized} />
+            </div>
+
+            <div className="input-group">
+              <label>Supplier Name</label>
+              <input name="supplierName" value={formData.supplierName} onChange={handleChange} required disabled={!isAuthorized} />
+            </div>
+
+            <div className="input-group">
+              <label>Item Name</label>
+              <input name="itemName" value={formData.itemName} onChange={handleChange} required disabled={!isAuthorized} />
+            </div>
+
+            <div className="input-group">
+              <label>Bill No</label>
+              <input name="billNo" value={formData.billNo} onChange={handleChange} required disabled={!isAuthorized} />
             </div>
 
             <div className="input-group">
               <label>Quantity</label>
-              <input
-                type="number"
-                placeholder="0.00"
-                value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                required
-                disabled={loading}
-              />
+              <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} disabled={!isAuthorized} />
             </div>
 
             <div className="input-group">
-              <label>Unit</label>
-              <select
-                value={formData.unit}
-                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                className="styled-select"
-                disabled={loading}
-              >
-                <option value="kg">kg</option>
-                <option value="Bags">Bags</option>
-                <option value="Pcs">Pcs</option>
-                <option value="Tons">Tons</option>
-              </select>
+              <label>Rate</label>
+              <input type="number" name="rate" value={formData.rate} onChange={handleChange} disabled={!isAuthorized} />
+            </div>
+
+            <div className="input-group readonly-group">
+              <label>Total Amount</label>
+              <input value={formData.totalAmount} readOnly />
             </div>
 
             <div className="input-group">
-              <label>Updated Date</label>
-              <input 
-                type="text" 
-                value={new Date().toISOString().split("T")[0]} 
-                readOnly 
-                className="readonly-input" 
-              />
+              <label>Paid Amount</label>
+              <input type="number" name="paidAmount" value={formData.paidAmount} onChange={handleChange} disabled={!isAuthorized} />
             </div>
 
-            <div className="input-group span-4">
-              <label>Remarks / Notes</label>
-              <input
-                placeholder="Any notes about this stock..."
-                value={formData.remarks}
-                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                disabled={loading}
-              />
+            <div className="input-group readonly-group">
+              <label>Balance</label>
+              <input value={formData.balanceAmount} readOnly />
             </div>
 
             <div className="button-container-full">
               <button 
-                type="button" 
-                className="btn-reset-3d" 
-                onClick={onCancel}
-                disabled={loading}
-              >
-                Cancel
-              </button>
-              <button 
                 type="submit" 
-                className="btn-submit-colored"
-                disabled={loading}
+                className="btn-submit-colored" 
+                disabled={loading || !isAuthorized}
+                style={{ opacity: isAuthorized ? 1 : 0.6 }}
               >
-                {loading ? "Updating..." : "✅ Update Stock"}
+                {loading ? "Saving..." : !isAuthorized ? "🔒 Read Only" : "✅ Save Purchase"}
               </button>
             </div>
           </form>
         </div>
       </div>
-
-      {/* 🔔 Advanced Alert */}
-      <Alert
-        show={alertData.show}
-        title={alertData.title}
-        message={alertData.message}
-        onClose={closeAlert}
-      />
+      <Alert show={alertData.show} title={alertData.title} message={alertData.message} onClose={closeAlert} />
     </>
   );
 };

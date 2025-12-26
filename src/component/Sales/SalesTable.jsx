@@ -3,10 +3,14 @@ import "./Sales.css";
 import { getDatabase, ref, onValue, remove, update } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
 import Loader from "../Core_Component/Loader/Loader";
-import Alert from "../Core_Component/Alert/Alert"; // 👈 Custom Alert Import
+import Alert from "../Core_Component/Alert/Alert";
 
-const SalesTable = () => {
+const SalesTable = ({ role }) => { // 👈 role prop add kiya gaya hai
   const db = getDatabase(app);
+  
+  // 🔐 Permission Check: Sirf Admin aur Accountant edit/delete kar sakte hain
+  const isAuthorized = role === "Admin" || role === "Accountant";
+
   const [salesList, setSalesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -32,7 +36,7 @@ const SalesTable = () => {
     setAlertData((prev) => ({ ...prev, show: false }));
   };
 
-  // 1️⃣ Fetch Data
+  // 1️⃣ Fetch Data (Unchanged)
   useEffect(() => {
     const salesRef = ref(db, "sales");
     const unsubscribe = onValue(salesRef, (snapshot) => {
@@ -51,7 +55,7 @@ const SalesTable = () => {
     return () => unsubscribe();
   }, [db]);
 
-  // 2️⃣ Auto Calculation in Edit Mode
+  // 2️⃣ Auto Calculation in Edit Mode (Unchanged)
   useEffect(() => {
     if (editId) {
       const total = (Number(editData.quantity) || 0) * (Number(editData.rate) || 0);
@@ -60,7 +64,7 @@ const SalesTable = () => {
     }
   }, [editData.quantity, editData.rate, editData.amountReceived, editId]);
 
-  // 3️⃣ Filter & Sort Logic
+  // 3️⃣ Filter & Sort Logic (Unchanged)
   const getProcessedList = () => {
     let list = salesList.filter((s) => {
       const matchesSearch =
@@ -87,16 +91,19 @@ const SalesTable = () => {
   const currentRows = processedList.slice(indexOfFirstRow, indexOfLastRow);
   const totalPages = Math.ceil(processedList.length / rowsPerPage);
 
-  // 4️⃣ Actions with Custom Alert
+  // 4️⃣ Actions with Permission Guard
   const handleDelete = (id) => {
-    // Note: Agar aapko 'Confirm' wala alert chahiye to uske liye Alert component 
-    // mein 'Confirm/Cancel' buttons hone chahiye. Abhi hum simple notification use kar rahe hain.
+    if (!isAuthorized) {
+      showAlert("Denied ❌", "Aapke paas delete karne ki permission nahi hai.");
+      return;
+    }
     remove(ref(db, `sales/${id}`))
       .then(() => showAlert("Deleted 🗑️", "Record successfully delete ho gaya."))
       .catch((err) => showAlert("Error ❌", "Delete nahi ho paya."));
   };
 
   const handleSave = () => {
+    if (!isAuthorized) return;
     update(ref(db), { [`/sales/${editId}`]: editData })
       .then(() => {
         showAlert("Updated! ✅", "Record update kar diya gaya hai.");
@@ -106,6 +113,10 @@ const SalesTable = () => {
   };
 
   const startEdit = (sale) => {
+    if (!isAuthorized) {
+      showAlert("Denied ❌", "Aapke paas edit karne ki permission nahi hai.");
+      return;
+    }
     setEditId(sale.id);
     setEditData({ ...sale });
   };
@@ -124,6 +135,7 @@ const SalesTable = () => {
           <div className="table-header-flex">
             <h2 className="table-title">SALES RECORDS</h2>
             <div className="table-controls-row">
+              {/* Filter controls unchanged */}
               <select className="table-select-custom" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                 <option value="dateNewest">Newest Date</option>
                 <option value="dateOldest">Oldest Date</option>
@@ -170,6 +182,7 @@ const SalesTable = () => {
               <tbody>
                 {currentRows.map((sale) => (
                   <tr key={sale.id} className={editId === sale.id ? "active-edit" : ""}>
+                    {/* Inline edit logic remains same */}
                     <td>{editId === sale.id ? <input type="date" name="date" value={editData.date} onChange={handleEditChange} className="edit-input-field" /> : sale.date}</td>
                     <td>{editId === sale.id ? <input name="billNo" value={editData.billNo} onChange={handleEditChange} className="edit-input-field" /> : <span className="bill-tag">{sale.billNo}</span>}</td>
                     <td>
@@ -189,6 +202,7 @@ const SalesTable = () => {
                     <td>₹{editId === sale.id ? <input type="number" name="amountReceived" value={editData.amountReceived} onChange={handleEditChange} className="edit-input-field small-input" /> : sale.amountReceived}</td>
                     <td className="danger-text">₹{editId === sale.id ? editData.paymentDue : sale.paymentDue}</td>
                     <td>{editId === sale.id ? <input type="date" name="billDueDate" value={editData.billDueDate} onChange={handleEditChange} className="edit-input-field" /> : sale.billDueDate}</td>
+                    
                     <td className="action-btns-cell">
                       {editId === sale.id ? (
                         <>
@@ -197,8 +211,21 @@ const SalesTable = () => {
                         </>
                       ) : (
                         <>
-                          <button className="row-edit-btn" onClick={() => startEdit(sale)}>✏️</button>
-                          <button className="row-delete-btn" onClick={() => handleDelete(sale.id)}>🗑️</button>
+                          <button 
+                            className="row-edit-btn" 
+                            onClick={() => startEdit(sale)}
+                            disabled={!isAuthorized}
+                            title={!isAuthorized ? "No Edit Permission" : "Edit Record"}
+                            style={{ opacity: isAuthorized ? 1 : 0.5, cursor: isAuthorized ? "pointer" : "not-allowed" }}
+                          >✏️</button>
+                          
+                          <button 
+                            className="row-delete-btn" 
+                            onClick={() => handleDelete(sale.id)}
+                            disabled={!isAuthorized}
+                            title={!isAuthorized ? "No Delete Permission" : "Delete Record"}
+                            style={{ opacity: isAuthorized ? 1 : 0.5, cursor: isAuthorized ? "pointer" : "not-allowed" }}
+                          >🗑️</button>
                         </>
                       )}
                     </td>
@@ -216,7 +243,6 @@ const SalesTable = () => {
         </div>
       </div>
 
-      {/* 🔔 Alert Component */}
       <Alert
         show={alertData.show}
         title={alertData.title}

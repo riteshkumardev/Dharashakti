@@ -3,15 +3,20 @@ import './Purchase.css';
 import { getDatabase, ref, onValue, remove, update } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
 
-const PurchaseTable = () => {
+// 👈 role prop add kiya gaya hai
+const PurchaseTable = ({ role }) => {
   const db = getDatabase(app);
+  
+  // 🔐 Permission Check: Sirf Admin aur Accountant edit/delete kar sakte hain
+  const isAuthorized = role === "Admin" || role === "Accountant";
+
   const [purchaseData, setPurchaseData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
 
   // --- Edit States ---
-  const [editId, setEditId] = useState(null); // Kaunsi row edit ho rahi hai
-  const [editData, setEditData] = useState({}); // Editing ka temp data
+  const [editId, setEditId] = useState(null); 
+  const [editData, setEditData] = useState({}); 
 
   useEffect(() => {
     const purchaseRef = ref(db, "purchases");
@@ -31,20 +36,24 @@ const PurchaseTable = () => {
     return () => unsubscribe();
   }, [db]);
 
-  // ✏️ Edit Start
+  // ✏️ Edit Start with Guard
   const startEdit = (item) => {
+    if (!isAuthorized) {
+      alert("Aapko edit karne ki permission nahi hai.");
+      return;
+    }
     setEditId(item.firebaseId);
     setEditData({ ...item });
   };
 
-  // ⌨️ Handle Input Change
   const handleEditChange = (e) => {
     const { name, value } = e.target;
     setEditData(prev => ({ ...prev, [name]: value }));
   };
 
-  // ✅ Save to Firebase
+  // ✅ Save with Guard
   const handleSave = async () => {
+    if (!isAuthorized) return;
     try {
       await update(ref(db, `purchases/${editId}`), editData);
       alert("Update Successful!");
@@ -54,7 +63,12 @@ const PurchaseTable = () => {
     }
   };
 
+  // 🗑️ Delete with Guard
   const handleDelete = (id) => {
+    if (!isAuthorized) {
+      alert("Aapko delete karne ki permission nahi hai.");
+      return;
+    }
     if (window.confirm("Are you sure you want to delete?")) {
       remove(ref(db, `purchases/${id}`));
     }
@@ -99,7 +113,6 @@ const PurchaseTable = () => {
                   <td>{index + 1}</td>
                   <td>{item.date}</td>
                   
-                  {/* Inline Editing Logic */}
                   <td>
                     {editId === item.firebaseId ? 
                       <input name="item" value={editData.item} onChange={handleEditChange} className="edit-input-field" /> 
@@ -125,8 +138,27 @@ const PurchaseTable = () => {
                       </>
                     ) : (
                       <>
-                        <button className="row-edit-btn" onClick={() => startEdit(item)}>✏️</button>
-                        <button className="row-delete-btn" onClick={() => handleDelete(item.firebaseId)}>🗑️</button>
+                        <button 
+                          className="row-edit-btn" 
+                          onClick={() => startEdit(item)}
+                          disabled={!isAuthorized}
+                          title={!isAuthorized ? "Permission Required" : "Edit"}
+                          style={{ 
+                            opacity: isAuthorized ? 1 : 0.5, 
+                            cursor: isAuthorized ? "pointer" : "not-allowed" 
+                          }}
+                        >✏️</button>
+                        
+                        <button 
+                          className="row-delete-btn" 
+                          onClick={() => handleDelete(item.firebaseId)}
+                          disabled={!isAuthorized}
+                          title={!isAuthorized ? "Permission Required" : "Delete"}
+                          style={{ 
+                            opacity: isAuthorized ? 1 : 0.5, 
+                            cursor: isAuthorized ? "pointer" : "not-allowed" 
+                          }}
+                        >🗑️</button>
                       </>
                     )}
                   </td>

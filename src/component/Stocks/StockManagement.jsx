@@ -4,21 +4,24 @@ import { getDatabase, ref, onValue, remove, update } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
 import Alert from "../Core_Component/Alert/Alert"; 
 
-const StockManagement = () => {
+const StockManagement = ({ role }) => { // 👈 role prop add kiya gaya
   const db = getDatabase(app);
   
+  // 🔐 Permission Check
+  const isAuthorized = role === "Admin" || role === "Accountant";
+
   const [stocks, setStocks] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({});
-const [alertData, setAlertData] = useState({
-  show: false,
-  title: "",
-  message: "",
-  type: "info", // "info" (sirf OK) ya "confirm" (Yes/No)
-  onConfirm: null, // Confirm hone par jo function chalega
-});
+  const [alertData, setAlertData] = useState({
+    show: false,
+    title: "",
+    message: "",
+    type: "info",
+    onConfirm: null,
+  });
 
   const showAlert = (title, message) => {
     setAlertData({ show: true, title, message });
@@ -46,27 +49,34 @@ const [alertData, setAlertData] = useState({
     return () => unsubscribe();
   }, [db]);
 
-// 🗑️ Delete Logic
-const handleDelete = (id) => {
-  setAlertData({
-    show: true,
-    title: "Confirm Delete 🗑️",
-    message: "Kya aap sach mein is item ko delete karna chahte hain?",
-    type: "confirm", 
-    onConfirm: () => executeDelete(id), // Agar user "Yes" kare toh ye function chale
-  });
-};
+  // 🗑️ Delete Logic with Authorization
+  const handleDelete = (id) => {
+    if (!isAuthorized) {
+      showAlert("Denied ❌", "Aapke paas delete karne ki permission nahi hai.");
+      return;
+    }
+    setAlertData({
+      show: true,
+      title: "Confirm Delete 🗑️",
+      message: "Kya aap sach mein is item ko delete karna chahte hain?",
+      type: "confirm", 
+      onConfirm: () => executeDelete(id), 
+    });
+  };
 
-// Asli Delete Function
-const executeDelete = (id) => {
-  remove(ref(db, `stocks/${id}`))
-    .then(() => {
-      showAlert("Deleted!", "Item successfully delete ho gaya.");
-    })
-    .catch((err) => showAlert("Error ❌", err.message));
-};
+  const executeDelete = (id) => {
+    remove(ref(db, `stocks/${id}`))
+      .then(() => {
+        showAlert("Deleted!", "Item successfully delete ho gaya.");
+      })
+      .catch((err) => showAlert("Error ❌", err.message));
+  };
 
   const startEdit = (stock) => {
+    if (!isAuthorized) {
+      showAlert("Denied ❌", "Aapke paas edit karne ki permission nahi hai.");
+      return;
+    }
     setEditId(stock.id);
     setEditData({ ...stock });
   };
@@ -76,8 +86,9 @@ const executeDelete = (id) => {
     setEditData(prev => ({ ...prev, [name]: value }));
   };
 
-  // ✅ Save Logic (Updated: Removed standard alert)
   const handleSave = async () => {
+    if (!isAuthorized) return; // Guard clause
+    
     try {
       const itemRef = ref(db, `stocks/${editId}`);
       await update(itemRef, {
@@ -88,7 +99,7 @@ const executeDelete = (id) => {
       setEditId(null);
       showAlert("Success ✅", "Stock database mein update ho gaya hai!"); 
     } catch (err) {
-      showAlert("Update Failed ❌", err.message); // alert() ki jagah showAlert
+      showAlert("Update Failed ❌", err.message);
     }
   };
 
@@ -164,8 +175,20 @@ const executeDelete = (id) => {
                           </>
                         ) : (
                           <>
-                            <button className="row-edit-btn" onClick={() => startEdit(stock)}>✏️</button>
-                            <button className="row-delete-btn" onClick={() => handleDelete(stock.id)}>🗑️</button>
+                            <button 
+                              className="row-edit-btn" 
+                              onClick={() => startEdit(stock)}
+                              disabled={!isAuthorized}
+                              title={!isAuthorized ? "No Edit Permission" : "Edit Stock"}
+                              style={{ opacity: isAuthorized ? 1 : 0.5, cursor: isAuthorized ? "pointer" : "not-allowed" }}
+                            >✏️</button>
+                            <button 
+                              className="row-delete-btn" 
+                              onClick={() => handleDelete(stock.id)}
+                              disabled={!isAuthorized}
+                              title={!isAuthorized ? "No Delete Permission" : "Delete Stock"}
+                              style={{ opacity: isAuthorized ? 1 : 0.5, cursor: isAuthorized ? "pointer" : "not-allowed" }}
+                            >🗑️</button>
                           </>
                         )}
                       </td>
@@ -179,7 +202,6 @@ const executeDelete = (id) => {
         </div>
       </div>
 
-      {/* 🔔 Custom Alert */}
       <Alert
         show={alertData.show}
         title={alertData.title}

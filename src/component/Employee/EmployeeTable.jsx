@@ -3,15 +3,21 @@ import './Emp.css';
 import { getDatabase, ref, onValue, remove, update } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
 import { useNavigate } from "react-router-dom";
- 
-const EmployeeTable = ({ onViewDetails }) => {
+
+// 👈 role prop add kiya gaya hai
+const EmployeeTable = ({ role }) => { 
   const db = getDatabase(app);
+  
+  // 🔐 Permission Check: Sirf Admin aur Accountant edit/delete kar sakte hain
+  const isAuthorized = role === "Admin" || role === "Accountant";
+
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({});
- const navigate = useNavigate();
+  const navigate = useNavigate();
+
   useEffect(() => {
     const empRef = ref(db, "employees");
     const unsubscribe = onValue(empRef, (snapshot) => {
@@ -31,6 +37,11 @@ const EmployeeTable = ({ onViewDetails }) => {
   }, [db]);
 
   const startEdit = (emp) => {
+    // 🛑 Guard
+    if (!isAuthorized) {
+      alert("Unauthorized: Aapko edit karne ki permission nahi hai.");
+      return;
+    }
     setEditId(emp.firebaseId);
     setEditData({ ...emp });
   };
@@ -39,12 +50,13 @@ const EmployeeTable = ({ onViewDetails }) => {
     const { name, value } = e.target;
     setEditData(prev => ({ ...prev, [name]: value }));
   };
+
   const handleNavigate = (path) => {
     navigate(path);
-    
   };
 
   const handleSave = async () => {
+    if (!isAuthorized) return; // 🛑 Guard
     try {
       await update(ref(db, `employees/${editId}`), editData);
       alert("Employee Updated Successfully!");
@@ -55,16 +67,20 @@ const EmployeeTable = ({ onViewDetails }) => {
   };
 
   const handleDelete = (id) => {
+    // 🛑 Guard
+    if (!isAuthorized) {
+      alert("Unauthorized: Aapko delete karne ki permission nahi hai.");
+      return;
+    }
     if (window.confirm("Are you sure you want to delete this employee?")) {
       remove(ref(db, `employees/${id}`));
     }
   };
 
-  // --- Search Logic: ID, Name, aur Aadhar teeno par kaam karega ---
   const filtered = employees.filter(emp => 
     emp.name?.toLowerCase().includes(search.toLowerCase()) || 
     emp.aadhar?.includes(search) ||
-    emp.employeeId?.toString().includes(search) // ID search fix
+    emp.employeeId?.toString().includes(search)
   );
 
   if (loading) return <div className="no-records-box">Loading Staff Directory...</div>;
@@ -90,7 +106,7 @@ const EmployeeTable = ({ onViewDetails }) => {
             <thead>
               <tr>
                 <th>SI</th>
-                <th>Emp ID</th> {/* Naya ID Column */}
+                <th>Emp ID</th>
                 <th>Photo</th>
                 <th>Name</th>
                 <th>Phone</th>
@@ -102,7 +118,6 @@ const EmployeeTable = ({ onViewDetails }) => {
                 <tr key={emp.firebaseId} className={editId === emp.firebaseId ? "active-edit-row" : ""}>
                   <td>{index + 1}</td>
                   
-                  {/* Employee ID Display */}
                   <td style={{fontWeight: 'bold', color: '#2563eb'}}>
                     {emp.employeeId || '---'}
                   </td>
@@ -139,8 +154,25 @@ const EmployeeTable = ({ onViewDetails }) => {
                       </div>
                     ) : (
                       <div className="btn-group-row">
-                        <button className="row-edit-btn" onClick={() => startEdit(emp)} title="Edit">✏️</button>
-                        <button className="row-delete-btn" onClick={() => handleDelete(emp.firebaseId)} title="Delete">🗑️</button>
+                        {/* Edit Button */}
+                        <button 
+                          className="row-edit-btn" 
+                          onClick={() => startEdit(emp)} 
+                          disabled={!isAuthorized}
+                          title={!isAuthorized ? "No Permission" : "Edit"}
+                          style={{ opacity: isAuthorized ? 1 : 0.5, cursor: isAuthorized ? "pointer" : "not-allowed" }}
+                        >✏️</button>
+
+                        {/* Delete Button */}
+                        <button 
+                          className="row-delete-btn" 
+                          onClick={() => handleDelete(emp.firebaseId)} 
+                          disabled={!isAuthorized}
+                          title={!isAuthorized ? "No Permission" : "Delete"}
+                          style={{ opacity: isAuthorized ? 1 : 0.5, cursor: isAuthorized ? "pointer" : "not-allowed" }}
+                        >🗑️</button>
+
+                        {/* View Button - Always Enabled for everyone */}
                         <button 
                           className="ledger-btn-ui" 
                           onClick={() => handleNavigate("/staff-ledger")}

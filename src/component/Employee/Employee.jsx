@@ -4,8 +4,8 @@ import EmployeeDetails from './EmployeeDetails';
 import EmployeeAdd from './EmployeeAdd';
 import Attendance from '../Attendance/Attendance';
 
-
-const Employee = () => {
+// 👈 role prop receive kiya gaya
+const Employee = ({ role }) => {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [view, setView] = useState('TABLE'); // 'TABLE' or 'ATTENDANCE'
@@ -17,6 +17,7 @@ const Employee = () => {
         <EmployeeDetails 
           employee={selectedEmployee} 
           onBack={() => setSelectedEmployee(null)} 
+          role={role} // 👈 role bhej diya
         />
       ) : (
         /* Warna Table ya Attendance dikhao */
@@ -29,13 +30,15 @@ const Employee = () => {
             </button>
           </div>
 
-          {showAddForm && <EmployeeAdd />}
+          {/* Role pass karna zaroori hai naye staff registration ke liye */}
+          {showAddForm && <EmployeeAdd role={role} />} 
 
           {view === 'ATTENDANCE' ? (
-            <Attendance />
+            <Attendance role={role} /> // 👈 Attendance ko bhi role bhej diya
           ) : (
             <EmployeeTable 
-              onViewDetails={(emp) => setSelectedEmployee(emp)} // 🟢 YEH PROP ZAROORI HAI
+              role={role} // 👈 Table ko bhi role bhej diya
+              onViewDetails={(emp) => setSelectedEmployee(emp)} 
             />
           )}
         </>

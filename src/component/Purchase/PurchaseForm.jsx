@@ -2,10 +2,14 @@ import React, { useState } from 'react';
 import './Purchase.css';
 import { getDatabase, ref, push, set } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
-import Alert from "../Core_Component/Alert/Alert"; // 👈 Custom Alert import
+import Alert from "../Core_Component/Alert/Alert";
 
-const PurchaseForm = ({ onCancel }) => {
+// 👈 role prop add kiya gaya hai
+const PurchaseForm = ({ onCancel, role }) => {
   const db = getDatabase(app);
+
+  // 🔐 Permission Check: Sirf Admin aur Accountant submit kar sakte hain
+  const isAuthorized = role === "Admin" || role === "Accountant";
 
   const [formData, setFormData] = useState({
     item: '',
@@ -35,11 +39,18 @@ const PurchaseForm = ({ onCancel }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 🛑 Security Check
+    if (!isAuthorized) {
+      showAlert("Unauthorized ❌", "Aapko purchase entry save karne ki permission nahi hai.");
+      return;
+    }
+
     setLoading(true);
 
     const purchaseEntry = {
       ...formData,
-      quantity: Number(formData.quantity), // String ko number mein convert karein
+      quantity: Number(formData.quantity),
       date: new Date().toISOString().split('T')[0],
       timestamp: new Date().getTime()
     };
@@ -50,14 +61,9 @@ const PurchaseForm = ({ onCancel }) => {
       
       await set(newEntryRef, purchaseEntry);
 
-      // Success Alert
-      showAlert("Success 🎉", "Purchase Stock Saved to Firebase Successfully!");
+      showAlert("Success 🎉", "Purchase Stock Saved Successfully!");
       
-      // Form reset
       setFormData({ item: '', quantity: '', unit: 'kg', remarks: '' });
-      
-      // Note: Agar aap chahte hain alert band hote hi form band ho jaye, 
-      // toh onCancel() ko closeAlert function mein daal sakte hain.
 
     } catch (error) {
       console.error("Firebase Error:", error);
@@ -84,7 +90,7 @@ const PurchaseForm = ({ onCancel }) => {
                 onChange={(e) => setFormData({...formData, item: e.target.value})} 
                 required
                 className="styled-select"
-                disabled={loading}
+                disabled={loading || !isAuthorized} // 👈 Disable if not authorized
               >
                 <option value="">-- Select Product --</option>
                 {productList.map(p => <option key={p} value={p}>{p}</option>)}
@@ -99,7 +105,7 @@ const PurchaseForm = ({ onCancel }) => {
                 onChange={(e) => setFormData({...formData, quantity: e.target.value})} 
                 required 
                 placeholder="0.00" 
-                disabled={loading}
+                disabled={loading || !isAuthorized} // 👈 Disable if not authorized
               />
             </div>
 
@@ -109,7 +115,7 @@ const PurchaseForm = ({ onCancel }) => {
                 value={formData.unit} 
                 onChange={(e) => setFormData({...formData, unit: e.target.value})}
                 className="styled-select"
-                disabled={loading}
+                disabled={loading || !isAuthorized} // 👈 Disable if not authorized
               >
                 <option value="kg">kg</option>
                 <option value="Bags">Bags</option>
@@ -136,7 +142,7 @@ const PurchaseForm = ({ onCancel }) => {
                 placeholder="Enter purchase details..." 
                 value={formData.remarks} 
                 onChange={(e) => setFormData({...formData, remarks: e.target.value})} 
-                disabled={loading}
+                disabled={loading || !isAuthorized} // 👈 Disable if not authorized
               />
             </div>
 
@@ -144,15 +150,23 @@ const PurchaseForm = ({ onCancel }) => {
               <button type="button" className="btn-reset-3d" onClick={onCancel} disabled={loading}>
                 Cancel
               </button>
-              <button type="submit" className="btn-submit-colored" disabled={loading}>
-                {loading ? "Saving..." : "✅ Save Purchase Stock"}
+              <button 
+                type="submit" 
+                className="btn-submit-colored" 
+                disabled={loading || !isAuthorized} // 👈 Permission Guard
+                title={!isAuthorized ? "Permission required" : "Save data"}
+                style={{ 
+                  opacity: isAuthorized ? 1 : 0.6, 
+                  cursor: isAuthorized ? "pointer" : "not-allowed" 
+                }}
+              >
+                {loading ? "Saving..." : !isAuthorized ? "🔒 Read Only" : "✅ Save Purchase Stock"}
               </button>
             </div>
           </form>
         </div>
       </div>
 
-      {/* 🔔 Custom Alert Component */}
       <Alert
         show={alertData.show}
         title={alertData.title}

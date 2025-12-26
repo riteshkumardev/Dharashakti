@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { getDatabase, ref, onValue, push } from "firebase/database";
 import { app } from "../../../redux/api/firebase/firebase";
-import Calendar from 'react-calendar'; // ✅ Import Calendar
-import 'react-calendar/dist/Calendar.css'; // ✅ Import Calendar CSS
+import Calendar from 'react-calendar'; 
+import 'react-calendar/dist/Calendar.css'; 
 import './EmployeeLedger.css';
 
-const EmployeeLedger = () => {
+// 👈 role prop add kiya gaya hai
+const EmployeeLedger = ({ role }) => {
   const db = getDatabase(app);
+  
+  // 🔐 Permission Check: Sirf Admin aur Accountant hi payments add kar sakte hain
+  const isAuthorized = role === "Admin" || role === "Accountant";
+
   const [employees, setEmployees] = useState([]);
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [attendanceStats, setAttendanceStats] = useState({ present: 0, absent: 0 });
   const [advanceAmount, setAdvanceAmount] = useState('');
   
-  // New States for Calendar Popup
   const [showCalendar, setShowCalendar] = useState(false);
   const [fullAttendanceData, setFullAttendanceData] = useState({});
 
@@ -45,10 +49,8 @@ const EmployeeLedger = () => {
           const dayData = allAttendance[dateKey];
           if (dayData && dayData[emp.id]) {
             const status = dayData[emp.id].status;
-            // Full history for calendar
             empHistory[dateKey] = status;
 
-            // Stats for current month
             if (dateKey.startsWith(currentMonthPrefix)) {
               if (status === "Present") p++;
               else if (status === "Absent") a++;
@@ -57,14 +59,13 @@ const EmployeeLedger = () => {
         });
       }
       setAttendanceStats({ present: p, absent: a });
-      setFullAttendanceData(empHistory); // Save for calendar
+      setFullAttendanceData(empHistory); 
     });
   };
 
-  // Calendar Tile Color Logic
   const getTileClassName = ({ date, view }) => {
     if (view === 'month') {
-      const dateStr = date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+      const dateStr = date.toLocaleDateString('en-CA'); 
       if (fullAttendanceData[dateStr] === "Present") return 'cal-present';
       if (fullAttendanceData[dateStr] === "Absent") return 'cal-absent';
     }
@@ -77,6 +78,13 @@ const EmployeeLedger = () => {
 
   const handlePayment = async (e) => {
     e.preventDefault();
+
+    // 🛑 Security Guard
+    if (!isAuthorized) {
+      alert("Unauthorized: Aapko payment add karne ki permission nahi hai.");
+      return;
+    }
+
     if(!advanceAmount || !selectedEmp) return;
     const payRef = ref(db, `salaryPayments/${selectedEmp.id}`);
     await push(payRef, {
@@ -107,7 +115,6 @@ const EmployeeLedger = () => {
 
           {selectedEmp && (
             <div className="ledger-detail-view">
-              {/* ✅ Attendance Bar - Click to open Calendar */}
               <div className="attendance-summary-bar" onClick={() => setShowCalendar(true)} title="Click to view Full Calendar">
                 <div className="summary-item">Month: <b>{new Date().toLocaleString('default', { month: 'long' })}</b></div>
                 <div className="summary-item green">Present: <b>{attendanceStats.present} Days</b></div>
@@ -122,11 +129,30 @@ const EmployeeLedger = () => {
                 <div className="stat-pill final-pay">Net Payable <b>₹{earnedSalary - totalAdvance}</b></div>
               </div>
 
-              <div className="advance-entry-box">
+              {/* 🔐 Advance Entry Section Protected */}
+              <div className={`advance-entry-box ${!isAuthorized ? 'locked-box' : ''}`}>
                  <form onSubmit={handlePayment} className="advance-form-grid">
-                    <input type="number" placeholder="Enter Payment Amount" value={advanceAmount} onChange={(e)=>setAdvanceAmount(e.target.value)} />
-                    <button type="submit" className="save-btn-new">ADD ENTRY</button>
+                    <input 
+                      type="number" 
+                      placeholder={isAuthorized ? "Enter Payment Amount" : "🔒 Access Restricted"} 
+                      value={advanceAmount} 
+                      onChange={(e)=>setAdvanceAmount(e.target.value)} 
+                      disabled={!isAuthorized}
+                      readOnly={!isAuthorized}
+                    />
+                    <button 
+                      type="submit" 
+                      className="save-btn-new"
+                      disabled={!isAuthorized}
+                      style={{ 
+                        opacity: isAuthorized ? 1 : 0.6,
+                        cursor: isAuthorized ? 'pointer' : 'not-allowed'
+                      }}
+                    >
+                      {isAuthorized ? "ADD ENTRY" : "🔒 Locked"}
+                    </button>
                  </form>
+                 {!isAuthorized && <p style={{fontSize: '11px', color: 'red', marginTop: '5px'}}>* Sirf Admin aur Accountant hi payment entry kar sakte hain.</p>}
               </div>
 
               <div className="ledger-table-container">
@@ -144,7 +170,6 @@ const EmployeeLedger = () => {
         </div>
       </div>
 
-      {/* ✅ Attendance Calendar Popup */}
       {showCalendar && (
         <div className="cal-modal-overlay">
           <div className="cal-modal-content">

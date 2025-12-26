@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { getDatabase, ref, push, set, onValue } from "firebase/database";
+import { getDatabase, ref, onValue, push, set } from "firebase/database";
 import { app } from "../../../redux/api/firebase/firebase";
 import './ExpenseManager.css';
 
-const ExpenseManager = () => {
+// 👈 role prop add kiya gaya hai
+const ExpenseManager = ({ role }) => {
   const db = getDatabase(app);
+  
+  // 🔐 Permission Check: Sirf Admin aur Accountant hi kharcha add kar sakte hain
+  const isAuthorized = role === "Admin" || role === "Accountant";
+
   const [allExpenses, setAllExpenses] = useState([]);
   const [grandTotal, setGrandTotal] = useState(0);
-  const [showHistory, setShowHistory] = useState(false); // Show/Hide state
+  const [showHistory, setShowHistory] = useState(false); 
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [formData, setFormData] = useState({ category: 'Khana-Pina', amount: '', detail: '' });
@@ -36,6 +41,13 @@ const ExpenseManager = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 🛑 Security Guard
+    if (!isAuthorized) {
+      alert("Unauthorized: Aapko expense add karne ki permission nahi hai.");
+      return;
+    }
+
     if(!formData.amount) return alert("Please enter amount");
     try {
       const expRef = ref(db, `dailyExpenses/${selectedDate}`);
@@ -51,7 +63,6 @@ const ExpenseManager = () => {
 
   return (
     <div className="expense-fixed-container">
-      {/* 1. Fixed Top Header & Form */}
       <div className="expense-top-section">
         <div className="table-header-row">
           <h2 className="table-title">COMPANY EXPENSES</h2>
@@ -61,17 +72,31 @@ const ExpenseManager = () => {
           </div>
         </div>
 
-        <div className="expense-form-card">
-          
+        {/* 🔐 Form protected by role */}
+        <div className={`expense-form-card ${!isAuthorized ? 'form-locked' : ''}`}>
+          {!isAuthorized && (
+            <p style={{ color: '#d32f2f', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px' }}>
+              🔒 Read Only Mode: Sirf Admin entries kar sakte hain.
+            </p>
+          )}
           <form onSubmit={handleSubmit} className="expense-compact-form">
             <div className="form-row">
               <div className="input-group">
                 <label>Date</label>
-                <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+                <input 
+                  type="date" 
+                  value={selectedDate} 
+                  onChange={(e) => setSelectedDate(e.target.value)} 
+                  disabled={!isAuthorized}
+                />
               </div>
               <div className="input-group">
                 <label>Category</label>
-                <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+                <select 
+                  value={formData.category} 
+                  onChange={e => setFormData({...formData, category: e.target.value})}
+                  disabled={!isAuthorized}
+                >
                   <option value="Khana-Pina">Khana-Pina</option>
                   <option value="Dawai">Dawai</option>
                   <option value="Maintenance">Maintenance</option>
@@ -80,26 +105,47 @@ const ExpenseManager = () => {
               </div>
               <div className="input-group">
                 <label>Amount (₹)</label>
-                <input type="number" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0" required />
+                <input 
+                  type="number" 
+                  value={formData.amount} 
+                  onChange={e => setFormData({...formData, amount: e.target.value})} 
+                  placeholder="0" 
+                  required 
+                  disabled={!isAuthorized}
+                />
               </div>
             </div>
             <div className="form-row">
               <div className="input-group full-width">
                 <label>Details</label>
-                <input type="text" value={formData.detail} onChange={e => setFormData({...formData, detail: e.target.value})} placeholder="Ex: Staff Lunch, Petrol..." />
+                <input 
+                  type="text" 
+                  value={formData.detail} 
+                  onChange={e => setFormData({...formData, detail: e.target.value})} 
+                  placeholder={isAuthorized ? "Ex: Staff Lunch, Petrol..." : "🔒 Access Restricted"} 
+                  disabled={!isAuthorized}
+                />
               </div>
-              <button type="submit" className="save-expense-btn">SAVE EXPENSE</button>
+              <button 
+                type="submit" 
+                className="save-expense-btn"
+                disabled={!isAuthorized}
+                style={{ 
+                  opacity: isAuthorized ? 1 : 0.6,
+                  cursor: isAuthorized ? 'pointer' : 'not-allowed'
+                }}
+              >
+                {isAuthorized ? "SAVE EXPENSE" : "🔒 LOCKED"}
+              </button>
             </div>
           </form>
         </div>
 
-        {/* 2. Toggle Button */}
         <button className="toggle-history-btn" onClick={() => setShowHistory(!showHistory)}>
           {showHistory ? "⬆ Hide History" : "⬇ Show History List"}
         </button>
       </div>
 
-      {/* 3. Scrollable Table History */}
       {showHistory && (
         <div className="expense-history-scroll">
            <table className="modern-sales-table">

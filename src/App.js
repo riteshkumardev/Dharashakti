@@ -120,18 +120,18 @@ console.log(user, "<<<<< App.js user state after listener");
 
             {/* PROTECTED */}
             <Route path="/" element={<ProtectedRoute><Home user={user} /></ProtectedRoute>} />
-            <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
-            <Route path="/profit-loss" element={<ProtectedRoute><ProfitLoss /></ProtectedRoute>} />
-            <Route path="/expenses" element={<ProtectedRoute><ExpenseManager /></ProtectedRoute>} />
-            <Route path="/staff-ledger" element={<ProtectedRoute><EmployeeLedger /></ProtectedRoute>} />
-            <Route path="/sales-entry" element={<ProtectedRoute><SalesEntry /></ProtectedRoute>} />
-            <Route path="/sales-table" element={<ProtectedRoute><SalesTable /></ProtectedRoute>} />
-            <Route path="/purchase-form" element={<ProtectedRoute><PurchaseForm /></ProtectedRoute>} />
-            <Route path="/purchase-table" element={<ProtectedRoute><PurchaseTable /></ProtectedRoute>} />
-            <Route path="/employee-table" element={<ProtectedRoute><EmployeeTable /></ProtectedRoute>} />
-            <Route path="/employee-details/:id" element={<ProtectedRoute><EmployeeDetails /></ProtectedRoute>} />
-            <Route path="/stock-management" element={<ProtectedRoute><StockManagement /></ProtectedRoute>} />
-            <Route path="/stock-add" element={<ProtectedRoute><StockAddForm /></ProtectedRoute>} />
+            <Route path="/attendance" element={<ProtectedRoute><Attendance role={user?user.role:"" }/></ProtectedRoute>} />
+            <Route path="/profit-loss" element={<ProtectedRoute><ProfitLoss role={user?user.role:"" } /></ProtectedRoute>} />
+            <Route path="/expenses" element={<ProtectedRoute><ExpenseManager role={user?user.role:"" } /></ProtectedRoute>} />
+            <Route path="/staff-ledger" element={<ProtectedRoute><EmployeeLedger role={user?user.role:"" }/></ProtectedRoute>} />
+            <Route path="/sales-entry" element={<ProtectedRoute><SalesEntry role={user?user.role:"" } /></ProtectedRoute>} />
+            <Route path="/sales-table" element={<ProtectedRoute><SalesTable role={user?user.role:"" }/></ProtectedRoute>} />
+            <Route path="/purchase-form" element={<ProtectedRoute><PurchaseForm role={user?user.role:"" }/></ProtectedRoute>} />
+            <Route path="/purchase-table" element={<ProtectedRoute><PurchaseTable role={user?user.role:"" } /></ProtectedRoute>} />
+            <Route path="/employee-table" element={<ProtectedRoute><EmployeeTable role={user?user.role:"" }/></ProtectedRoute>} />
+            <Route path="/employee-details/:id" element={<ProtectedRoute><EmployeeDetails role={user?user.role:"" }/></ProtectedRoute>} />
+            <Route path="/stock-management" element={<ProtectedRoute><StockManagement role={user?user.role:"" }/></ProtectedRoute>} />
+            <Route path="/stock-add" element={<ProtectedRoute><StockAddForm role={user?user.role:"" }/></ProtectedRoute>} />
 
             {/* ADMIN ONLY */}
             <Route
