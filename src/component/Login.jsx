@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { getDatabase, ref, get, update } from "firebase/database";
 import { app } from "../redux/api/firebase/firebase";
 import { useNavigate } from "react-router-dom";
-import Loader from "./Core_Component/Loader/Loader"; // ✅ Loader import kiya
+import Loader from "./Core_Component/Loader/Loader"; 
+import CustomSnackbar from "./Core_Component/Snackbar/CustomSnackbar"; // ✅ Snackbar Import
 import "../App.css";
 
 const generateSessionId = () =>
@@ -11,15 +12,22 @@ const generateSessionId = () =>
 function Login({ setUser }) {
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   /* --- 🔢 Captcha States --- */
   const [captcha, setCaptcha] = useState({ num1: 0, num2: 0, total: 0 });
   const [userCaptcha, setUserCaptcha] = useState("");
 
+  /* 🔔 Snackbar State */
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "error" });
+
   const navigate = useNavigate();
   const db = getDatabase(app);
+
+  // Snackbar Helper
+  const showMsg = (msg, type = "error") => {
+    setSnackbar({ open: true, message: msg, severity: type });
+  };
 
   const refreshCaptcha = () => {
     const n1 = Math.floor(Math.random() * 10) + 1;
@@ -38,20 +46,19 @@ function Login({ setUser }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
 
     // 1. Captcha Verification
     if (parseInt(userCaptcha) !== captcha.total) {
-      setError("❌ Invalid Captcha. Please solve again.");
+      showMsg("❌ Invalid Captcha. Please solve again.", "error");
       refreshCaptcha();
       return;
     }
 
-    setLoading(true); // 🔄 Loader On
+    setLoading(true); 
     const cleanId = employeeId.trim();
 
     if (!/^\d{8}$/.test(cleanId)) {
-      setError("Please enter a valid 8-digit numeric ID.");
+      showMsg("Please enter a valid 8-digit numeric ID.", "warning");
       setLoading(false);
       return;
     }
@@ -61,7 +68,7 @@ function Login({ setUser }) {
       const snapshot = await get(usersRef);
 
       if (!snapshot.exists()) {
-        setError("No employees registered.");
+        showMsg("No employees registered in system.", "error");
         setLoading(false);
         return;
       }
@@ -72,7 +79,7 @@ function Login({ setUser }) {
       );
 
       if (!foundKey) {
-        setError("❌ Invalid Employee ID.");
+        showMsg("❌ Invalid Employee ID.", "error");
         refreshCaptcha();
         setLoading(false);
         return;
@@ -82,7 +89,7 @@ function Login({ setUser }) {
 
       // 3. Password Verification
       if (userData.password !== password) {
-        setError("❌ Incorrect Password.");
+        showMsg("❌ Incorrect Password.", "error");
         refreshCaptcha();
         setLoading(false);
         return;
@@ -90,7 +97,7 @@ function Login({ setUser }) {
 
       // 4. Blocked status check
       if (userData.isBlocked) {
-        setError("🚫 Your account is blocked by Admin.");
+        showMsg("🚫 Your account is blocked by Admin.", "error");
         setLoading(false);
         return;
       }
@@ -113,27 +120,23 @@ function Login({ setUser }) {
 
         localStorage.setItem("user", JSON.stringify(finalUser));
         setUser(finalUser);
-        setLoading(false); // ✅ Loader Off
+        setLoading(false); 
         navigate("/", { replace: true });
       }, 1000);
 
     } catch (err) {
-      setError("Login failed: " + err.message);
+      showMsg("Login failed: " + err.message, "error");
       refreshCaptcha();
       setLoading(false);
     }
   };
 
-  // ✅ Global Loader Overlay: Jab verify ho raha ho
+  // ✅ UI Logic: Jab tak verify ho raha ho, Loader dikhega
   if (loading) return <Loader />;
 
   return (
     <div className="login-box">
       <h2>Dharashakti Login</h2>
-
-      {error && (
-        <p style={{ color: "red", fontWeight: "bold", textAlign: "center" }}>{error}</p>
-      )}
 
       <form onSubmit={handleSubmit}>
         <div className="input-group">
@@ -202,6 +205,14 @@ function Login({ setUser }) {
           {loading ? "Verifying Access..." : "Login Now"}
         </button>
       </form>
+
+      {/* 🔔 MUI Snackbar for Modern Errors */}
+      <CustomSnackbar 
+        open={snackbar.open} 
+        message={snackbar.message} 
+        severity={snackbar.severity} 
+        onClose={() => setSnackbar({ ...snackbar, open: false })} 
+      />
     </div>
   );
 }

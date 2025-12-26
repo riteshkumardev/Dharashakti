@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { getDatabase, ref, onValue, update, push } from "firebase/database";
 import { useNavigate } from "react-router-dom"; 
 import { app } from "../../redux/api/firebase/firebase";
-import Loader from "../Core_Component/Loader/Loader"; // ✅ Correct Import
+import Loader from "../Core_Component/Loader/Loader"; 
+import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar"; // ✅ Snackbar Import
 import './MasterPanel.css';
 
 const MasterPanel = ({ user }) => { 
@@ -12,9 +13,15 @@ const MasterPanel = ({ user }) => {
   const [search, setSearch] = useState('');
   const [logs, setLogs] = useState([]);
   
-  // ⏳ Loading States
+  // ⏳ Feedback States
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+
+  // 🔔 Snackbar Helper
+  const showMsg = (msg, type = "success") => {
+    setSnackbar({ open: true, message: msg, severity: type });
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -25,7 +32,6 @@ const MasterPanel = ({ user }) => {
       if (data) {
         setUsers(Object.keys(data).map(k => ({ firebaseId: k, ...data[k] })));
       }
-      // Fake delay for smooth UI feel
       setTimeout(() => setLoading(false), 800);
     });
 
@@ -58,10 +64,11 @@ const MasterPanel = ({ user }) => {
         timestamp: Date.now()
       });
 
-      // Role change ya block hone par alert
-      console.log("System Updated");
+      // ✅ Success Notification
+      showMsg(`System Updated: ${field.toUpperCase()} set to ${value}`, "success");
+      
     } catch (err) {
-      alert("System Error: " + err.message);
+      showMsg("System Error: " + err.message, "error");
     } finally {
       setActionLoading(false); // Action khatam
     }
@@ -72,12 +79,11 @@ const MasterPanel = ({ user }) => {
     u.employeeId?.toString().includes(search)
   );
 
-  // ✅ Global Loader (Pehli baar page khulne par)
   if (loading) return <Loader />;
 
   return (
     <div className="master-panel-page">
-      {/* Action Loader Overlay (Jab block/role change ho raha ho) */}
+      {/* Action Loader Overlay */}
       {actionLoading && (
         <div className="action-loader-overlay" style={{
           position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
@@ -180,6 +186,14 @@ const MasterPanel = ({ user }) => {
           </div>
         </div>
       </div>
+
+      {/* 🔔 CUSTOM SNACKBAR */}
+      <CustomSnackbar 
+        open={snackbar.open} 
+        message={snackbar.message} 
+        severity={snackbar.severity} 
+        onClose={() => setSnackbar({ ...snackbar, open: false })} 
+      />
     </div>
   );
 };

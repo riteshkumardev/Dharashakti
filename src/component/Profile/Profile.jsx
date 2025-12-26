@@ -9,7 +9,10 @@ import {
 } from "firebase/storage";
 import { app } from "../../redux/api/firebase/firebase";
 import { useNavigate } from "react-router-dom";
-import Loader from "../Core_Component/Loader/Loader"; // ✅ Loader integration
+
+// 🏗️ Core Components
+import Loader from "../Core_Component/Loader/Loader";
+import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar"; // ✅ Snackbar Import
 
 export default function Profile({ user, setUser }) {
   // State Initialization
@@ -20,19 +23,25 @@ export default function Profile({ user, setUser }) {
     user?.photoURL || user?.photo || "https://i.imgur.com/6VBx3io.png"
   );
   
-  // ⏳ Global Loading State
+  // ⏳ Feedback States
   const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const db = getDatabase(app);
   const storage = getStorage(app);
   const navigate = useNavigate();
 
+  // 🔔 Snackbar Helper
+  const showMsg = (msg, type = "success") => {
+    setSnackbar({ open: true, message: msg, severity: type });
+  };
+
   /* ================= UPDATE PROFILE (NAME & PHONE) ================= */
   const updateProfile = async () => {
-    if (!user?.firebaseId) return alert("User ID not found!");
+    if (!user?.firebaseId) return showMsg("User ID not found!", "error");
     
     try {
-      setLoading(true); // 🔄 Loader On
+      setLoading(true);
 
       const updates = {
         name: name,
@@ -50,12 +59,12 @@ export default function Profile({ user, setUser }) {
       localStorage.setItem("user", JSON.stringify(updatedUser));
       setUser(updatedUser);
 
-      alert("✅ Profile details updated successfully!");
+      showMsg("✅ Profile details updated successfully!", "success");
     } catch (e) {
       console.error(e);
-      alert("❌ Update failed: " + e.message);
+      showMsg("❌ Update failed: " + e.message, "error");
     } finally {
-      setLoading(false); // ✅ Loader Off
+      setLoading(false);
     }
   };
 
@@ -63,10 +72,10 @@ export default function Profile({ user, setUser }) {
   const changePassword = async () => {
     try {
       if (newPassword.length < 4) {
-        alert("Password must be at least 4 characters");
+        showMsg("Password must be at least 4 characters", "warning");
         return;
       }
-      setLoading(true); // 🔄 Loader On
+      setLoading(true);
 
       await update(ref(db, `employees/${user.firebaseId}`), {
         password: newPassword,
@@ -76,12 +85,12 @@ export default function Profile({ user, setUser }) {
       localStorage.setItem("user", JSON.stringify(updatedUser));
       setUser(updatedUser);
 
-      alert("🔐 Password updated in Database!");
+      showMsg("🔐 Password updated in Database!", "success");
       setNewPassword("");
     } catch (e) {
-      alert("❌ Password update failed");
+      showMsg("❌ Password update failed", "error");
     } finally {
-      setLoading(false); // ✅ Loader Off
+      setLoading(false);
     }
   };
 
@@ -91,7 +100,7 @@ export default function Profile({ user, setUser }) {
     if (!file) return;
 
     try {
-      setLoading(true); // 🔄 Loader On
+      setLoading(true);
       
       const imageRef = sRef(
         storage,
@@ -116,19 +125,19 @@ export default function Profile({ user, setUser }) {
       setUser(updatedUser);
       setPhotoURL(downloadURL);
 
-      alert("✅ Profile image updated!");
+      showMsg("✅ Profile image updated!", "success");
     } catch (err) {
       console.error(err);
-      alert("❌ Image upload failed: " + err.message);
+      showMsg("❌ Image upload failed: " + err.message, "error");
     } finally {
-      setLoading(false); // ✅ Loader Off
+      setLoading(false);
     }
   };
 
   /* ================= LOGOUT ================= */
   const logout = async () => {
     try {
-      setLoading(true); // 🔄 Loader On
+      setLoading(true);
       await update(ref(db, `employees/${user.firebaseId}`), {
         currentSessionId: null,
         lastLogoutAt: new Date().toISOString(),
@@ -138,12 +147,12 @@ export default function Profile({ user, setUser }) {
     } finally {
       localStorage.removeItem("user");
       setUser(null);
-      setLoading(false); // ✅ Loader Off
+      setLoading(false);
       navigate("/login");
     }
   };
 
-  // ✅ UI Security: Jab loading ho tab Loader overlay dikhao
+  // UI Security: Jab loading ho tab Loader overlay dikhao
   if (loading) return <Loader />;
 
   return (
@@ -206,6 +215,14 @@ export default function Profile({ user, setUser }) {
           {loading ? "Logging out..." : "🔒 Logout from Device"}
         </button>
       </div>
+
+      {/* 🔔 CUSTOM SNACKBAR */}
+      <CustomSnackbar 
+        open={snackbar.open} 
+        message={snackbar.message} 
+        severity={snackbar.severity} 
+        onClose={() => setSnackbar({ ...snackbar, open: false })} 
+      />
     </div>
   );
 }

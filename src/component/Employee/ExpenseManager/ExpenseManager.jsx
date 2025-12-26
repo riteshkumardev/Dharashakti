@@ -3,11 +3,14 @@ import { getDatabase, ref, onValue, push, set } from "firebase/database";
 import { app } from "../../../redux/api/firebase/firebase";
 import './ExpenseManager.css';
 
-// 👈 role prop add kiya gaya hai
+// 🏗️ Core Components Import
+import Loader from "../../Core_Component/Loader/Loader";
+import CustomSnackbar from "../../Core_Component/Snackbar/CustomSnackbar";
+
 const ExpenseManager = ({ role }) => {
   const db = getDatabase(app);
   
-  // 🔐 Permission Check: Sirf Admin aur Accountant hi kharcha add kar sakte hain
+  // 🔐 Permission Check
   const isAuthorized = role === "Admin" || role === "Accountant";
 
   const [allExpenses, setAllExpenses] = useState([]);
@@ -17,7 +20,17 @@ const ExpenseManager = ({ role }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [formData, setFormData] = useState({ category: 'Khana-Pina', amount: '', detail: '' });
 
+  // ⏳ Feedback States
+  const [loading, setLoading] = useState(true);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+
+  // 🔔 Snackbar Helper
+  const showMsg = (msg, type = "success") => {
+    setSnackbar({ open: true, message: msg, severity: type });
+  };
+
   useEffect(() => {
+    setLoading(true);
     const expRef = ref(db, `dailyExpenses`);
     const unsubscribe = onValue(expRef, (snapshot) => {
       const data = snapshot.val();
@@ -35,6 +48,9 @@ const ExpenseManager = ({ role }) => {
       tempAllList.sort((a, b) => new Date(b.displayDate) - new Date(a.displayDate));
       setAllExpenses(tempAllList);
       setGrandTotal(total);
+      
+      // Artificial delay for smooth feel
+      setTimeout(() => setLoading(false), 800);
     });
     return () => unsubscribe();
   }, [db]);
@@ -44,11 +60,16 @@ const ExpenseManager = ({ role }) => {
 
     // 🛑 Security Guard
     if (!isAuthorized) {
-      alert("Unauthorized: Aapko expense add karne ki permission nahi hai.");
+      showMsg("Unauthorized: Aapko expense add karne ki permission nahi hai.", "error");
       return;
     }
 
-    if(!formData.amount) return alert("Please enter amount");
+    if(!formData.amount) {
+        showMsg("Please enter amount", "warning");
+        return;
+    }
+
+    setLoading(true); // 🔄 Action Loader
     try {
       const expRef = ref(db, `dailyExpenses/${selectedDate}`);
       await set(push(expRef), { 
@@ -57,12 +78,22 @@ const ExpenseManager = ({ role }) => {
         entryTimestamp: Date.now() 
       });
       setFormData({ category: 'Khana-Pina', amount: '', detail: '' });
-      alert("✅ Saved!");
-    } catch (error) { alert("Error: " + error.message); }
+      showMsg("✅ Expense Saved Successfully!", "success");
+    } catch (error) { 
+      showMsg("Error: " + error.message, "error"); 
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Global Initial Loader
+  if (loading && allExpenses.length === 0) return <Loader />;
 
   return (
     <div className="expense-fixed-container">
+      {/* 🔄 Action Loader (Jab submit ho raha ho) */}
+      {loading && <Loader />}
+
       <div className="expense-top-section">
         <div className="table-header-row">
           <h2 className="table-title">COMPANY EXPENSES</h2>
@@ -72,7 +103,6 @@ const ExpenseManager = ({ role }) => {
           </div>
         </div>
 
-        {/* 🔐 Form protected by role */}
         <div className={`expense-form-card ${!isAuthorized ? 'form-locked' : ''}`}>
           {!isAuthorized && (
             <p style={{ color: '#d32f2f', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px' }}>
@@ -87,7 +117,7 @@ const ExpenseManager = ({ role }) => {
                   type="date" 
                   value={selectedDate} 
                   onChange={(e) => setSelectedDate(e.target.value)} 
-                  disabled={!isAuthorized}
+                  disabled={!isAuthorized || loading}
                 />
               </div>
               <div className="input-group">
@@ -95,7 +125,7 @@ const ExpenseManager = ({ role }) => {
                 <select 
                   value={formData.category} 
                   onChange={e => setFormData({...formData, category: e.target.value})}
-                  disabled={!isAuthorized}
+                  disabled={!isAuthorized || loading}
                 >
                   <option value="Khana-Pina">Khana-Pina</option>
                   <option value="Dawai">Dawai</option>
@@ -111,7 +141,7 @@ const ExpenseManager = ({ role }) => {
                   onChange={e => setFormData({...formData, amount: e.target.value})} 
                   placeholder="0" 
                   required 
-                  disabled={!isAuthorized}
+                  disabled={!isAuthorized || loading}
                 />
               </div>
             </div>
@@ -123,19 +153,19 @@ const ExpenseManager = ({ role }) => {
                   value={formData.detail} 
                   onChange={e => setFormData({...formData, detail: e.target.value})} 
                   placeholder={isAuthorized ? "Ex: Staff Lunch, Petrol..." : "🔒 Access Restricted"} 
-                  disabled={!isAuthorized}
+                  disabled={!isAuthorized || loading}
                 />
               </div>
               <button 
                 type="submit" 
                 className="save-expense-btn"
-                disabled={!isAuthorized}
+                disabled={!isAuthorized || loading}
                 style={{ 
                   opacity: isAuthorized ? 1 : 0.6,
-                  cursor: isAuthorized ? 'pointer' : 'not-allowed'
+                  cursor: (isAuthorized && !loading) ? 'pointer' : 'not-allowed'
                 }}
               >
-                {isAuthorized ? "SAVE EXPENSE" : "🔒 LOCKED"}
+                {loading ? "SAVING..." : (isAuthorized ? "SAVE EXPENSE" : "🔒 LOCKED")}
               </button>
             </div>
           </form>
@@ -149,27 +179,38 @@ const ExpenseManager = ({ role }) => {
       {showHistory && (
         <div className="expense-history-scroll">
            <table className="modern-sales-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Category</th>
-                  <th>Details</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allExpenses.map((exp) => (
-                  <tr key={exp.id}>
-                    <td>{exp.displayDate}</td>
-                    <td><span className="unit-badge">{exp.category}</span></td>
-                    <td>{exp.detail}</td>
-                    <td className="amount-red">₹{exp.amount}</td>
-                  </tr>
-                ))}
-              </tbody>
+             <thead>
+               <tr>
+                 <th>Date</th>
+                 <th>Category</th>
+                 <th>Details</th>
+                 <th>Amount</th>
+               </tr>
+             </thead>
+             <tbody>
+               {allExpenses.map((exp) => (
+                 <tr key={exp.id}>
+                   <td>{exp.displayDate}</td>
+                   <td><span className="unit-badge">{exp.category}</span></td>
+                   <td>{exp.detail}</td>
+                   <td className="amount-red">₹{exp.amount}</td>
+                 </tr>
+               ))}
+               {allExpenses.length === 0 && (
+                 <tr><td colSpan="4" style={{textAlign:'center', padding:'20px'}}>No expenses found.</td></tr>
+               )}
+             </tbody>
            </table>
         </div>
       )}
+
+      {/* 🔔 Custom Snackbar Integration */}
+      <CustomSnackbar 
+        open={snackbar.open} 
+        message={snackbar.message} 
+        severity={snackbar.severity} 
+        onClose={() => setSnackbar({ ...snackbar, open: false })} 
+      />
     </div>
   );
 };

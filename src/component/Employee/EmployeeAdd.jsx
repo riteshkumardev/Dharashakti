@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
-import { getDatabase, ref, push, set, get, child } from "firebase/database";
+import { getDatabase, ref, set, get, child } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
 import './Emp.css';
 
+// 🏗️ Core Components Import
+import Loader from "../Core_Component/Loader/Loader";
+import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
+
 const EmployeeAdd = ({ onEntrySaved }) => {
   const db = getDatabase(app);
+  
+  // ⏳ States for Feedback
   const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const [formData, setFormData] = useState({
     name: "",
@@ -21,10 +28,15 @@ const EmployeeAdd = ({ onEntrySaved }) => {
     accountNo: "",
     ifscCode: "",
     photo: "",
-    password: "" // 👈 Naya field add kiya
+    password: "" 
   });
 
-  // --- 8-Digit Unique ID Generator Function (Wahi purana logic) ---
+  // 🔔 Snackbar Helper Function
+  const showMsg = (msg, type = "success") => {
+    setSnackbar({ open: true, message: msg, severity: type });
+  };
+
+  // --- 🔢 8-Digit Unique ID Generator (Wahi purana logic) ---
   const generateUniqueID = async () => {
     let isUnique = false;
     let newID = "";
@@ -58,13 +70,13 @@ const EmployeeAdd = ({ onEntrySaved }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // 👈 Password validation bhi add ki gayi hai
+    
     if (!formData.name || !formData.aadhar || !formData.salary || !formData.password) {
-      alert("Please fill Name, Aadhar, Salary and Password!");
+      showMsg("Please fill Name, Aadhar, Salary and Password!", "warning");
       return;
     }
 
-    setLoading(true);
+    setLoading(true); // 🔄 Global Loader On
     try {
       const empID = await generateUniqueID();
       const empRef = ref(db, `employees/${empID}`);
@@ -72,91 +84,99 @@ const EmployeeAdd = ({ onEntrySaved }) => {
       await set(empRef, {
         ...formData,
         employeeId: empID,
-        createdAt: new Date().toISOString()
+        role: formData.designation === "Admin" ? "Admin" : (formData.designation === "Manager" ? "Manager" : "Worker"), // Set role based on designation
+        createdAt: new Date().toISOString(),
+        isBlocked: false // Default active
       });
 
-      alert(`🎉 New Employee Registered! \nID: ${empID} \nPassword: ${formData.password}`);
+      showMsg(`🎉 Employee Registered! ID: ${empID}`, "success");
+      
       if (onEntrySaved) onEntrySaved();
       
+      // Reset Form
       setFormData({
         name: "", fatherName: "", phone: "", emergencyPhone: "",
         aadhar: "", address: "", designation: "Worker",
         joiningDate: new Date().toISOString().split("T")[0],
         salary: "", bankName: "", accountNo: "", ifscCode: "", photo: "",
-        password: "" // 👈 Reset password field
+        password: "" 
       });
+
     } catch (err) {
-      alert("Error: " + err.message);
+      showMsg("Registration Error: " + err.message, "error");
     } finally {
-      setLoading(false);
+      // Chhota sa delay taaki Snackbar message user padh sake bina UI flickering ke
+      setTimeout(() => setLoading(false), 500);
     }
   };
 
   return (
     <div className="table-card-wide">
+      {/* 🔄 Global Loader Overlay */}
+      {loading && <Loader />}
+
       <h2 className="table-title">Employee Registration Form</h2>
       <form onSubmit={handleSubmit} className="stock-form-grid">
         
         <div className="input-group">
           <label>Employee Name *</label>
-          <input type="text" name="name" value={formData.name} onChange={handleChange} required />
+          <input type="text" name="name" value={formData.name} onChange={handleChange} required disabled={loading} />
         </div>
         <div className="input-group">
           <label>Father's Name</label>
-          <input type="text" name="fatherName" value={formData.fatherName} onChange={handleChange} />
+          <input type="text" name="fatherName" value={formData.fatherName} onChange={handleChange} disabled={loading} />
         </div>
         <div className="input-group">
           <label>Profile Photo</label>
-          <input type="file" accept="image/*" onChange={handlePhotoChange} />
+          <input type="file" accept="image/*" onChange={handlePhotoChange} disabled={loading} />
         </div>
 
         <div className="input-group">
           <label>Phone Number *</label>
-          <input type="number" name="phone" value={formData.phone} onChange={handleChange} required />
+          <input type="number" name="phone" value={formData.phone} onChange={handleChange} required disabled={loading} />
         </div>
         <div className="input-group">
           <label>Emergency Contact</label>
-          <input type="number" name="emergencyPhone" value={formData.emergencyPhone} onChange={handleChange} />
+          <input type="number" name="emergencyPhone" value={formData.emergencyPhone} onChange={handleChange} disabled={loading} />
         </div>
         <div className="input-group">
           <label>Aadhar Number *</label>
-          <input type="number" name="aadhar" value={formData.aadhar} onChange={handleChange} required />
+          <input type="number" name="aadhar" value={formData.aadhar} onChange={handleChange} required disabled={loading} />
         </div>
 
         <div className="input-group">
           <label>Designation</label>
-          <select name="designation" value={formData.designation} onChange={handleChange}>
+          <select name="designation" value={formData.designation} onChange={handleChange} disabled={loading}>
             <option value="Manager">Manager</option>
             <option value="Operator">Operator</option>
             <option value="Worker">Worker</option>
             <option value="Driver">Driver</option>
             <option value="Helper">Helper</option>
-            <option value="Admin">Admin</option> {/* Admin option agar aap dena chahein */}
+            <option value="Admin">Admin</option>
           </select>
         </div>
         <div className="input-group">
           <label>Joining Date</label>
-          <input type="date" name="joiningDate" value={formData.joiningDate} onChange={handleChange} />
+          <input type="date" name="joiningDate" value={formData.joiningDate} onChange={handleChange} disabled={loading} />
         </div>
         <div className="input-group">
           <label>Monthly Salary / Daily Wage *</label>
-          <input type="number" name="salary" value={formData.salary} onChange={handleChange} required />
+          <input type="number" name="salary" value={formData.salary} onChange={handleChange} required disabled={loading} />
         </div>
 
         <div className="input-group">
           <label>Bank Name</label>
-          <input type="text" name="bankName" value={formData.bankName} onChange={handleChange} />
+          <input type="text" name="bankName" value={formData.bankName} onChange={handleChange} disabled={loading} />
         </div>
         <div className="input-group">
           <label>Account Number</label>
-          <input type="text" name="accountNo" value={formData.accountNo} onChange={handleChange} />
+          <input type="text" name="accountNo" value={formData.accountNo} onChange={handleChange} disabled={loading} />
         </div>
         <div className="input-group">
           <label>IFSC Code</label>
-          <input type="text" name="ifscCode" value={formData.ifscCode} onChange={handleChange} />
+          <input type="text" name="ifscCode" value={formData.ifscCode} onChange={handleChange} disabled={loading} />
         </div>
 
-        {/* 🔥 YAHAN PASSWORD FIELD ADD KIYA HAI 🔥 */}
         <div className="input-group">
           <label style={{color: '#d32f2f', fontWeight: 'bold'}}>Login Password *</label>
           <input 
@@ -167,20 +187,29 @@ const EmployeeAdd = ({ onEntrySaved }) => {
             onChange={handleChange} 
             required 
             style={{borderColor: '#ffcdd2'}}
+            disabled={loading}
           />
         </div>
 
         <div className="input-group span-4">
           <label>Full Address</label>
-          <input type="text" name="address" value={formData.address} onChange={handleChange} />
+          <input type="text" name="address" value={formData.address} onChange={handleChange} disabled={loading} />
         </div>
 
         <div className="button-container-full">
           <button type="submit" className="btn-submit-colored" disabled={loading}>
-            {loading ? "Registering..." : "✅ Register Employee"}
+            {loading ? "Registering Employee..." : "✅ Register Employee"}
           </button>
         </div>
       </form>
+
+      {/* 🔔 MUI Snackbar for modern Alerts */}
+      <CustomSnackbar 
+        open={snackbar.open} 
+        message={snackbar.message} 
+        severity={snackbar.severity} 
+        onClose={() => setSnackbar({ ...snackbar, open: false })} 
+      />
     </div>
   );
 };

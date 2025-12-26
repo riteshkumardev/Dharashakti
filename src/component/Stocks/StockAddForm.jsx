@@ -1,9 +1,12 @@
 import React, { useState } from "react";
-import { getDatabase, ref, push, set } from "firebase/database";
+import { getDatabase, ref, push } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
-import Alert from "../Core_Component/Alert/Alert";
 
-const  StockAddForm= ({ role }) => { // 👈 Prop received
+// 🏗️ Core Components Import
+import Loader from "../Core_Component/Loader/Loader";
+import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
+
+const StockAddForm = ({ role }) => {
   const db = getDatabase(app);
 
   // 🔐 Permission Guard
@@ -24,15 +27,24 @@ const  StockAddForm= ({ role }) => { // 👈 Prop received
 
   const [formData, setFormData] = useState(initialState);
   const [loading, setLoading] = useState(false);
-  const [alertData, setAlertData] = useState({ show: false, title: "", message: "" });
 
-  const showAlert = (title, message) => setAlertData({ show: true, title, message });
-  const closeAlert = () => setAlertData((prev) => ({ ...prev, show: false }));
+  /* 🔔 Snackbar State (Modern Notification) */
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
+  // Helper to trigger Snackbar
+  const triggerMsg = (msg, type = "success") => {
+    setSnackbar({ open: true, message: msg, severity: type });
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     const updatedData = { ...formData, [name]: value };
 
+    // 🔢 Auto Calculation Logic (Original)
     if (name === "quantity" || name === "rate" || name === "paidAmount") {
       const total = (Number(updatedData.quantity) || 0) * (Number(updatedData.rate) || 0);
       const balance = total - (Number(updatedData.paidAmount) || 0);
@@ -47,91 +59,104 @@ const  StockAddForm= ({ role }) => { // 👈 Prop received
     
     // 🛑 Logic Guard
     if (!isAuthorized) {
-      showAlert("Denied ❌", "Aapko purchase entry karne ki permission nahi hai.");
+      triggerMsg("Denied: Aapko purchase entry karne ki permission nahi hai.", "error");
       return;
     }
 
-    setLoading(true);
+    setLoading(true); // 🔄 Global Loader Start
     try {
       const purchaseRef = ref(db, "purchases");
       await push(purchaseRef, { ...formData, timestamp: Date.now() });
-      showAlert("Success ✅", "Purchase record save ho gaya.");
+      
+      triggerMsg("✅ Purchase record saved successfully!", "success");
       setFormData(initialState);
     } catch (error) {
-      showAlert("Error ❌", "Data save nahi ho saka.");
+      triggerMsg("❌ Error: Data save nahi ho saka.", "error");
     } finally {
-      setLoading(false);
+      // 500ms delay for smooth UI feel
+      setTimeout(() => setLoading(false), 500);
     }
   };
 
   return (
-    <>
-      <div className="sales-container">
-        <div className="sales-card-wide">
-          <h2 className="form-title">Purchase Entry</h2>
-          <form onSubmit={handleSubmit} className="sales-form-grid">
-            
-            {/* Inputs - Sabhi ko disabled={!isAuthorized} kar sakte hain agar form touch bhi nahi karne dena */}
-            <div className="input-group">
-              <label>Date</label>
-              <input type="date" name="date" value={formData.date} onChange={handleChange} disabled={!isAuthorized} />
-            </div>
+    <div className="sales-container">
+      {/* 🔄 Global Loader Overlay */}
+      {loading && <Loader />}
 
-            <div className="input-group">
-              <label>Supplier Name</label>
-              <input name="supplierName" value={formData.supplierName} onChange={handleChange} required disabled={!isAuthorized} />
-            </div>
-
-            <div className="input-group">
-              <label>Item Name</label>
-              <input name="itemName" value={formData.itemName} onChange={handleChange} required disabled={!isAuthorized} />
-            </div>
-
-            <div className="input-group">
-              <label>Bill No</label>
-              <input name="billNo" value={formData.billNo} onChange={handleChange} required disabled={!isAuthorized} />
-            </div>
-
-            <div className="input-group">
-              <label>Quantity</label>
-              <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} disabled={!isAuthorized} />
-            </div>
-
-            <div className="input-group">
-              <label>Rate</label>
-              <input type="number" name="rate" value={formData.rate} onChange={handleChange} disabled={!isAuthorized} />
-            </div>
-
-            <div className="input-group readonly-group">
-              <label>Total Amount</label>
-              <input value={formData.totalAmount} readOnly />
-            </div>
-
-            <div className="input-group">
-              <label>Paid Amount</label>
-              <input type="number" name="paidAmount" value={formData.paidAmount} onChange={handleChange} disabled={!isAuthorized} />
-            </div>
-
-            <div className="input-group readonly-group">
-              <label>Balance</label>
-              <input value={formData.balanceAmount} readOnly />
-            </div>
-
-            <div className="button-container-full">
-              <button 
-                type="submit" 
-                className="btn-submit-colored" 
-                disabled={loading || !isAuthorized}
-                style={{ opacity: isAuthorized ? 1 : 0.6 }}
-              >
-                {loading ? "Saving..." : !isAuthorized ? "🔒 Read Only" : "✅ Save Purchase"}
-              </button>
-            </div>
-          </form>
+      <div className="sales-card-wide">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 className="form-title">Purchase Entry</h2>
+            {!isAuthorized && <span style={{ color: 'red', fontSize: '12px', fontWeight: 'bold' }}>🔒 READ ONLY</span>}
         </div>
+
+        <form onSubmit={handleSubmit} className="sales-form-grid">
+          
+          <div className="input-group">
+            <label>Date</label>
+            <input type="date" name="date" value={formData.date} onChange={handleChange} disabled={loading || !isAuthorized} />
+          </div>
+
+          <div className="input-group">
+            <label>Supplier Name</label>
+            <input name="supplierName" value={formData.supplierName} onChange={handleChange} required disabled={loading || !isAuthorized} />
+          </div>
+
+          <div className="input-group">
+            <label>Item Name</label>
+            <input name="itemName" value={formData.itemName} onChange={handleChange} required disabled={loading || !isAuthorized} />
+          </div>
+
+          <div className="input-group">
+            <label>Bill No</label>
+            <input name="billNo" value={formData.billNo} onChange={handleChange} required disabled={loading || !isAuthorized} />
+          </div>
+
+          <div className="input-group">
+            <label>Quantity</label>
+            <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} disabled={loading || !isAuthorized} />
+          </div>
+
+          <div className="input-group">
+            <label>Rate</label>
+            <input type="number" name="rate" value={formData.rate} onChange={handleChange} disabled={loading || !isAuthorized} />
+          </div>
+
+          <div className="input-group readonly-group">
+            <label>Total Amount (₹)</label>
+            <input value={formData.totalAmount} readOnly style={{ background: '#f0f0f0' }} />
+          </div>
+
+          <div className="input-group">
+            <label>Paid Amount (₹)</label>
+            <input type="number" name="paidAmount" value={formData.paidAmount} onChange={handleChange} disabled={loading || !isAuthorized} />
+          </div>
+
+          <div className="input-group readonly-group">
+            <label>Balance (₹)</label>
+            <input value={formData.balanceAmount} readOnly style={{ background: '#fff0f0', color: 'red', fontWeight: 'bold' }} />
+          </div>
+
+          <div className="button-container-full">
+            <button 
+              type="submit" 
+              className="btn-submit-colored" 
+              disabled={loading || !isAuthorized}
+              style={{ opacity: isAuthorized ? 1 : 0.6, cursor: isAuthorized ? 'pointer' : 'not-allowed' }}
+            >
+              {loading ? "Saving Data..." : !isAuthorized ? "🔒 Read Only Mode" : "✅ Save Purchase"}
+            </button>
+          </div>
+        </form>
       </div>
-      <Alert show={alertData.show} title={alertData.title} message={alertData.message} onClose={closeAlert} />
-    </>
+
+      {/* 🔔 MUI CustomSnackbar Integration */}
+      <CustomSnackbar 
+        open={snackbar.open} 
+        message={snackbar.message} 
+        severity={snackbar.severity} 
+        onClose={() => setSnackbar({ ...snackbar, open: false })} 
+      />
+    </div>
   );
 };
 
