@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./Profile.css";
 import { getDatabase, ref, update } from "firebase/database";
 import {
@@ -9,6 +9,7 @@ import {
 } from "firebase/storage";
 import { app } from "../../redux/api/firebase/firebase";
 import { useNavigate } from "react-router-dom";
+import Loader from "../Core_Component/Loader/Loader"; // ✅ Loader integration
 
 export default function Profile({ user, setUser }) {
   // State Initialization
@@ -18,6 +19,8 @@ export default function Profile({ user, setUser }) {
   const [photoURL, setPhotoURL] = useState(
     user?.photoURL || user?.photo || "https://i.imgur.com/6VBx3io.png"
   );
+  
+  // ⏳ Global Loading State
   const [loading, setLoading] = useState(false);
 
   const db = getDatabase(app);
@@ -29,9 +32,8 @@ export default function Profile({ user, setUser }) {
     if (!user?.firebaseId) return alert("User ID not found!");
     
     try {
-      setLoading(true);
+      setLoading(true); // 🔄 Loader On
 
-      // Realtime Database mein updates
       const updates = {
         name: name,
         phone: phone,
@@ -39,7 +41,6 @@ export default function Profile({ user, setUser }) {
 
       await update(ref(db, `employees/${user.firebaseId}`), updates);
 
-      // Local state aur localStorage update karein
       const updatedUser = {
         ...user,
         name,
@@ -54,7 +55,7 @@ export default function Profile({ user, setUser }) {
       console.error(e);
       alert("❌ Update failed: " + e.message);
     } finally {
-      setLoading(false);
+      setLoading(false); // ✅ Loader Off
     }
   };
 
@@ -65,14 +66,12 @@ export default function Profile({ user, setUser }) {
         alert("Password must be at least 4 characters");
         return;
       }
-      setLoading(true);
+      setLoading(true); // 🔄 Loader On
 
-      // Hum Auth update nahi karenge kyunki hum custom password use kar rahe hain
       await update(ref(db, `employees/${user.firebaseId}`), {
         password: newPassword,
       });
 
-      // Update local user state
       const updatedUser = { ...user, password: newPassword };
       localStorage.setItem("user", JSON.stringify(updatedUser));
       setUser(updatedUser);
@@ -82,7 +81,7 @@ export default function Profile({ user, setUser }) {
     } catch (e) {
       alert("❌ Password update failed");
     } finally {
-      setLoading(false);
+      setLoading(false); // ✅ Loader Off
     }
   };
 
@@ -92,21 +91,16 @@ export default function Profile({ user, setUser }) {
     if (!file) return;
 
     try {
-      setLoading(true);
+      setLoading(true); // 🔄 Loader On
       
-      // Image path: profileImages/8-digit-id.jpg
       const imageRef = sRef(
         storage,
         `profileImages/${user.firebaseId}.jpg`
       );
 
-      // Uploading...
       await uploadBytes(imageRef, file);
-      
-      // Get URL
       const downloadURL = await getDownloadURL(imageRef);
 
-      // Database mein photo update karein (photo aur photoURL dono keys update kar rahe hain safety ke liye)
       await update(ref(db, `employees/${user.firebaseId}`), {
         photo: downloadURL,
         photoURL: downloadURL,
@@ -127,15 +121,14 @@ export default function Profile({ user, setUser }) {
       console.error(err);
       alert("❌ Image upload failed: " + err.message);
     } finally {
-      setLoading(false);
+      setLoading(false); // ✅ Loader Off
     }
   };
 
   /* ================= LOGOUT ================= */
   const logout = async () => {
     try {
-      setLoading(true);
-      // Session clear karein
+      setLoading(true); // 🔄 Loader On
       await update(ref(db, `employees/${user.firebaseId}`), {
         currentSessionId: null,
         lastLogoutAt: new Date().toISOString(),
@@ -145,10 +138,13 @@ export default function Profile({ user, setUser }) {
     } finally {
       localStorage.removeItem("user");
       setUser(null);
-      setLoading(false);
+      setLoading(false); // ✅ Loader Off
       navigate("/login");
     }
   };
+
+  // ✅ UI Security: Jab loading ho tab Loader overlay dikhao
+  if (loading) return <Loader />;
 
   return (
     <div className="profile-wrapper">
@@ -156,7 +152,7 @@ export default function Profile({ user, setUser }) {
         {/* PROFILE IMAGE */}
         <div className="profile-img">
           <img src={photoURL} alt="profile" style={{ objectFit: 'cover' }} />
-          <label className="img-edit">
+          <label className="img-edit" title="Change Photo">
             📸
             <input
               type="file"
@@ -170,28 +166,25 @@ export default function Profile({ user, setUser }) {
 
         <h2 className="profile-title">{user?.role} Profile</h2>
 
-        {/* LOGIN INFO (ID Dikhayenge Email ki jagah) */}
         <div className="field">
           <label>Employee ID (Login User)</label>
-          <input value={user?.employeeId || user?.firebaseId || ""} disabled style={{ background: '#f0f0f0' }} />
+          <input value={user?.employeeId || user?.firebaseId || ""} disabled style={{ background: 'rgba(255,255,255,0.05)' }} />
         </div>
 
-        {/* BASIC INFO */}
         <div className="field">
           <label>Full Name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter name" />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter name" disabled={loading} />
         </div>
 
         <div className="field">
           <label>Phone Number</label>
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Enter phone" />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Enter phone" disabled={loading} />
         </div>
 
         <button onClick={updateProfile} disabled={loading} className="update-btn">
           {loading ? "Updating..." : "Update Details"}
         </button>
 
-        {/* SECURITY */}
         <div className="divider">Security & Password</div>
 
         <div className="field">
@@ -201,16 +194,16 @@ export default function Profile({ user, setUser }) {
             placeholder="Min 4 characters"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
+            disabled={loading}
           />
         </div>
 
         <button onClick={changePassword} disabled={loading || !newPassword}>
-          Change Password
+          {loading ? "Saving..." : "Change Password"}
         </button>
 
-        {/* LOGOUT */}
         <button className="danger" onClick={logout} disabled={loading} style={{ marginTop: '20px' }}>
-          {loading ? "Closing..." : "🔒 Logout from Device"}
+          {loading ? "Logging out..." : "🔒 Logout from Device"}
         </button>
       </div>
     </div>

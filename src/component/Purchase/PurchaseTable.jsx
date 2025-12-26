@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './Purchase.css';
 import { getDatabase, ref, onValue, remove, update } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
+import Loader from '../Core_Component/Loader/Loader';
 
 // 👈 role prop add kiya gaya hai
 const PurchaseTable = ({ role }) => {
@@ -79,7 +80,7 @@ const PurchaseTable = ({ role }) => {
     item.remarks?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) return <div className="no-records-box">Loading...</div>;
+  if (loading) return <Loader />;
 
   return (
     <div className="table-container-wide">

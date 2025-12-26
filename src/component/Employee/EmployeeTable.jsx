@@ -3,6 +3,7 @@ import './Emp.css';
 import { getDatabase, ref, onValue, remove, update } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
 import { useNavigate } from "react-router-dom";
+import Loader from '../Core_Component/Loader/Loader';
 
 // 👈 role prop add kiya gaya hai
 const EmployeeTable = ({ role }) => { 
@@ -83,7 +84,7 @@ const EmployeeTable = ({ role }) => {
     emp.employeeId?.toString().includes(search)
   );
 
-  if (loading) return <div className="no-records-box">Loading Staff Directory...</div>;
+  if (loading) return <Loader />;
 
   return (
     <div className="table-container-wide">

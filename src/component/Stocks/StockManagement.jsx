@@ -3,6 +3,7 @@ import "./Stock.css";
 import { getDatabase, ref, onValue, remove, update } from "firebase/database";
 import { app } from "../../redux/api/firebase/firebase";
 import Alert from "../Core_Component/Alert/Alert"; 
+import Loader from '../Core_Component/Loader/Loader';
 
 const StockManagement = ({ role }) => { // 👈 role prop add kiya gaya
   const db = getDatabase(app);
@@ -107,7 +108,7 @@ const StockManagement = ({ role }) => { // 👈 role prop add kiya gaya
     s.item?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) return <div className="no-records-box">Loading Live Inventory...</div>;
+  if (loading) return <Loader />;
 
   return (
     <>

@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { getDatabase, ref, onValue, set } from "firebase/database";
 import { app } from "../../../redux/api/firebase/firebase";
 import './Attendanc.css';
+import Loader from '../../Core_Component/Loader/Loader';
 
-// 👈 role prop add kiya gaya hai
 const Attendance = ({ role }) => {
   const db = getDatabase(app);
   
-  // 🔐 Permission Check: Sirf Admin aur Accountant hi hazri mark kar sakte hain
   const isAuthorized = role === "Admin" || role === "Accountant";
 
   const [employees, setEmployees] = useState([]);
@@ -16,7 +15,14 @@ const Attendance = ({ role }) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  // 1. Employees Load Karein
+  // 🛡️ Helper Function: ID ko chhupane ke liye (Ex: 12345678 -> XXXX5678)
+  const maskID = (id) => {
+    if (!id) return "---";
+    const strID = id.toString();
+    if (strID.length <= 4) return strID; // Agar ID bahut chhoti hai
+    return "XXXX" + strID.slice(-4); // Shuru ke characters ki jagah XXXX aur aakhri 4 digits
+  };
+
   useEffect(() => {
     const empRef = ref(db, "employees");
     const unsubscribe = onValue(empRef, (snapshot) => {
@@ -35,7 +41,6 @@ const Attendance = ({ role }) => {
     return () => unsubscribe();
   }, [db]);
 
-  // 2. Selected Date ki Attendance Load Karein
   useEffect(() => {
     const attRef = ref(db, `attendance/${date}`);
     const unsubscribe = onValue(attRef, (snapshot) => {
@@ -44,9 +49,7 @@ const Attendance = ({ role }) => {
     return () => unsubscribe();
   }, [date, db]);
 
-  // 3. Hazri Lagane ka Function with Guard
   const markAttendance = (empId, empName, status) => {
-    // 🛑 Security Guard
     if (!isAuthorized) {
       alert("Aapko attendance mark karne ki permission nahi hai.");
       return;
@@ -70,13 +73,11 @@ const Attendance = ({ role }) => {
     );
   });
 
-  if (loading) return <div className="no-records-box">Loading Staff Directory...</div>;
+  if (loading) return <Loader />;
 
   return (
     <div className="table-container-wide">
       <div className="table-card-wide">
-        
-        {/* Header Section */}
         <div className="table-header-row">
           <div>
             <h2 className="table-title">DAILY ATTENDANCE</h2>
@@ -90,7 +91,7 @@ const Attendance = ({ role }) => {
           <div className="btn-group-row" style={{gap: '12px'}}>
             <input 
               type="text" 
-              placeholder="Search ID or Name..." 
+              placeholder="Search Name or ID..." 
               className="table-search-box"
               style={{width: '220px'}}
               value={search}
@@ -106,7 +107,6 @@ const Attendance = ({ role }) => {
           </div>
         </div>
 
-        {/* Attendance Table */}
         <div className="table-responsive-wrapper">
           <table className="modern-sales-table">
             <thead>
@@ -125,8 +125,9 @@ const Attendance = ({ role }) => {
                   
                   return (
                     <tr key={emp.firebaseId}>
-                      <td style={{fontWeight: 'bold', color: '#2563eb'}}>
-                          {emp.employeeId || 'NEW'}
+                      <td style={{fontWeight: 'bold', color: '#2563eb', letterSpacing: '1px'}}>
+                          {/* 🔒 Masked ID yahan dikhayi degi */}
+                          {emp.employeeId ? maskID(emp.employeeId) : 'NEW'}
                       </td>
 
                       <td>
@@ -160,7 +161,6 @@ const Attendance = ({ role }) => {
                             className={`save-btn-ui ${currentStatus === 'Present' ? 'active-p' : ''}`} 
                             onClick={() => markAttendance(emp.firebaseId, emp.name, 'Present')}
                             disabled={!isAuthorized}
-                            title={!isAuthorized ? "No Permission" : "Mark Present"}
                             style={{ opacity: isAuthorized ? 1 : 0.5, cursor: isAuthorized ? "pointer" : "not-allowed" }}
                           >P</button>
                           
@@ -168,7 +168,6 @@ const Attendance = ({ role }) => {
                             className={`row-delete-btn ${currentStatus === 'Absent' ? 'active-a' : ''}`} 
                             onClick={() => markAttendance(emp.firebaseId, emp.name, 'Absent')}
                             disabled={!isAuthorized}
-                            title={!isAuthorized ? "No Permission" : "Mark Absent"}
                             style={{ opacity: isAuthorized ? 1 : 0.5, cursor: isAuthorized ? "pointer" : "not-allowed" }}
                           >A</button>
                           
@@ -176,7 +175,6 @@ const Attendance = ({ role }) => {
                             className={`ledger-btn-ui ${currentStatus === 'Half-Day' ? 'active-h' : ''}`} 
                             onClick={() => markAttendance(emp.firebaseId, emp.name, 'Half-Day')}
                             disabled={!isAuthorized}
-                            title={!isAuthorized ? "No Permission" : "Mark Half-Day"}
                             style={{ opacity: isAuthorized ? 1 : 0.5, cursor: isAuthorized ? "pointer" : "not-allowed" }}
                           >H</button>
                         </div>
@@ -187,7 +185,7 @@ const Attendance = ({ role }) => {
               ) : (
                 <tr>
                   <td colSpan="5" className="no-records-box">
-                    {search ? `"${search}" ke liye koi record nahi mila.` : "Staff list khali hai."}
+                    No results found.
                   </td>
                 </tr>
               )}
