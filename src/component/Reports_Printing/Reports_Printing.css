@@ -1,16 +1,19 @@
 /* --- 1. Screen View Styling --- */
 .reports-full-screen {
+    font-size: small;
     padding: 20px;
     background: #ffffff !important;
     min-height: 100vh;
 }
 
 .report-controls {
+    font-size: small;
     background: #fff;
-    padding: 25px;
+    /* padding: 25px; */
     border-radius: 12px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-    margin-bottom: 20px;
+    margin-top: 0px;
+    /* margin-bottom: 20px; */
 }
 
 .report-form-grid {
@@ -23,7 +26,7 @@
 .modern-report-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
+    /* margin-top: 20px; */
     background: #fff !important;
 }
 
@@ -125,11 +128,13 @@
     }
 
     .signature-box {
+     
         text-align: center;
         width: 250px;
     }
 
     .signature-box p {
+        
         margin: 5px 0;
         font-size: 11pt;
         color: #000 !important;
@@ -146,4 +151,8 @@
         /* Content ko manually margin dena taaki text kinaro se na kate */
         margin: 1.5cm !important; 
     }
+}
+.signboauthsign {
+    justify-content: space-between !important;
+
 }

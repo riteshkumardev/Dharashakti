@@ -54,7 +54,6 @@ const Reports_Printing = () => {
         showMsg(`${temp.length} Records found!`, "success");
     };
 
-    // Total calculation logic
     const calculateTotal = () => {
         return filteredData.reduce((sum, item) => sum + (Number(item.totalPrice) || Number(item.totalAmount) || Number(item.amount) || Number(item.salary) || 0), 0);
     };
@@ -64,20 +63,20 @@ const Reports_Printing = () => {
             {loading && <Loader />}
             
             <div className="report-controls no-print">
-                <h2 className="table-title">🖨️ Report & Billing Center</h2>
+                <h2 className="table-title">🖨️ Bill of Supply Center</h2>
                 <div className="report-form-grid">
                     <div className="input-group">
-                        <label>Report Category</label>
+                        <label>Category</label>
                         <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                            <option value="sales">Sales (Grahak)</option>
-                            <option value="purchases">Purchases (Stock)</option>
-                            <option value="employees">Employees (Salary)</option>
+                            <option value="sales">Sales</option>
+                            <option value="purchases">Purchases</option>
+                            <option value="employees">Employees</option>
                         </select>
                     </div>
                     <div className="input-group">
-                        <label>Filter By {category === 'sales' ? 'Buyer' : 'Person'}</label>
+                        <label>Filter By Name</label>
                         <select value={selectedSubItem} onChange={(e) => setSelectedSubItem(e.target.value)}>
-                            <option value="All">-- All Records --</option>
+                            <option value="All">-- All --</option>
                             {subList.map((name, i) => <option key={i} value={name}>{name}</option>)}
                         </select>
                     </div>
@@ -92,63 +91,86 @@ const Reports_Printing = () => {
                 </div>
                 <div className="report-actions">
                     <button className="btn-filter" onClick={handleFilter}>🔍 View Data</button>
-                    <button className="btn-print-main" onClick={() => window.print()}>🖨️ Print A4 Invoice</button>
+                    <button className="btn-print-main" onClick={() => window.print()}>🖨️ Print Bill of Supply</button>
                 </div>
             </div>
 
             <div className="printable-invoice A4">
                 <div className="invoice-header only-print">
-                    <div className="company-info">
-                        <h1>DHARA SHAKTI INDUSTRIES</h1>
-                        <p>Address: Industrial Area, Near Main Gate, City</p>
-                        <p>Contact: +91 99999-XXXXX | Email: dharashakti@gmail.com</p>
+                    <div className="bill-tag">BILL OF SUPPLY</div>
+                    <div className="company-info-center">
+                        <h1>DHARA SHAKTI AGRO PRODUCTS</h1>
+                        <p className="manufacture-line">MANUFACTURER OF CORN GRITS & FLOUR, RICE GRITS & FLOUR, ANIMAL FEED</p>
+                        <p>Sri Pur Gahar, Khanpur, Samastipur, Bihar-848117</p>
+                        <p>Mob.: 7325055939, 8789895589, 8102720905</p>
+                        <p>FSSAI : 2042331000141 | GSTIN : 10DZTPM1457E1ZE</p>
                     </div>
-                    <div className="report-meta">
-                        <h2>{category.toUpperCase()} REPORT</h2>
-                        <p><strong>Entity:</strong> {selectedSubItem}</p>
-                        <p><strong>Period:</strong> {startDate || 'Start'} to {endDate || 'End'}</p>
+                </div>
+
+                <div className="party-details-grid only-print">
+                    <div className="party-box">
+                        <p><strong>PARTY DETAILS:</strong> {selectedSubItem !== "All" ? selectedSubItem : "____________________"}</p>
+                        <p><strong>GSTIN / UIN:</strong> 10ABECS2390B1ZY</p>
+                    </div>
+                    <div className="invoice-meta-box">
+                        <p><strong>Invoice No:</strong> {filteredData[0]?.billNo || '____'}</p>
+                        <p><strong>Dated:</strong> {startDate || '__________'}</p>
+                        <p><strong>Place of Supply:</strong> Bihar</p>
                     </div>
                 </div>
 
                 <table className="modern-report-table">
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            {category === "sales" && <><th>Customer</th><th>Bill No</th><th>Product</th><th>Amount</th></>}
-                            {category === "purchases" && <><th>Item</th><th>Supplier</th><th>Qty</th><th>Amount</th></>}
-                            {category === "employees" && <><th>Name</th><th>Role</th><th>Salary Slip</th></>}
+                            <th>Sl. No.</th>
+                            <th>Description of Goods</th>
+                            <th>HSN / SAC</th>
+                            <th>Qty</th>
+                            <th>Rate</th>
+                            <th>Amount (Rs.)</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredData.map((item) => (
+                        {filteredData.map((item, index) => (
                             <tr key={item.id}>
-                                <td>{item.date || item.joiningDate}</td>
-                                {category === "sales" && <><td>{item.customerName}</td><td>{item.billNo}</td><td>{item.productName}</td><td>₹{item.totalPrice}</td></>}
-                                {category === "purchases" && <><td>{item.itemName || item.item}</td><td>{item.supplierName || "Direct"}</td><td>{item.quantity}</td><td>₹{item.totalAmount || item.amount}</td></>}
-                                {category === "employees" && <><td>{item.name}</td><td>{item.designation}</td><td>₹{item.salary}</td></>}
+                                <td>{index + 1}</td>
+                                <td>{item.productName || item.itemName} (NON BRANDED)</td>
+                                <td>11031300</td>
+                                <td>{item.quantity || "____"}</td>
+                                <td>{item.rate || "____"}</td>
+                                <td>{item.totalPrice || item.totalAmount || "____"}</td>
                             </tr>
                         ))}
                     </tbody>
                     <tfoot>
-                      <tr className="grand-total-row">
-    <td colSpan={category === "employees" ? 2 : 4} style={{ textAlign: 'right' }}>
-        <strong>GRAND TOTAL:</strong>
-    </td>
-    <td style={{ color: '#000', fontWeight: 'bold' }}>
-        ₹{calculateTotal()}
-    </td>
-</tr>
+                        <tr className="exempt-row">
+                            <td colSpan="5">TAX EXEMPTED GOODS</td>
+                            <td>₹{calculateTotal()}</td>
+                        </tr>
+                        <tr className="grand-total-row">
+                            <td colSpan="5" style={{textAlign: 'right'}}>GRAND TOTAL</td>
+                            <td>₹{calculateTotal()}</td>
+                        </tr>
                     </tfoot>
                 </table>
 
-                <div className="invoice-footer only-print">
-                    <div className="signature-box">
-                        <p>___________________</p>
-                        <p>Authorized Signatory</p>
+                <div className="invoice-footer-pro only-print">
+                    <div className="bank-info-section">
+                        <p><strong>Bank Details:</strong> MS DHARA SHAKTI AGRO PRODUCTS | ACCOUNT NUMBER: 3504008700005079</p>
+                        <p>IFSC: PUNB0350400 | BRANCH NAME: WARISNAGAR</p>
                     </div>
-                    <div className="signature-box">
-                        <p>___________________</p>
-                        <p>Receiver Signature</p>
+                    <div className="terms-section">
+                        <p>We do not take responsibility for loss of invoice after unloading of material. Interest at 24% per annum will be charged if payment not made within due date.</p>
+                    </div>
+                    <div className="signature-grid">
+                        <div className="sign-box">
+                            <p>Receiver's Signature</p>
+                        </div>
+                        <div className="signboauthsign" >
+                            <p>For DHARA SHAKTI AGRO PRODUCTS</p>
+                          
+                            <p>Auth. Signatory</p>
+                        </div>
                     </div>
                 </div>
             </div>
