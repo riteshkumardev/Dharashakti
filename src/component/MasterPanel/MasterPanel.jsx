@@ -3,7 +3,7 @@ import { getDatabase, ref, onValue, update, push } from "firebase/database";
 import { useNavigate } from "react-router-dom"; 
 import { app } from "../../redux/api/firebase/firebase";
 import Loader from "../Core_Component/Loader/Loader"; 
-import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar"; // ✅ Snackbar Import
+import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar"; 
 import './MasterPanel.css';
 
 const MasterPanel = ({ user }) => { 
@@ -13,19 +13,16 @@ const MasterPanel = ({ user }) => {
   const [search, setSearch] = useState('');
   const [logs, setLogs] = useState([]);
   
-  // ⏳ Feedback States
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
-  // 🔔 Snackbar Helper
   const showMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
   useEffect(() => {
     setLoading(true);
-    // 1. Users loading logic
     const userRef = ref(db, "employees");
     const unsubUsers = onValue(userRef, (snapshot) => {
       const data = snapshot.val();
@@ -35,7 +32,6 @@ const MasterPanel = ({ user }) => {
       setTimeout(() => setLoading(false), 800);
     });
 
-    // 2. Activity Logs
     const logRef = ref(db, "activityLogs");
     const unsubLogs = onValue(logRef, (snapshot) => {
       const data = snapshot.val();
@@ -51,26 +47,50 @@ const MasterPanel = ({ user }) => {
     };
   }, [db]);
 
+  // --- 🛠️ Password Reset Function ---
+  const handlePasswordReset = async (targetId, targetName) => {
+    const newPass = window.prompt(`Enter new password for ${targetName}:`);
+    
+    if (!newPass) return; // Agar cancel kiya ya khali chhoda
+    if (newPass.length < 4) return showMsg("Password too short (Min 4 chars)", "error");
+
+    setActionLoading(true);
+    try {
+      await update(ref(db, `employees/${targetId}`), { password: newPass });
+
+      // Log the activity
+      await push(ref(db, 'activityLogs'), {
+        adminName: user?.name || "Super Admin", 
+        action: `PASSWORD RESET for ${targetName}`,
+        time: new Date().toLocaleString(),
+        timestamp: Date.now()
+      });
+
+      showMsg(`Password for ${targetName} changed successfully!`, "success");
+    } catch (err) {
+      showMsg("Reset Failed: " + err.message, "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleSystemUpdate = async (targetId, targetName, field, value) => {
-    setActionLoading(true); // Action shuru
+    setActionLoading(true);
     try {
       await update(ref(db, `employees/${targetId}`), { [field]: value });
 
-      const logPushRef = ref(db, 'activityLogs');
-      await push(logPushRef, {
+      await push(ref(db, 'activityLogs'), {
         adminName: user?.name || "Super Admin", 
         action: `${field.toUpperCase()} changed to ${value} for ${targetName}`,
         time: new Date().toLocaleString(),
         timestamp: Date.now()
       });
 
-      // ✅ Success Notification
       showMsg(`System Updated: ${field.toUpperCase()} set to ${value}`, "success");
-      
     } catch (err) {
       showMsg("System Error: " + err.message, "error");
     } finally {
-      setActionLoading(false); // Action khatam
+      setActionLoading(false);
     }
   };
 
@@ -83,7 +103,6 @@ const MasterPanel = ({ user }) => {
 
   return (
     <div className="master-panel-page">
-      {/* Action Loader Overlay */}
       {actionLoading && (
         <div className="action-loader-overlay" style={{
           position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
@@ -107,24 +126,8 @@ const MasterPanel = ({ user }) => {
             className="master-search-bar"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ margin: 0 }} 
           />
-          
-          <button 
-            className="master-register-btn"
-            onClick={() => navigate("/employee-add")} 
-            style={{
-              padding: '12px 20px',
-              backgroundColor: '#fbbf24', 
-              color: '#000',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-            }}
-          >
+          <button className="master-register-btn" onClick={() => navigate("/employee-add")}>
             + Add New Staff
           </button>
         </div>
@@ -159,13 +162,32 @@ const MasterPanel = ({ user }) => {
                   </select>
                 </div>
 
-                <button 
-                  className={`access-toggle-btn ${userItem.isBlocked ? 'btn-enable' : 'btn-disable'}`}
-                  onClick={() => handleSystemUpdate(userItem.firebaseId, userItem.name, 'isBlocked', !userItem.isBlocked)}
-                  disabled={actionLoading}
-                >
-                  {userItem.isBlocked ? '🔓 Restore Access' : '🚫 Terminate Access'}
-                </button>
+                <div className="button-actions-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {/* --- 🔑 New Reset Password Button --- */}
+                    <button 
+                      className="reset-pass-btn"
+                      onClick={() => handlePasswordReset(userItem.firebaseId, userItem.name)}
+                      style={{
+                        padding: '10px',
+                        backgroundColor: '#6366f1',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🔑 Reset Password
+                    </button>
+
+                    <button 
+                      className={`access-toggle-btn ${userItem.isBlocked ? 'btn-enable' : 'btn-disable'}`}
+                      onClick={() => handleSystemUpdate(userItem.firebaseId, userItem.name, 'isBlocked', !userItem.isBlocked)}
+                      disabled={actionLoading}
+                    >
+                      {userItem.isBlocked ? '🔓 Restore Access' : '🚫 Terminate Access'}
+                    </button>
+                </div>
               </div>
             </div>
           )) : (
@@ -175,19 +197,18 @@ const MasterPanel = ({ user }) => {
 
         <div className="activity-logs-sidebar">
           <h3>🕒 Recent Activity</h3>
-          <div className="logs-list" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+          <div className="logs-list">
             {logs.length > 0 ? logs.slice(0, 15).map((log, i) => (
-              <div key={i} className="log-entry" style={{ padding: '10px 0', borderBottom: '1px solid #eee' }}>
-                <strong style={{ fontSize: '13px' }}>{log.adminName}</strong>
-                <p style={{ fontSize: '12px', margin: '4px 0', color: '#444' }}>{log.action}</p>
-                <small style={{ fontSize: '10px', color: '#888' }}>{log.time}</small>
+              <div key={i} className="log-entry">
+                <strong>{log.adminName}</strong>
+                <p>{log.action}</p>
+                <small>{log.time}</small>
               </div>
-            )) : <p style={{fontSize: '12px', color: '#999'}}>No logs available.</p>}
+            )) : <p>No logs available.</p>}
           </div>
         </div>
       </div>
 
-      {/* 🔔 CUSTOM SNACKBAR */}
       <CustomSnackbar 
         open={snackbar.open} 
         message={snackbar.message} 
