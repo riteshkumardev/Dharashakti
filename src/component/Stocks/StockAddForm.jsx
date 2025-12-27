@@ -101,9 +101,20 @@ const StockAddForm = ({ role }) => {
             <input name="supplierName" value={formData.supplierName} onChange={handleChange} required disabled={loading || !isAuthorized} />
           </div>
 
-          <div className="input-group">
+          {/* <div className="input-group">
             <label>Item Name</label>
-            <input name="itemName" value={formData.itemName} onChange={handleChange} required disabled={loading || !isAuthorized} />
+            <input name="itemName" value={formData.productName} onChange={handleChange} required disabled={loading || !isAuthorized} />
+          </div> */}
+            <div className="input-group">
+            <label>Product Name</label>
+            <select name="productName" value={formData.productName} onChange={handleChange} required disabled={loading || !isAuthorized}>
+              <option value="">Select Product</option>
+              <option value="Corn Grit">Corn Grit</option>
+              <option value="Corn Grit (3mm)">Corn Grit (3mm)</option>
+              <option value="Cattle Feed">Cattle Feed</option>
+              <option value="Rice Grit">Rice Grit</option>
+              <option value="Corn Flour">Corn Flour</option>
+            </select>
           </div>
 
           <div className="input-group">

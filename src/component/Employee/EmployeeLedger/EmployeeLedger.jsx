@@ -6,15 +6,12 @@ import 'react-calendar/dist/Calendar.css';
 import './EmployeeLedger.css';
 import Loader from "../../Core_Component/Loader/Loader";
 
-// 👈 role aur user props App.js se aa rahe hain
 const EmployeeLedger = ({ role, user }) => {
   const db = getDatabase(app);
   
-  // 🔐 Permissions Setup
   const isAuthorized = role === "Admin" || role === "Accountant";
   const isBoss = role === "Admin" || role === "Manager";
 
-  // State Management
   const [employees, setEmployees] = useState([]);
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [paymentHistory, setPaymentHistory] = useState([]);
@@ -22,26 +19,20 @@ const EmployeeLedger = ({ role, user }) => {
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [showCalendar, setShowCalendar] = useState(false);
   const [fullAttendanceData, setFullAttendanceData] = useState({});
-  
-  // ⏳ Loading States
   const [loading, setLoading] = useState(true); 
   const [fetchingDetail, setFetchingDetail] = useState(false);
 
-  // 🛡️ Helper: ID Masking (Ex: 12345678 -> XXXX5678)
   const maskID = (id) => {
     if (!id) return "---";
     const strID = id.toString();
     return strID.length > 4 ? "XXXX" + strID.slice(-4) : strID;
   };
 
-  // 1. Employees Load Logic (Sirf Management ke liye)
   useEffect(() => {
-    // Agar boss nahi hai, toh loader band karke ruk jao
     if (!isBoss) {
       setLoading(false);
       return;
     }
-
     const empRef = ref(db, "employees");
     const unsubscribe = onValue(empRef, (snapshot) => {
       const data = snapshot.val();
@@ -49,55 +40,42 @@ const EmployeeLedger = ({ role, user }) => {
         const list = Object.keys(data).map(k => ({ id: k, ...data[k] }));
         setEmployees(list);
       }
-      // Data aane ke baad 1 second ka artificial delay taaki loader dikhe
       setTimeout(() => setLoading(false), 1000);
     });
-
     return () => unsubscribe();
   }, [db, isBoss]);
 
-  // 2. 🛡️ Privacy Auto-Select: Worker ko seedha uska data dikhao
   useEffect(() => {
     if (!isBoss && user) {
-      const self = { 
-        id: user.firebaseId || user.employeeId, 
-        ...user 
-      };
+      const self = { id: user.firebaseId || user.employeeId, ...user };
       viewLedger(self);
     }
   }, [isBoss, user]);
 
-  // 3. Ledger Details Load Function
   const viewLedger = (emp) => {
-    setFetchingDetail(true); // Detail loading shuru
+    setFetchingDetail(true);
     setSelectedEmp(emp);
     
-    // Payments History fetch
     const payRef = ref(db, `salaryPayments/${emp.id}`);
     onValue(payRef, (snapshot) => {
       const data = snapshot.val();
       const list = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
       setPaymentHistory(list);
-      
-      // Detail loader delay
       setTimeout(() => setFetchingDetail(false), 600);
     });
 
-    // Attendance Calculation logic
     const currentMonthPrefix = new Date().toISOString().slice(0, 7); 
     const attRef = ref(db, `attendance`);
     onValue(attRef, (snapshot) => {
       const allAttendance = snapshot.val();
       let p = 0, a = 0;
       let empHistory = {};
-
       if (allAttendance) {
         Object.keys(allAttendance).forEach(dateKey => {
           const dayData = allAttendance[dateKey];
           if (dayData && dayData[emp.id]) {
             const status = dayData[emp.id].status;
             empHistory[dateKey] = status;
-
             if (dateKey.startsWith(currentMonthPrefix)) {
               if (status === "Present") p++;
               else if (status === "Absent") a++;
@@ -110,7 +88,6 @@ const EmployeeLedger = ({ role, user }) => {
     });
   };
 
-  // Calendar styling
   const getTileClassName = ({ date, view }) => {
     if (view === 'month') {
       const dateStr = date.toLocaleDateString('en-CA'); 
@@ -122,18 +99,14 @@ const EmployeeLedger = ({ role, user }) => {
 
   // Financial Calculations
   const totalAdvance = paymentHistory.reduce((sum, p) => sum + Number(p.amount), 0);
-  const perDaySalary = selectedEmp ? (Number(selectedEmp.salary) / 30) : 0;
-  const earnedSalary = Math.round(perDaySalary * attendanceStats.present);
+  const monthlySalary = selectedEmp ? Number(selectedEmp.salary) : 0;
+  const earnedSalary = Math.round((monthlySalary / 30) * attendanceStats.present);
+  const netPayable = earnedSalary - totalAdvance;
 
-  // Advance Payment Submit
   const handlePayment = async (e) => {
     e.preventDefault();
-    if (!isAuthorized) {
-      alert("Aapko entries karne ki permission nahi hai!");
-      return;
-    }
+    if (!isAuthorized) { alert("Permission denied!"); return; }
     if(!advanceAmount || !selectedEmp) return;
-
     try {
       const payRef = ref(db, `salaryPayments/${selectedEmp.id}`);
       await push(payRef, {
@@ -142,41 +115,28 @@ const EmployeeLedger = ({ role, user }) => {
           type: 'Advance'
       });
       setAdvanceAmount('');
-      alert("✅ Advance Payment Added!");
-    } catch (err) {
-      alert("Error saving: " + err.message);
-    }
+      alert("✅ Advance Added!");
+    } catch (err) { alert("Error: " + err.message); }
   };
-
-  // ======================================================
-  // RENDER LOGIC
-  // ======================================================
 
   if (loading) return <Loader />;
 
   return (
     <div className="table-container-wide">
-      <div className="table-card-wide">
+      <div className="table-card-wide no-print">
         <h2 className="table-title">
             {isBoss ? "Staff Salary & Attendance Ledger" : "My Payroll Ledger"}
         </h2>
         
         <div className="ledger-main-wrapper">
-          {/* Sidebar Section: Privacy Protected */}
           {isBoss && (
             <div className="ledger-staff-list">
               <div className="scrollable-box">
                 {employees.map(emp => (
-                  <div 
-                    key={emp.id} 
-                    className={`staff-card-item ${selectedEmp?.id === emp.id ? 'active-ledger' : ''}`} 
-                    onClick={() => viewLedger(emp)}
-                  >
+                  <div key={emp.id} className={`staff-card-item ${selectedEmp?.id === emp.id ? 'active-ledger' : ''}`} onClick={() => viewLedger(emp)}>
                     <div className="staff-info-mini">
                         <strong>{emp.name}</strong>
-                        <div className="masked-id-text">
-                            ID: {maskID(emp.employeeId)}
-                        </div>
+                        <div className="masked-id-text">ID: {maskID(emp.employeeId)}</div>
                     </div>
                   </div>
                 ))}
@@ -184,42 +144,31 @@ const EmployeeLedger = ({ role, user }) => {
             </div>
           )}
 
-          {/* Details Section */}
           {selectedEmp && (
             <div className={`ledger-detail-view ${!isBoss ? 'full-width-ledger' : ''}`}>
-              
               {fetchingDetail ? (
-                <div className="detail-fetch-loader">
-                   <Loader />
-                   <p>Fetching Secure Data...</p>
-                </div>
+                <div className="detail-fetch-loader"><Loader /><p>Fetching Secure Data...</p></div>
               ) : (
                 <>
-                  <div className="attendance-summary-bar" onClick={() => setShowCalendar(true)}>
+                  <div className="attendance-summary-bar">
                     <div className="summary-item">Month: <b>{new Date().toLocaleString('default', { month: 'long' })}</b></div>
                     <div className="summary-item green">Present: <b>{attendanceStats.present} Days</b></div>
                     <div className="summary-item red">Absent: <b>{attendanceStats.absent} Days</b></div>
-                    <div className="view-btn-small">👁️ History</div>
+                    <button className="view-btn-small" onClick={() => setShowCalendar(true)}>👁️ History</button>
+                    <button className="view-btn-small" style={{background: '#2e7d32', color: 'white'}} onClick={() => window.print()}>🖨️ Print Ledger</button>
                   </div>
 
                   <div className="ledger-stats-row">
-                    <div className="stat-pill total-salary">Salary <b>₹{selectedEmp.salary}</b></div>
+                    <div className="stat-pill total-salary">Salary <b>₹{monthlySalary}</b></div>
                     <div className="stat-pill balance-due">Earned <b>₹{earnedSalary}</b></div>
                     <div className="stat-pill total-advance">Advance <b>₹{totalAdvance}</b></div>
-                    <div className="stat-pill final-pay">Payable <b>₹{earnedSalary - totalAdvance}</b></div>
+                    <div className="stat-pill final-pay">Payable <b>₹{netPayable}</b></div>
                   </div>
 
-                  {/* Advance Entry: Sirf Admin/Accountant ke liye */}
                   {isAuthorized && (
                     <div className="advance-entry-box">
                        <form onSubmit={handlePayment} className="advance-form-grid">
-                          <input 
-                            type="number" 
-                            placeholder="Enter Amount" 
-                            value={advanceAmount} 
-                            onChange={(e)=>setAdvanceAmount(e.target.value)} 
-                            required
-                          />
+                          <input type="number" placeholder="Enter Amount" value={advanceAmount} onChange={(e)=>setAdvanceAmount(e.target.value)} required />
                           <button type="submit" className="save-btn-new">SAVE</button>
                        </form>
                     </div>
@@ -227,13 +176,7 @@ const EmployeeLedger = ({ role, user }) => {
 
                   <div className="ledger-table-container">
                     <table className="modern-sales-table">
-                      <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Amount</th>
-                        </tr>
-                      </thead>
+                      <thead><tr><th>Date</th><th>Type</th><th>Amount</th></tr></thead>
                       <tbody>
                         {paymentHistory.length > 0 ? (
                           paymentHistory.map(pay => (
@@ -256,6 +199,8 @@ const EmployeeLedger = ({ role, user }) => {
         </div>
       </div>
 
+      {/* --- HIDDEN PRINT SECTION --- */}
+     
       {/* CALENDAR MODAL */}
       {showCalendar && (
         <div className="cal-modal-overlay">
@@ -272,8 +217,51 @@ const EmployeeLedger = ({ role, user }) => {
               </div>
             </div>
           </div>
+
         </div>
       )}
+       {selectedEmp && (
+        <div className="printable-invoice A4 only-print">
+            <div className="invoice-header">
+                <div className="company-info-center">
+                    <h1>DHARA SHAKTI AGRO PRODUCTS</h1>
+                    <p className="manufacture-line">STAFF EARNING & ATTENDANCE LEDGER</p>
+                    <p>GSTIN : 10DZTPM1457E1ZE | Calculation: (Base Salary / 30 Days)</p>
+                </div>
+            </div>
+
+            <table className="modern-report-table">
+                <thead>
+                    <tr>
+                        <th>Staff Name</th>
+                        <th>Monthly Salary</th>
+                        <th>Days Worked</th>
+                        <th>Earned Amount</th>
+                        <th>Advance Paid</th>
+                        <th>Net Payable</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>{selectedEmp.name}</strong></td>
+                        <td>₹{monthlySalary.toLocaleString()}</td>
+                        <td>{attendanceStats.present} Days</td>
+                        <td>₹{earnedSalary.toLocaleString()}</td>
+                        <td style={{color: 'red'}}>- ₹{totalAdvance.toLocaleString()}</td>
+                        <td style={{fontWeight: 'bold', color: 'green', backgroundColor: '#f9f9f9'}}>
+                            ₹{netPayable.toLocaleString()}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div className="print-footer" style={{marginTop: '40px', display: 'flex', justifyContent: 'space-between'}}>
+                <div style={{borderTop: '1px solid black', width: '200px', textAlign: 'center'}}>Manager Signature</div>
+                <div style={{borderTop: '1px solid black', width: '200px', textAlign: 'center'}}>Employee Signature</div>
+            </div>
+        </div>
+      )}
+
     </div>
   );
 };

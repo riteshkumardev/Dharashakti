@@ -161,6 +161,7 @@ const SalesEntry = ({ role }) => {
             <select name="productName" value={formData.productName} onChange={handleChange} required disabled={loading || !isAuthorized}>
               <option value="">Select Product</option>
               <option value="Corn Grit">Corn Grit</option>
+              <option value="Corn Grit (3mm)">Corn Grit (3mm)</option>
               <option value="Cattle Feed">Cattle Feed</option>
               <option value="Rice Grit">Rice Grit</option>
               <option value="Corn Flour">Corn Flour</option>
