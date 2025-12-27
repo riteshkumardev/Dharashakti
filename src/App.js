@@ -24,6 +24,7 @@ import MasterPanel from "./component/MasterPanel/MasterPanel";
 import ProfitLoss from "./component/ProfitLoss/ProfitLoss";
 import Profile from "./component/Profile/Profile";
 import ScreenLock from "./component/Core_Component/ScreenLock/ScreenLocl";
+import Reports_Printing from "./component/Reports_Printing/Reports_Printing";
 
 
 function App() {
@@ -159,6 +160,7 @@ function App() {
             
             {/* Employee Management Privacy */}
             <Route path="/employee-table" element={<ProtectedRoute managerAllowed><EmployeeTable role={user?.role}/></ProtectedRoute>} />
+            <Route path="/Reports_Printing" element={<ProtectedRoute managerAllowed><Reports_Printing role={user?.role}/></ProtectedRoute>} />
            
 
             {/* --- SUPER ADMIN ONLY --- */}

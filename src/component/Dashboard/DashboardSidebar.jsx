@@ -122,6 +122,7 @@ const DashboardSidebar = ({ closeSidebar }) => {
           <ul className="sidebar-list" style={{ paddingLeft: "15px" }}>
             <li onClick={() => handleNavigate("/expenses")}>➤ Expenses</li>
             <li onClick={() => handleNavigate("/profit-loss")}>➤ Profit & Loss</li>
+            <li onClick={() => handleNavigate("/Reports_Printing")}>➤ Reports & Printing</li>
           </ul>
         )}
       </div>
