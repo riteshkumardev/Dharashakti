@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import path from "path"; // Path module import karein
+import path from "path";
 import connectDB from "./config/db.js";
 
 // Routes Imports
@@ -17,16 +17,23 @@ import expenseRoutes from "./routes/expense.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
 
 dotenv.config();
+
+// Database connection call
 connectDB();
 
 const app = express();
 
 // Middlewares
-app.use(cors());
+// CORS ko origin * ke saath allow kiya hai taaki frontend connect ho sake
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
 app.use(express.json());
-app.use("/uploads", express.static("uploads")); // Static folder for photos
+app.use("/uploads", express.static("uploads"));
 
-// API Routes Registration
+// API Routes
 app.use("/api/sales", salesRoutes);
 app.use("/api/employees", employeesRoutes);
 app.use("/api/auth", authRoutes);
@@ -39,13 +46,19 @@ app.use("/api/stocks", stockRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/salary-payments", salaryRoutes);
 
+// Test Route
 app.get("/", (req, res) => {
-  res.send("Backend running successfully");
+  res.send("Backend running successfully on Vercel");
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+// Vercel ke liye serverless function fix: 
+// app.listen sirf tab chalega jab hum local mein run karenge (npm run dev)
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
+}
 
+// Ye line Vercel ke liye sabse zaroori hai
 export default app;
