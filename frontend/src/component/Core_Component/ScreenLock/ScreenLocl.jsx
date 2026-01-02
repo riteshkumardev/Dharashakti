@@ -5,17 +5,28 @@ const ScreenLock = ({ user, setIsLocked }) => {
   const [passInput, setPassInput] = useState("");
   const [error, setError] = useState(false);
 
-  const handleUnlock = () => {
-    // 🔐 User ke password se match karenge
-    if (passInput === user.password) {
-      setIsLocked(false);
-      setError(false);
-    } else {
-      setError(true);
-      setPassInput("");
-      alert("❌ Galat Password! Kripya sahi password dalein.");
-    }
-  };
+const handleUnlock = async () => {
+  const res = await fetch("http://localhost:5000/api/auth/unlock", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      employeeId: user.employeeId,
+      password: passInput,
+    }),
+  });
+
+  const data = await res.json();
+
+  if (data.success) {
+    setIsLocked(false);
+    setError(false);
+  } else {
+    setError(true);
+    setPassInput("");
+    alert("❌ Galat Password!");
+  }
+};
+
 
   return (
     <div className="screen-lock-overlay">

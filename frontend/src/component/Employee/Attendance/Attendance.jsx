@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getDatabase, ref, onValue, set } from "firebase/database";
-import { app } from "../../../redux/api/firebase/firebase";
+import axios from 'axios'; 
 import './Attendanc.css';
 import Loader from '../../Core_Component/Loader/Loader';
 
 const Attendance = ({ role }) => {
-  const db = getDatabase(app);
-  
   const isAuthorized = role === "Admin" || role === "Accountant";
 
   const [employees, setEmployees] = useState([]);
@@ -15,53 +12,75 @@ const Attendance = ({ role }) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  // 🛡️ Helper Function: ID ko chhupane ke liye (Ex: 12345678 -> XXXX5678)
   const maskID = (id) => {
     if (!id) return "---";
     const strID = id.toString();
-    if (strID.length <= 4) return strID; // Agar ID bahut chhoti hai
-    return "XXXX" + strID.slice(-4); // Shuru ke characters ki jagah XXXX aur aakhri 4 digits
+    if (strID.length <= 4) return strID;
+    return "XXXX" + strID.slice(-4);
+  };
+
+  // 1️⃣ Fetch All Employees from MongoDB
+  const fetchEmployees = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/employees");
+      if (res.data.success) setEmployees(res.data.data);
+    } catch (err) {
+      console.error("Error fetching employees:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 2️⃣ Fetch Attendance for Selected Date from MongoDB
+  const fetchAttendance = async () => {
+    try {
+      const res = await axios.get(`http://localhost:5000/api/attendance/${date}`);
+      if (res.data.success) {
+        // Convert array to object format for easy lookup: { empId: { status, time } }
+        const attObj = {};
+        res.data.data.forEach(item => {
+          attObj[item.employeeId] = item;
+        });
+        setAttendance(attObj);
+      }
+    } catch (err) {
+      setAttendance({});
+    }
   };
 
   useEffect(() => {
-    const empRef = ref(db, "employees");
-    const unsubscribe = onValue(empRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const list = Object.keys(data).map(key => ({ 
-          firebaseId: key, 
-          ...data[key] 
-        }));
-        setEmployees(list);
-      } else {
-        setEmployees([]);
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [db]);
+    fetchEmployees();
+  }, []);
 
   useEffect(() => {
-    const attRef = ref(db, `attendance/${date}`);
-    const unsubscribe = onValue(attRef, (snapshot) => {
-      setAttendance(snapshot.val() || {});
-    });
-    return () => unsubscribe();
-  }, [date, db]);
+    fetchAttendance();
+  }, [date]);
 
-  const markAttendance = (empId, empName, status) => {
+  // 3️⃣ Mark Attendance in MongoDB
+  const markAttendance = async (empId, empName, status) => {
     if (!isAuthorized) {
       alert("Aapko attendance mark karne ki permission nahi hai.");
       return;
     }
 
-    const attRef = ref(db, `attendance/${date}/${empId}`);
-    set(attRef, {
-      name: empName || "Unknown",
-      status: status,
-      time: new Date().toLocaleTimeString(),
-      timestamp: Date.now()
-    }).catch(err => alert("Error marking attendance: " + err.message));
+    try {
+      const res = await axios.post("http://localhost:5000/api/attendance", {
+        employeeId: empId,
+        name: empName,
+        status: status,
+        date: date
+      });
+
+      if (res.data.success) {
+        // Local state update karein taki UI turant change ho
+        setAttendance(prev => ({
+          ...prev,
+          [empId]: { status, time: new Date().toLocaleTimeString() }
+        }));
+      }
+    } catch (err) {
+      alert("Error marking attendance: " + (err.response?.data?.message || err.message));
+    }
   };
 
   const filteredEmployees = employees.filter(emp => {
@@ -80,11 +99,11 @@ const Attendance = ({ role }) => {
       <div className="table-card-wide">
         <div className="table-header-row">
           <div>
-            <h2 className="table-title">DAILY ATTENDANCE</h2>
+            <h2 className="table-title">DAILY ATTENDANCE (MongoDB)</h2>
             <p style={{fontSize: '12px', color: '#666', margin: 0}}>
               {isAuthorized 
-                ? "Hazri lagane ke liye P (Present), A (Absent), ya H (Half-Day) dabayein" 
-                : "⚠️ View Only: Aapko attendance mark karne ki permission nahi hai."}
+                ? "Hazri lagane ke liye P, A, ya H dabayein" 
+                : "⚠️ View Only Mode"}
             </p>
           </div>
           
@@ -121,12 +140,11 @@ const Attendance = ({ role }) => {
             <tbody>
               {filteredEmployees.length > 0 ? (
                 filteredEmployees.map((emp) => {
-                  const currentStatus = attendance[emp.firebaseId]?.status;
+                  const currentStatus = attendance[emp.employeeId]?.status;
                   
                   return (
-                    <tr key={emp.firebaseId}>
-                      <td style={{fontWeight: 'bold', color: '#2563eb', letterSpacing: '1px'}}>
-                          {/* 🔒 Masked ID yahan dikhayi degi */}
+                    <tr key={emp._id}>
+                      <td style={{fontWeight: 'bold', color: '#2563eb'}}>
                           {emp.employeeId ? maskID(emp.employeeId) : 'NEW'}
                       </td>
 
@@ -159,23 +177,20 @@ const Attendance = ({ role }) => {
                         <div className="btn-group-row" style={{justifyContent: 'center', gap: '8px'}}>
                           <button 
                             className={`save-btn-ui ${currentStatus === 'Present' ? 'active-p' : ''}`} 
-                            onClick={() => markAttendance(emp.firebaseId, emp.name, 'Present')}
+                            onClick={() => markAttendance(emp.employeeId, emp.name, 'Present')}
                             disabled={!isAuthorized}
-                            style={{ opacity: isAuthorized ? 1 : 0.5, cursor: isAuthorized ? "pointer" : "not-allowed" }}
                           >P</button>
                           
                           <button 
                             className={`row-delete-btn ${currentStatus === 'Absent' ? 'active-a' : ''}`} 
-                            onClick={() => markAttendance(emp.firebaseId, emp.name, 'Absent')}
+                            onClick={() => markAttendance(emp.employeeId, emp.name, 'Absent')}
                             disabled={!isAuthorized}
-                            style={{ opacity: isAuthorized ? 1 : 0.5, cursor: isAuthorized ? "pointer" : "not-allowed" }}
                           >A</button>
                           
                           <button 
                             className={`ledger-btn-ui ${currentStatus === 'Half-Day' ? 'active-h' : ''}`} 
-                            onClick={() => markAttendance(emp.firebaseId, emp.name, 'Half-Day')}
+                            onClick={() => markAttendance(emp.employeeId, emp.name, 'Half-Day')}
                             disabled={!isAuthorized}
-                            style={{ opacity: isAuthorized ? 1 : 0.5, cursor: isAuthorized ? "pointer" : "not-allowed" }}
                           >H</button>
                         </div>
                       </td>
@@ -184,9 +199,7 @@ const Attendance = ({ role }) => {
                 })
               ) : (
                 <tr>
-                  <td colSpan="5" className="no-records-box">
-                    No results found.
-                  </td>
+                  <td colSpan="5" className="no-records-box">No results found.</td>
                 </tr>
               )}
             </tbody>

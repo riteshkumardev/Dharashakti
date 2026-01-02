@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { getDatabase, ref, onValue } from "firebase/database";
-import { app } from "../redux/api/firebase/firebase";
-import Loader from "./Core_Component/Loader/Loader"; // ✅ Loader import kiya
+import axios from "axios"; // 🛠️ Firebase ki jagah Axios
+import Loader from "./Core_Component/Loader/Loader";
 import "../App.css";
 
 const Home = ({ user }) => {
-  const db = getDatabase(app);
-  
   // 📊 States
   const [stats, setStats] = useState({ sales: 0, stock: 0 });
-  const [loading, setLoading] = useState(true); // ⏳ Loading state
+  const [loading, setLoading] = useState(true);
 
-  // 🛡️ Helper: ID Masking (Ex: 12345678 -> XXXX5678)
+  // 🛡️ Helper: ID Masking
   const maskID = (id) => {
     if (!id) return "--------";
     const strID = id.toString();
@@ -19,48 +16,30 @@ const Home = ({ user }) => {
   };
 
   useEffect(() => {
-    setLoading(true);
-    let salesLoaded = false;
-    let stockLoaded = false;
+    const fetchDashboardStats = async () => {
+      try {
+        setLoading(true);
+        
+        // 1️⃣ Backend se Sales aur Stock ka data ek sath fetch karna
+        // Aapne jo pehle endpoints banaye hain wahi use honge
+        const salesRes = await axios.get("http://localhost:5000/api/sales");
+        const stockRes = await axios.get("http://localhost:5000/api/stocks");
 
-    const checkLoading = () => {
-      if (salesLoaded && stockLoaded) {
-        // Smooth transition ke liye chhota sa delay
+        setStats({
+          sales: salesRes.data.data?.length || 0,
+          stock: stockRes.data.data?.length || 0
+        });
+
+      } catch (err) {
+        console.error("Dashboard data load error:", err);
+      } finally {
+        // Smooth UI feel ke liye 800ms ka delay
         setTimeout(() => setLoading(false), 800);
       }
     };
 
-    // 1️⃣ Live Sales Counting
-    const salesRef = ref(db, "sales");
-    const unsubSales = onValue(salesRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        setStats(prev => ({ ...prev, sales: Object.keys(data).length }));
-      } else {
-        setStats(prev => ({ ...prev, sales: 0 }));
-      }
-      salesLoaded = true;
-      checkLoading();
-    });
-
-    // 2️⃣ Live Stock Counting
-    const stockRef = ref(db, "stocks");
-    const unsubStock = onValue(stockRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        setStats(prev => ({ ...prev, stock: Object.keys(data).length }));
-      } else {
-        setStats(prev => ({ ...prev, stock: 0 }));
-      }
-      stockLoaded = true;
-      checkLoading();
-    });
-
-    return () => {
-      unsubSales();
-      unsubStock();
-    };
-  }, [db]);
+    fetchDashboardStats();
+  }, []);
 
   // ✅ Global Loader check
   if (loading) return <Loader />;
@@ -68,11 +47,10 @@ const Home = ({ user }) => {
   return (
     <div className="home-container">
       
-      {/* 🚀 Floating Profile Card (Right Side) */}
+      {/* 🚀 Floating Profile Card */}
       <div className="floating-profile-card">
         <div className="mini-info">
           <h4>{user?.name || "User Name"}</h4>
-          {/* 🔒 Masked ID for safety */}
           <p className="emp-id-tag">ID: {maskID(user?.employeeId)}</p>
           <span className="badge">{user?.role || 'Staff'}</span>
         </div>
@@ -89,12 +67,11 @@ const Home = ({ user }) => {
       <section className="hero-section">
         <div className="hero-content">
           <h1>Welcome, <span className="highlight">{user?.name || "Guest"}</span></h1>
-          <p>Your business dashboard is now synced live with Firebase Realtime Database.</p>
+          <p>Your business dashboard is now synced live with <strong>MongoDB Engine</strong>.</p>
         </div>
       </section>
 
       {/* Stats Cards Section */}
-      
       <section className="features">
         <div className="feature-card">
           <div className="card-icon">📈</div>
@@ -105,7 +82,7 @@ const Home = ({ user }) => {
         
         <div className="feature-card">
           <div className="card-icon">📦</div>
-          <h3>Total Stock</h3>
+          <h3>Total Stock Items</h3>
           <p className="stat-number">{stats.stock}</p>
           <small>Live Inventory</small>
         </div>

@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getDatabase, ref, onValue, push } from "firebase/database";
-import { app } from "../../../redux/api/firebase/firebase";
+import axios from 'axios'; // 🛠️ Firebase ki jagah Axios
 import Calendar from 'react-calendar'; 
 import 'react-calendar/dist/Calendar.css'; 
 import './EmployeeLedger.css';
 import Loader from "../../Core_Component/Loader/Loader";
 
 const EmployeeLedger = ({ role, user }) => {
-  const db = getDatabase(app);
-  
   const isAuthorized = role === "Admin" || role === "Accountant";
   const isBoss = role === "Admin" || role === "Manager";
 
@@ -28,64 +25,63 @@ const EmployeeLedger = ({ role, user }) => {
     return strID.length > 4 ? "XXXX" + strID.slice(-4) : strID;
   };
 
+  // 1️⃣ Fetch Staff List (Boss Only)
   useEffect(() => {
-    if (!isBoss) {
-      setLoading(false);
-      return;
-    }
-    const empRef = ref(db, "employees");
-    const unsubscribe = onValue(empRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const list = Object.keys(data).map(k => ({ id: k, ...data[k] }));
-        setEmployees(list);
+    const fetchEmployees = async () => {
+      if (!isBoss) {
+        setLoading(false);
+        return;
       }
-      setTimeout(() => setLoading(false), 1000);
-    });
-    return () => unsubscribe();
-  }, [db, isBoss]);
+      try {
+        const res = await axios.get("http://localhost:5000/api/employees");
+        if (res.data.success) setEmployees(res.data.data);
+      } catch (err) { console.error("Staff load failed"); }
+      finally { setLoading(false); }
+    };
+    fetchEmployees();
+  }, [isBoss]);
 
+  // 2️⃣ Auto-View for Self (Workers/Operators)
   useEffect(() => {
     if (!isBoss && user) {
-      const self = { id: user.firebaseId || user.employeeId, ...user };
-      viewLedger(self);
+      viewLedger(user);
     }
   }, [isBoss, user]);
 
-  const viewLedger = (emp) => {
+  // 3️⃣ Fetch Detailed Ledger for Selected Employee
+  const viewLedger = async (emp) => {
     setFetchingDetail(true);
     setSelectedEmp(emp);
     
-    const payRef = ref(db, `salaryPayments/${emp.id}`);
-    onValue(payRef, (snapshot) => {
-      const data = snapshot.val();
-      const list = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
-      setPaymentHistory(list);
-      setTimeout(() => setFetchingDetail(false), 600);
-    });
+    const empId = emp.employeeId || emp._id;
 
-    const currentMonthPrefix = new Date().toISOString().slice(0, 7); 
-    const attRef = ref(db, `attendance`);
-    onValue(attRef, (snapshot) => {
-      const allAttendance = snapshot.val();
-      let p = 0, a = 0;
-      let empHistory = {};
-      if (allAttendance) {
-        Object.keys(allAttendance).forEach(dateKey => {
-          const dayData = allAttendance[dateKey];
-          if (dayData && dayData[emp.id]) {
-            const status = dayData[emp.id].status;
-            empHistory[dateKey] = status;
-            if (dateKey.startsWith(currentMonthPrefix)) {
-              if (status === "Present") p++;
-              else if (status === "Absent") a++;
-            }
+    try {
+      // Fetch Payment History (Advance)
+      const payRes = await axios.get(`http://localhost:5000/api/salary-payments/${empId}`);
+      if (payRes.data.success) setPaymentHistory(payRes.data.data.reverse());
+
+      // Fetch Attendance Data (Assuming you have an attendance API)
+      const currentMonth = new Date().toISOString().slice(0, 7); 
+      const attRes = await axios.get(`http://localhost:5000/api/attendance/report/${empId}`);
+      
+      if (attRes.data.success) {
+        const history = attRes.data.data; // Expected format: { "2023-10-01": "Present", ... }
+        let p = 0, a = 0;
+        
+        Object.keys(history).forEach(date => {
+          if (date.startsWith(currentMonth)) {
+            if (history[date] === "Present") p++;
+            else if (history[date] === "Absent") a++;
           }
         });
+        setAttendanceStats({ present: p, absent: a });
+        setFullAttendanceData(history);
       }
-      setAttendanceStats({ present: p, absent: a });
-      setFullAttendanceData(empHistory); 
-    });
+    } catch (err) {
+      console.error("Ledger detail fetch error");
+    } finally {
+      setFetchingDetail(false);
+    }
   };
 
   const getTileClassName = ({ date, view }) => {
@@ -103,20 +99,26 @@ const EmployeeLedger = ({ role, user }) => {
   const earnedSalary = Math.round((monthlySalary / 30) * attendanceStats.present);
   const netPayable = earnedSalary - totalAdvance;
 
+  // 4️⃣ Handle Advance Payment (Save to MongoDB)
   const handlePayment = async (e) => {
     e.preventDefault();
     if (!isAuthorized) { alert("Permission denied!"); return; }
     if(!advanceAmount || !selectedEmp) return;
+
     try {
-      const payRef = ref(db, `salaryPayments/${selectedEmp.id}`);
-      await push(payRef, {
-          amount: advanceAmount,
-          date: new Date().toISOString().split('T')[0],
-          type: 'Advance'
+      const res = await axios.post("http://localhost:5000/api/salary-payments", {
+        employeeId: selectedEmp.employeeId || selectedEmp._id,
+        amount: advanceAmount,
+        date: new Date().toISOString().split('T')[0],
+        type: 'Advance'
       });
-      setAdvanceAmount('');
-      alert("✅ Advance Added!");
-    } catch (err) { alert("Error: " + err.message); }
+
+      if (res.data.success) {
+        setAdvanceAmount('');
+        alert("✅ Advance Added!");
+        viewLedger(selectedEmp); // UI Refresh
+      }
+    } catch (err) { alert("Save failed: " + err.message); }
   };
 
   if (loading) return <Loader />;
@@ -133,7 +135,7 @@ const EmployeeLedger = ({ role, user }) => {
             <div className="ledger-staff-list">
               <div className="scrollable-box">
                 {employees.map(emp => (
-                  <div key={emp.id} className={`staff-card-item ${selectedEmp?.id === emp.id ? 'active-ledger' : ''}`} onClick={() => viewLedger(emp)}>
+                  <div key={emp._id} className={`staff-card-item ${selectedEmp?._id === emp._id ? 'active-ledger' : ''}`} onClick={() => viewLedger(emp)}>
                     <div className="staff-info-mini">
                         <strong>{emp.name}</strong>
                         <div className="masked-id-text">ID: {maskID(emp.employeeId)}</div>
@@ -180,7 +182,7 @@ const EmployeeLedger = ({ role, user }) => {
                       <tbody>
                         {paymentHistory.length > 0 ? (
                           paymentHistory.map(pay => (
-                            <tr key={pay.id}>
+                            <tr key={pay._id}>
                                 <td>{pay.date}</td>
                                 <td>{pay.type}</td>
                                 <td className="amount-text-red">₹{pay.amount}</td>
@@ -199,8 +201,6 @@ const EmployeeLedger = ({ role, user }) => {
         </div>
       </div>
 
-      {/* --- HIDDEN PRINT SECTION --- */}
-     
       {/* CALENDAR MODAL */}
       {showCalendar && (
         <div className="cal-modal-overlay">
@@ -217,19 +217,19 @@ const EmployeeLedger = ({ role, user }) => {
               </div>
             </div>
           </div>
-
         </div>
       )}
-       {selectedEmp && (
+
+      {/* PRINT SECTION */}
+      {selectedEmp && (
         <div className="printable-invoice A4 only-print">
             <div className="invoice-header">
                 <div className="company-info-center">
                     <h1>DHARA SHAKTI AGRO PRODUCTS</h1>
                     <p className="manufacture-line">STAFF EARNING & ATTENDANCE LEDGER</p>
-                    <p>GSTIN : 10DZTPM1457E1ZE | Calculation: (Base Salary / 30 Days)</p>
+                    <p>Calculation: (Base Salary / 30 Days)</p>
                 </div>
             </div>
-
             <table className="modern-report-table">
                 <thead>
                     <tr>
@@ -254,14 +254,8 @@ const EmployeeLedger = ({ role, user }) => {
                     </tr>
                 </tbody>
             </table>
-            
-            <div className="print-footer" style={{marginTop: '40px', display: 'flex', justifyContent: 'space-between'}}>
-                <div style={{borderTop: '1px solid black', width: '200px', textAlign: 'center'}}>Manager Signature</div>
-                <div style={{borderTop: '1px solid black', width: '200px', textAlign: 'center'}}>Employee Signature</div>
-            </div>
         </div>
       )}
-
     </div>
   );
 };

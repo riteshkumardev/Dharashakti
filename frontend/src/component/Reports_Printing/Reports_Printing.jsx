@@ -1,15 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { getDatabase, ref, onValue } from "firebase/database";
-import { app } from "../../redux/api/firebase/firebase";
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
+import './Reports_Printing.css';
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
-import './Reports_Printing.css';
 
 const Reports_Printing = () => {
-    const db = getDatabase(app);
     const [loading, setLoading] = useState(false);
     
-    // Step 1: Filters (Only Business Related)
+    // Filters State
     const [category, setCategory] = useState("sales"); 
     const [productFilter, setProductFilter] = useState("All");
     const [selectedPerson, setSelectedPerson] = useState("All"); 
@@ -23,70 +21,76 @@ const Reports_Printing = () => {
 
     const productCategories = ["Corn Grit", "Corn Flour", "Cattle Feed", "Rice Grit", "Rice Flour", "Packing Bag"];
 
-    // 1️⃣ Data Fetching & Initial Reset
-    useEffect(() => {
+    // 1️⃣ Fetch Data from MongoDB (Optimized with useCallback)
+    const fetchData = useCallback(async () => {
         setLoading(true);
-        const dataRef = ref(db, category);
-        onValue(dataRef, (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                const list = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+        try {
+            // Humare backend routes: /api/sales, /api/stocks, /api/purchases
+            const endpoint = category === "stock" ? "stocks" : category;
+            const res = await axios.get(`http://localhost:5000/api/${endpoint}`);
+            
+            if (res.data.success) {
+                const list = res.data.data;
                 setRawData(list);
-                setFilteredData([]); 
+                setFilteredData([]); // Reset view on category change
                 
                 if (category !== "stock") {
-                    updatePersonList(list, "All");
+                    generatePersonList(list, "All");
                 } else {
                     setPersonList([]);
                 }
-            } else {
-                setRawData([]); setFilteredData([]); setPersonList([]);
             }
-            setProductFilter("All");
-            setSelectedPerson("All");
+        } catch (err) {
+            setSnackbar({ open: true, message: "Server error while fetching data!", severity: "error" });
+        } finally {
             setTimeout(() => setLoading(false), 500);
-        });
-    }, [category, db]);
+        }
+    }, [category]);
 
-    // 2️⃣ Dynamic Person List Update (Sales/Purchases Only)
-    const updatePersonList = (data, pFilter) => {
+    useEffect(() => {
+        fetchData();
+        setProductFilter("All");
+        setSelectedPerson("All");
+    }, [fetchData]);
+
+    // 2️⃣ Generate Party List dynamically
+    const generatePersonList = (data, pFilter) => {
         let list = data;
         if (pFilter !== "All") {
-            list = data.filter(item => item.productName === pFilter || item.item === pFilter);
+            list = data.filter(item => item.productName === pFilter);
         }
         
         let names = [];
         if (category === "sales") names = [...new Set(list.map(item => item.customerName))];
         else if (category === "purchases") names = [...new Set(list.map(item => item.supplierName))];
         
-        setPersonList(names.filter(Boolean));
+        setPersonList(names.filter(Boolean).sort());
     };
 
     const handleProductChange = (val) => {
         setProductFilter(val);
         setSelectedPerson("All");
-        updatePersonList(rawData, val);
+        generatePersonList(rawData, val);
     };
 
-    // 3️⃣ Final Filter Logic
+    // 3️⃣ Auto-Filter Logic (No Manual Refresh Required)
     const handleFilter = () => {
-        if (category !== "stock" && selectedPerson === "All" && productFilter === "All" && !startDate) {
-            setSnackbar({ open: true, message: "Please select a specific filter first!", severity: "warning" });
-            return;
-        }
-
         let temp = [...rawData];
 
         // Date Range Filter
         if (startDate && endDate) {
-            temp = temp.filter(item => item.date >= startDate && item.date <= endDate);
+            temp = temp.filter(item => {
+                const itemDate = item.date; // Format YYYY-MM-DD
+                return itemDate >= startDate && itemDate <= endDate;
+            });
         }
 
-        // Product & Person Filter
+        // Product Filter
         if (productFilter !== "All") {
-            temp = temp.filter(item => item.productName === productFilter || item.item === productFilter);
+            temp = temp.filter(item => item.productName === productFilter);
         }
         
+        // Person/Party Filter
         if (category !== "stock" && selectedPerson !== "All") {
             temp = temp.filter(item => 
                 (item.customerName === selectedPerson) || (item.supplierName === selectedPerson)
@@ -94,7 +98,7 @@ const Reports_Printing = () => {
         }
 
         setFilteredData(temp);
-        setSnackbar({ open: true, message: `${temp.length} Records Loaded!`, severity: "success" });
+        setSnackbar({ open: true, message: `${temp.length} Records Found!`, severity: "success" });
     };
 
     const calculateTotal = () => {
@@ -106,38 +110,42 @@ const Reports_Printing = () => {
             {loading && <Loader />}
             
             <div className="report-controls no-print">
-                <h2 className="table-title">🖨️ Business Report Center</h2>
+                <div className="report-header-flex">
+                    <h2 className="table-title">🖨️ Professional Report Center</h2>
+                    <div className="live-status">System: <span className="green-dot"></span> MongoDB Live</div>
+                </div>
+
                 <div className="report-form-grid">
                     <div className="input-group">
-                        <label>1. Category</label>
+                        <label>Report Category</label>
                         <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                            <option value="sales">Sales</option>
-                            <option value="purchases">Purchases</option>
-                            <option value="stock">Stock</option>
+                            <option value="sales">Sales (Billings)</option>
+                            <option value="purchases">Purchases (Inward)</option>
+                            <option value="stock">Current Inventory</option>
                         </select>
                     </div>
 
                     <div className="input-group">
-                        <label>2. Product/Item</label>
+                        <label>Filter by Product</label>
                         <select value={productFilter} onChange={(e) => handleProductChange(e.target.value)}>
-                            <option value="All">All Products</option>
+                            <option value="All">All Items</option>
                             {productCategories.map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                     </div>
 
                     {category !== "stock" && (
                         <div className="input-group">
-                            <label>3. Select Party/Person</label>
+                            <label>Filter by Party Name</label>
                             <select value={selectedPerson} onChange={(e) => setSelectedPerson(e.target.value)}>
-                                <option value="All">-- Select Name --</option>
+                                <option value="All">-- All Parties --</option>
                                 {personList.map((name, i) => <option key={i} value={name}>{name}</option>)}
                             </select>
                         </div>
                     )}
 
                     <div className="input-group">
-                        <label>4. Date Range</label>
-                        <div style={{display: 'flex', gap: '5px'}}>
+                        <label>Period (Start - End)</label>
+                        <div className="date-flex">
                             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                         </div>
@@ -145,18 +153,24 @@ const Reports_Printing = () => {
                 </div>
 
                 <div className="report-actions">
-                    <button className="btn-filter" onClick={handleFilter}>🔍 Show Data</button>
-                    <button className="btn-print-main" onClick={() => window.print()}>🖨️ Print Report</button>
+                    <button className="btn-filter" onClick={handleFilter}>🔍 Generate Report</button>
+                    <button className="btn-print-main" onClick={() => window.print()} disabled={filteredData.length === 0}>🖨️ Print PDF</button>
                 </div>
             </div>
 
-            {/* PRINTABLE AREA */}
+            {/* PROFESSIONAL PRINTABLE AREA */}
             <div className="printable-invoice A4">
                 <div className="invoice-header only-print">
                     <div className="company-info-center">
-                        <h1>DHARA SHAKTI AGRO PRODUCTS</h1>
-                        <p className="manufacture-line">MANUFACTURER OF CORN GRITS, RICE GRITS & ANIMAL FEED</p>
-                        <p>GSTIN : 10DZTPM1457E1ZE | REPORT TYPE: {category.toUpperCase()}</p>
+                        <h1 className="company-main-title">DHARA SHAKTI AGRO PRODUCTS</h1>
+                        <p className="manufacture-line">Quality Manufacturers of Corn Grits & Animal Feed</p>
+                        <div className="gst-report-line">
+                            <span><strong>GSTIN:</strong> 10DZTPM1457E1ZE</span>
+                            <span><strong>Report:</strong> {category.toUpperCase()} Ledger</span>
+                        </div>
+                        <p className="report-period">
+                            Period: {startDate || "Starting"} to {endDate || "Present"}
+                        </p>
                     </div>
                 </div>
 
@@ -164,27 +178,27 @@ const Reports_Printing = () => {
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th>Party Name</th>
-                            <th>Description</th>
-                            <th>Qty</th>
-                            <th>Total Amount</th>
+                            <th>Party/Description</th>
+                            <th>Product Name</th>
+                            <th>Qty (kg/bag)</th>
+                            <th className="text-right">Total Amount</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filteredData.length > 0 ? (
                             filteredData.map((item) => (
-                                <tr key={item.id}>
-                                    <td>{item.date || "N/A"}</td>
-                                    <td>{item.customerName || item.supplierName || (category === "stock" ? "Inventory" : "N/A")}</td>
-                                    <td>{item.productName || item.item || item.itemName}</td>
-                                    <td>{item.quantity || item.availableStock || 0}</td>
-                                    <td>₹{Number(item.totalPrice || item.totalAmount || 0).toLocaleString()}</td>
+                                <tr key={item._id}>
+                                    <td>{item.date || "---"}</td>
+                                    <td>{item.customerName || item.supplierName || (category === "stock" ? "Warehouse" : "Cash Sale")}</td>
+                                    <td className="bold-text">{item.productName || item.item}</td>
+                                    <td>{item.quantity || item.totalQuantity || 0}</td>
+                                    <td className="text-right">₹{Number(item.totalPrice || item.totalAmount || 0).toLocaleString()}</td>
                                 </tr>
                             ))
                         ) : (
                             <tr>
-                                <td colSpan="5" style={{textAlign: 'center', padding: '20px', color: '#999'}}>
-                                    No Data Selected. Use filters above and click "Show Data".
+                                <td colSpan="5" className="placeholder-row">
+                                    No data found. Please adjust filters and click "Generate Report".
                                 </td>
                             </tr>
                         )}
@@ -192,18 +206,25 @@ const Reports_Printing = () => {
                     {filteredData.length > 0 && (
                         <tfoot>
                             <tr className="grand-total-row">
-                                <td colSpan="4" style={{textAlign: 'right'}}><strong>GRAND TOTAL:</strong></td>
-                                <td><strong>₹{calculateTotal().toLocaleString()}</strong></td>
+                                <td colSpan="4" className="text-right"><strong>TOTAL BUSINESS VALUE:</strong></td>
+                                <td className="text-right"><strong>₹{calculateTotal().toLocaleString()}</strong></td>
                             </tr>
                         </tfoot>
                     )}
                 </table>
 
-                <div className="invoice-footer-pro only-print">
+                <div className="print-footer-signature only-print">
                     <div className="signature-grid">
-                        <div className="sign-box"><p>Authorized Signatory</p></div> 
-                        <div className="sign-box"><p>Receiver Signature</p></div>
+                        <div className="sign-placeholder">
+                            <div className="line"></div>
+                            <p>Prepared By</p>
+                        </div>
+                        <div className="sign-placeholder">
+                            <div className="line"></div>
+                            <p>Authorized Signatory</p>
+                        </div>
                     </div>
+                    <p className="system-gen">System Generated Report | {new Date().toLocaleString()}</p>
                 </div>
             </div>
 

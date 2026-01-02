@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getDatabase, ref, onValue, update, push } from "firebase/database";
 import { useNavigate } from "react-router-dom"; 
-import { app } from "../../redux/api/firebase/firebase";
+import axios from "axios"; // Firebase hata kar Axios use karenge
 import Loader from "../Core_Component/Loader/Loader"; 
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar"; 
 import './MasterPanel.css';
 
 const MasterPanel = ({ user }) => { 
-  const db = getDatabase(app);
   const navigate = useNavigate(); 
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
@@ -21,72 +19,65 @@ const MasterPanel = ({ user }) => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  useEffect(() => {
-    setLoading(true);
-    const userRef = ref(db, "employees");
-    const unsubUsers = onValue(userRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setUsers(Object.keys(data).map(k => ({ firebaseId: k, ...data[k] })));
-      }
+  // --- 🛠️ Fetch Users and Logs from MongoDB ---
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      // Backend routes jo aapne banaye hain
+      const usersRes = await axios.get("http://localhost:5000/api/employees");
+      const logsRes = await axios.get("http://localhost:5000/api/activity-logs"); // Ensure ye route backend me ho
+
+      if (usersRes.data.success) setUsers(usersRes.data.data);
+      if (logsRes.data.success) setLogs(logsRes.data.data);
+      
+    } catch (err) {
+      showMsg("Data Load Failed: " + err.message, "error");
+    } finally {
       setTimeout(() => setLoading(false), 800);
-    });
+    }
+  };
 
-    const logRef = ref(db, "activityLogs");
-    const unsubLogs = onValue(logRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const logList = Object.values(data).reverse(); 
-        setLogs(logList);
-      }
-    });
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-    return () => {
-      unsubUsers();
-      unsubLogs();
-    };
-  }, [db]);
-
-  // --- 🛠️ Password Reset Function ---
-  const handlePasswordReset = async (targetId, targetName) => {
+  // --- 🔑 Password Reset Logic (MongoDB) ---
+  const handlePasswordReset = async (employeeId, targetName) => {
     const newPass = window.prompt(`Enter new password for ${targetName}:`);
     
-    if (!newPass) return; // Agar cancel kiya ya khali chhoda
+    if (!newPass) return;
     if (newPass.length < 4) return showMsg("Password too short (Min 4 chars)", "error");
 
     setActionLoading(true);
     try {
-      await update(ref(db, `employees/${targetId}`), { password: newPass });
-
-      // Log the activity
-      await push(ref(db, 'activityLogs'), {
-        adminName: user?.name || "Super Admin", 
-        action: `PASSWORD RESET for ${targetName}`,
-        time: new Date().toLocaleString(),
-        timestamp: Date.now()
+      // API call to profile.controller.js -> changePassword
+      await axios.put("http://localhost:5000/api/profile/password", {
+        employeeId: employeeId,
+        password: newPass
       });
 
-      showMsg(`Password for ${targetName} changed successfully!`, "success");
+      showMsg(`Password for ${targetName} updated!`, "success");
+      fetchData(); // Refresh list to show logs
     } catch (err) {
-      showMsg("Reset Failed: " + err.message, "error");
+      showMsg("Reset Failed: " + err.response?.data?.message || err.message, "error");
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleSystemUpdate = async (targetId, targetName, field, value) => {
+  // --- 🛡️ Role & Access Toggle Logic (MongoDB) ---
+  const handleSystemUpdate = async (employeeId, targetName, field, value) => {
     setActionLoading(true);
     try {
-      await update(ref(db, `employees/${targetId}`), { [field]: value });
-
-      await push(ref(db, 'activityLogs'), {
-        adminName: user?.name || "Super Admin", 
-        action: `${field.toUpperCase()} changed to ${value} for ${targetName}`,
-        time: new Date().toLocaleString(),
-        timestamp: Date.now()
+      // Dynamic update route
+      await axios.put(`http://localhost:5000/api/employees/${employeeId}`, {
+        [field]: value,
+        adminAction: true, // Backend logic ke liye flag
+        adminName: user?.name
       });
 
       showMsg(`System Updated: ${field.toUpperCase()} set to ${value}`, "success");
+      fetchData(); // UI refresh
     } catch (err) {
       showMsg("System Error: " + err.message, "error");
     } finally {
@@ -104,11 +95,7 @@ const MasterPanel = ({ user }) => {
   return (
     <div className="master-panel-page">
       {actionLoading && (
-        <div className="action-loader-overlay" style={{
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-          backgroundColor: 'rgba(255,255,255,0.7)', zIndex: 999,
-          display: 'flex', justifyContent: 'center', alignItems: 'center'
-        }}>
+        <div className="action-loader-overlay">
           <Loader />
         </div>
       )}
@@ -116,10 +103,10 @@ const MasterPanel = ({ user }) => {
       <div className="master-hero">
         <div className="hero-text">
           <h1>🛡️ Master Admin Control</h1>
-          <p>Global system management and security logs</p>
+          <p>Global system management (MongoDB Engine)</p>
         </div>
 
-        <div className="admin-actions-area" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+        <div className="admin-actions-area">
           <input 
             type="text" 
             placeholder="Search System Users..." 
@@ -136,7 +123,8 @@ const MasterPanel = ({ user }) => {
       <div className="master-main-layout">
         <div className="users-grid-section">
           {filtered.length > 0 ? filtered.map(userItem => (
-            <div key={userItem.firebaseId} className={`user-control-card ${userItem.isBlocked ? 'is-blocked' : ''}`}>
+            // MongoDB me '_id' ya 'employeeId' use hota hai firebaseId ki jagah
+            <div key={userItem._id} className={`user-control-card ${userItem.isBlocked ? 'is-blocked' : ''}`}>
               <div className="card-header">
                 <div className="user-profile-img">
                    {userItem.photo ? <img src={userItem.photo} alt="p" /> : (userItem.name?.charAt(0) || "?")}
@@ -153,7 +141,7 @@ const MasterPanel = ({ user }) => {
                   <label>Assign Security Role</label>
                   <select 
                     value={userItem.role || 'Worker'} 
-                    onChange={(e) => handleSystemUpdate(userItem.firebaseId, userItem.name, 'role', e.target.value)}
+                    onChange={(e) => handleSystemUpdate(userItem.employeeId, userItem.name, 'role', e.target.value)}
                     disabled={actionLoading}
                   >
                     <option value="Admin">Admin</option>
@@ -162,27 +150,17 @@ const MasterPanel = ({ user }) => {
                   </select>
                 </div>
 
-                <div className="button-actions-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {/* --- 🔑 New Reset Password Button --- */}
+                <div className="button-actions-group">
                     <button 
                       className="reset-pass-btn"
-                      onClick={() => handlePasswordReset(userItem.firebaseId, userItem.name)}
-                      style={{
-                        padding: '10px',
-                        backgroundColor: '#6366f1',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer'
-                      }}
+                      onClick={() => handlePasswordReset(userItem.employeeId, userItem.name)}
                     >
                       🔑 Reset Password
                     </button>
 
                     <button 
                       className={`access-toggle-btn ${userItem.isBlocked ? 'btn-enable' : 'btn-disable'}`}
-                      onClick={() => handleSystemUpdate(userItem.firebaseId, userItem.name, 'isBlocked', !userItem.isBlocked)}
+                      onClick={() => handleSystemUpdate(userItem.employeeId, userItem.name, 'isBlocked', !userItem.isBlocked)}
                       disabled={actionLoading}
                     >
                       {userItem.isBlocked ? '🔓 Restore Access' : '🚫 Terminate Access'}
@@ -202,7 +180,7 @@ const MasterPanel = ({ user }) => {
               <div key={i} className="log-entry">
                 <strong>{log.adminName}</strong>
                 <p>{log.action}</p>
-                <small>{log.time}</small>
+                <small>{new Date(log.createdAt).toLocaleString()}</small>
               </div>
             )) : <p>No logs available.</p>}
           </div>

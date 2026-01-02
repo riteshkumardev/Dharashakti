@@ -1,23 +1,12 @@
 import React, { useState, useEffect } from "react";
 import "./Sales.css";
-import {
-  getDatabase,
-  ref,
-  push,
-  set,
-  query,
-  limitToLast,
-  onValue,
-} from "firebase/database";
-import { app } from "../../redux/api/firebase/firebase";
+import axios from "axios"; // 🛠️ Firebase ki jagah Axios
 
-// 🏗️ Core Components Import (Aapke project ke hisab se)
+// 🏗️ Core Components Import
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
 const SalesEntry = ({ role }) => {
-  const db = getDatabase(app);
-
   // 🔐 Permission Check
   const isAuthorized = role === "Admin" || role === "Accountant";
 
@@ -38,35 +27,33 @@ const SalesEntry = ({ role }) => {
   const [formData, setFormData] = useState(initialState);
   const [nextSi, setNextSi] = useState(1);
   const [loading, setLoading] = useState(false);
-
-  /* 🔔 Snackbar State (Modern Alert) */
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success",
-  });
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
   const showMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  // 1️⃣ Live SI No Fetching (Wahi purana logic)
-  useEffect(() => {
-    const salesRef = query(ref(db, "sales"), limitToLast(1));
-    const unsubscribe = onValue(salesRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const lastEntry = Object.values(data)[0];
-        const lastSi = Number(lastEntry.si) || 0;
+  // 1️⃣ Get Next SI No from MongoDB
+  const fetchNextSi = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/sales");
+      if (res.data.success && res.data.data.length > 0) {
+        // Sabse bada SI number dhoond kar +1 karein
+        const lastSi = Math.max(...res.data.data.map(s => s.si || 0));
         setNextSi(lastSi + 1);
       } else {
         setNextSi(1);
       }
-    });
-    return () => unsubscribe();
-  }, [db]);
+    } catch (err) {
+      console.error("SI fetching error:", err);
+    }
+  };
 
-  // 2️⃣ Live Calculations (Quantity * Rate & 15-Day Due Date logic)
+  useEffect(() => {
+    fetchNextSi();
+  }, []);
+
+  // 2️⃣ Live Calculations
   useEffect(() => {
     const total = (Number(formData.quantity) || 0) * (Number(formData.rate) || 0);
     const due = total - (Number(formData.amountReceived) || 0);
@@ -84,12 +71,7 @@ const SalesEntry = ({ role }) => {
       paymentDue: due,
       billDueDate: calculatedDueDate,
     }));
-  }, [
-    formData.quantity,
-    formData.rate,
-    formData.amountReceived,
-    formData.date,
-  ]);
+  }, [formData.quantity, formData.rate, formData.amountReceived, formData.date]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -103,47 +85,38 @@ const SalesEntry = ({ role }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // 🛑 Extra security check
     if (!isAuthorized) {
       showMsg("Unauthorized: Permission Denied!", "error");
       return;
     }
 
-    setLoading(true); // 🔄 Full Screen Loader On
+    setLoading(true);
 
     try {
-      const salesRef = ref(db, "sales");
-      const newSaleRef = push(salesRef);
-
-      await set(newSaleRef, {
+      // 🛠️ MongoDB API Call
+      const res = await axios.post("http://localhost:5000/api/sales", {
         ...formData,
-        si: nextSi,
-        timestamp: Date.now(),
+        si: nextSi
       });
 
-      // ✅ Modern Notification
-      showMsg(`Sale Saved! SI No: ${nextSi} | Due: ${formData.billDueDate}`, "success");
-
-      handleReset();
+      if (res.data.success) {
+        showMsg(`Sale Saved! SI No: ${nextSi}`, "success");
+        handleReset();
+        fetchNextSi(); // Agla SI number update karein
+      }
     } catch (error) {
-      console.error(error);
-      showMsg("Data save nahi ho paya. Please try again.", "error");
+      showMsg("Data save nahi ho paya. Backend check karein.", "error");
     } finally {
-      // Small delay for smooth transition
-      setTimeout(() => setLoading(false), 500);
+      setLoading(false);
     }
   };
 
   return (
     <div className="sales-container">
-      {/* 🔄 Global Loader Integration */}
       {loading && <Loader />}
-
       <div className="sales-card-wide">
         <div className="form-header-flex" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 className="form-title">Sales Entry (Cloud)</h2>
-
+          <h2 className="form-title">Sales Entry (MongoDB)</h2>
           <div style={{ display: "flex", gap: "10px" }}>
             <div className="si-badge">SI No: {nextSi}</div>
             <div className="due-badge">Due: {formData.billDueDate}</div>
@@ -209,35 +182,15 @@ const SalesEntry = ({ role }) => {
           </div>
 
           <div className="button-container-full">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="btn-reset-3d"
-              disabled={loading || !isAuthorized}
-              style={{ opacity: isAuthorized ? 1 : 0.6, cursor: isAuthorized ? "pointer" : "not-allowed" }}
-            >
-              Reset
-            </button>
-            
-            <button
-              type="submit"
-              className="btn-submit-colored"
-              disabled={loading || !isAuthorized}
-              style={{ opacity: isAuthorized ? 1 : 0.6, cursor: isAuthorized ? "pointer" : "not-allowed" }}
-            >
+            <button type="button" onClick={handleReset} className="btn-reset-3d" disabled={loading || !isAuthorized}>Reset</button>
+            <button type="submit" className="btn-submit-colored" disabled={loading || !isAuthorized}>
               {loading ? "Saving..." : !isAuthorized ? "🔒 Read Only" : "✅ Save Sale"}
             </button>
           </div>
         </form>
       </div>
 
-      {/* 🔔 MUI Snackbar (Purane Alert ki jagah) */}
-      <CustomSnackbar 
-        open={snackbar.open} 
-        message={snackbar.message} 
-        severity={snackbar.severity} 
-        onClose={() => setSnackbar({ ...snackbar, open: false })} 
-      />
+      <CustomSnackbar open={snackbar.open} message={snackbar.message} severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })} />
     </div>
   );
 };

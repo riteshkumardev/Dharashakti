@@ -1,49 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import './Emp.css';
-import { getDatabase, ref, onValue, remove, update } from "firebase/database";
-import { app } from "../../redux/api/firebase/firebase";
+import axios from 'axios'; // Firebase ki jagah axios use karenge
 import { useNavigate } from "react-router-dom";
 import Loader from '../Core_Component/Loader/Loader';
 
-// 👈 role prop add kiya gaya hai
 const EmployeeTable = ({ role }) => { 
-  const db = getDatabase(app);
-  
-  // 🔐 Permission Check: Sirf Admin aur Accountant edit/delete kar sakte hain
+  // 🔐 Permission Check
   const isAuthorized = role === "Admin" || role === "Accountant";
 
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [editId, setEditId] = useState(null);
+  const [editId, setEditId] = useState(null); // Ab ye MongoDB ki '_id' store karega
   const [editData, setEditData] = useState({});
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const empRef = ref(db, "employees");
-    const unsubscribe = onValue(empRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const list = Object.keys(data).map((key) => ({
-          firebaseId: key,
-          ...data[key],
-        }));
-        setEmployees(list.reverse());
-      } else {
-        setEmployees([]);
+  // 1️⃣ Fetch Data from MongoDB
+  const fetchEmployees = async () => {
+    try {
+      setLoading(true);
+      // Backend route jo humne pehle banaya tha
+      const res = await axios.get("http://localhost:5000/api/employees");
+      if (res.data.success) {
+        // Data ko reverse karke dikhayenge (Newest first)
+        setEmployees(res.data.data);
       }
+    } catch (err) {
+      console.error("Fetch Error:", err);
+      alert("Error loading employee data");
+    } finally {
       setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [db]);
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
 
   const startEdit = (emp) => {
-    // 🛑 Guard
     if (!isAuthorized) {
       alert("Unauthorized: Aapko edit karne ki permission nahi hai.");
       return;
     }
-    setEditId(emp.firebaseId);
+    setEditId(emp._id); // MongoDB ki unique ID use karein
     setEditData({ ...emp });
   };
 
@@ -56,25 +55,43 @@ const EmployeeTable = ({ role }) => {
     navigate(path);
   };
 
+  // 2️⃣ Update Logic (MongoDB PUT)
   const handleSave = async () => {
-    if (!isAuthorized) return; // 🛑 Guard
+    if (!isAuthorized) return;
     try {
-      await update(ref(db, `employees/${editId}`), editData);
-      alert("Employee Updated Successfully!");
-      setEditId(null);
+      const res = await axios.put(`http://localhost:5000/api/employees/${editData.employeeId}`, {
+        ...editData,
+        adminName: "Admin" // Activity log ke liye
+      });
+
+      if (res.data.success) {
+        alert("Employee Updated Successfully!");
+        setEditId(null);
+        fetchEmployees(); // Table refresh karein
+      }
     } catch (err) {
-      alert("Error: " + err.message);
+      alert("Error: " + (err.response?.data?.message || err.message));
     }
   };
 
-  const handleDelete = (id) => {
-    // 🛑 Guard
+  // 3️⃣ Delete Logic (MongoDB DELETE)
+  const handleDelete = async (id, empName) => {
     if (!isAuthorized) {
       alert("Unauthorized: Aapko delete karne ki permission nahi hai.");
       return;
     }
-    if (window.confirm("Are you sure you want to delete this employee?")) {
-      remove(ref(db, `employees/${id}`));
+
+    if (window.confirm(`Are you sure you want to delete ${empName}?`)) {
+      try {
+        // Backend controller me delete function hona zaroori hai
+        const res = await axios.delete(`http://localhost:5000/api/employees/${id}`);
+        if (res.data.success) {
+          alert("Employee Deleted!");
+          fetchEmployees();
+        }
+      } catch (err) {
+        alert("Delete Failed: " + err.message);
+      }
     }
   };
 
@@ -90,7 +107,7 @@ const EmployeeTable = ({ role }) => {
     <div className="table-container-wide">
       <div className="table-card-wide">
         <div className="table-header-row">
-          <h2 className="table-title">EMPLOYEE DIRECTORY</h2>
+          <h2 className="table-title">EMPLOYEE DIRECTORY (MongoDB)</h2>
           <div className="search-wrapper">
             <input 
               type="text" 
@@ -116,7 +133,7 @@ const EmployeeTable = ({ role }) => {
             </thead>
             <tbody>
               {filtered.map((emp, index) => (
-                <tr key={emp.firebaseId} className={editId === emp.firebaseId ? "active-edit-row" : ""}>
+                <tr key={emp._id} className={editId === emp._id ? "active-edit-row" : ""}>
                   <td>{index + 1}</td>
                   
                   <td style={{fontWeight: 'bold', color: '#2563eb'}}>
@@ -126,6 +143,7 @@ const EmployeeTable = ({ role }) => {
                   <td>
                     <div className="emp-profile-circle">
                       {emp.photo ? (
+                        // MongoDB me agar photo base64 hai toh direct dikhega
                         <img src={emp.photo} alt="Profile" />
                       ) : (
                         <div className="placeholder-avatar">
@@ -136,51 +154,44 @@ const EmployeeTable = ({ role }) => {
                   </td>
 
                   <td className="cust-name-cell">
-                    {editId === emp.firebaseId ? 
+                    {editId === emp._id ? 
                       <input name="name" value={editData.name} onChange={handleEditChange} className="edit-input-field" /> 
                       : emp.name}
                   </td>
                   
                   <td>
-                    {editId === emp.firebaseId ? 
+                    {editId === emp._id ? 
                       <input name="phone" value={editData.phone} onChange={handleEditChange} className="edit-input-field" /> 
                       : emp.phone}
                   </td>
 
                   <td className="action-btns-cell">
-                    {editId === emp.firebaseId ? (
+                    {editId === emp._id ? (
                       <div className="btn-group-row">
                         <button className="save-btn-ui" onClick={handleSave}>💾 Save</button>
                         <button className="cancel-btn-ui" onClick={() => setEditId(null)}>✖</button>
                       </div>
                     ) : (
                       <div className="btn-group-row">
-                        {/* Edit Button */}
                         <button 
                           className="row-edit-btn" 
                           onClick={() => startEdit(emp)} 
                           disabled={!isAuthorized}
-                          title={!isAuthorized ? "No Permission" : "Edit"}
-                          style={{ opacity: isAuthorized ? 1 : 0.5, cursor: isAuthorized ? "pointer" : "not-allowed" }}
+                          style={{ opacity: isAuthorized ? 1 : 0.5 }}
                         >✏️</button>
 
-                        {/* Delete Button */}
                         <button 
                           className="row-delete-btn" 
-                          onClick={() => handleDelete(emp.firebaseId)} 
+                          onClick={() => handleDelete(emp._id, emp.name)} 
                           disabled={!isAuthorized}
-                          title={!isAuthorized ? "No Permission" : "Delete"}
-                          style={{ opacity: isAuthorized ? 1 : 0.5, cursor: isAuthorized ? "pointer" : "not-allowed" }}
+                          style={{ opacity: isAuthorized ? 1 : 0.5 }}
                         >🗑️</button>
 
-                        {/* View Button - Always Enabled for everyone */}
                         <button 
                           className="ledger-btn-ui" 
-                          onClick={() => handleNavigate("/staff-ledger")}
+                          onClick={() => handleNavigate(`/staff-ledger/${emp.employeeId}`)}
                           title="View Details"
-                        >
-                          👁️
-                        </button>
+                        >👁️</button>
                       </div>
                     )}
                   </td>

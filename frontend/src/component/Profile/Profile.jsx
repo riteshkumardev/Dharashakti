@@ -1,149 +1,148 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import "./Profile.css";
-import { getDatabase, ref, update } from "firebase/database";
-import {
-  getStorage,
-  ref as sRef,
-  uploadBytes,
-  getDownloadURL,
-} from "firebase/storage";
-import { app } from "../../redux/api/firebase/firebase";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 // 🏗️ Core Components
 import Loader from "../Core_Component/Loader/Loader";
-import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar"; // ✅ Snackbar Import
+import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
 export default function Profile({ user, setUser }) {
-  // State Initialization
   const [name, setName] = useState(user?.name || "");
   const [phone, setPhone] = useState(user?.phone || "");
   const [newPassword, setNewPassword] = useState("");
   const [photoURL, setPhotoURL] = useState(
-    user?.photoURL || user?.photo || "https://i.imgur.com/6VBx3io.png"
+    user?.photo || "https://i.imgur.com/6VBx3io.png"
   );
-  
-  // ⏳ Feedback States
-  const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
-  const db = getDatabase(app);
-  const storage = getStorage(app);
+  const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
   const navigate = useNavigate();
 
-  // 🔔 Snackbar Helper
   const showMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  /* ================= UPDATE PROFILE (NAME & PHONE) ================= */
+  /* ================= UPDATE PROFILE ================= */
   const updateProfile = async () => {
-    if (!user?.firebaseId) return showMsg("User ID not found!", "error");
-    
     try {
       setLoading(true);
 
-      const updates = {
-        name: name,
-        phone: phone,
-      };
+      const res = await fetch("http://localhost:5000/api/profile/update", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employeeId: user.employeeId,
+          name,
+          phone,
+        }),
+      });
 
-      await update(ref(db, `employees/${user.firebaseId}`), updates);
+      const data = await res.json();
 
-      const updatedUser = {
-        ...user,
-        name,
-        phone,
-      };
+      if (!data.success) throw new Error();
 
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      setUser(updatedUser);
-
-      showMsg("✅ Profile details updated successfully!", "success");
-    } catch (e) {
-      console.error(e);
-      showMsg("❌ Update failed: " + e.message, "error");
+      localStorage.setItem("user", JSON.stringify(data.data));
+      setUser(data.data);
+      showMsg("✅ Profile updated successfully");
+    } catch {
+      showMsg("❌ Profile update failed", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  /* ================= CHANGE PASSWORD (DATABASE BASED) ================= */
+  /* ================= CHANGE PASSWORD ================= */
   const changePassword = async () => {
+    if (newPassword.length < 4) {
+      showMsg("Password must be at least 4 characters", "warning");
+      return;
+    }
+
     try {
-      if (newPassword.length < 4) {
-        showMsg("Password must be at least 4 characters", "warning");
-        return;
-      }
       setLoading(true);
 
-      await update(ref(db, `employees/${user.firebaseId}`), {
-        password: newPassword,
+      const res = await fetch("http://localhost:5000/api/profile/password", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employeeId: user.employeeId,
+          password: newPassword,
+        }),
       });
 
-      const updatedUser = { ...user, password: newPassword };
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      setUser(updatedUser);
+      const data = await res.json();
+      if (!data.success) throw new Error();
 
-      showMsg("🔐 Password updated in Database!", "success");
+      showMsg("🔐 Password updated");
       setNewPassword("");
-    } catch (e) {
+    } catch {
       showMsg("❌ Password update failed", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  /* ================= IMAGE UPLOAD (FIREBASE STORAGE) ================= */
-  const handleImageChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  /* ================= IMAGE UPLOAD ================= */
 
-    try {
-      setLoading(true);
+// Profile.jsx ke handleImageChange function ke andar
+const handleImageChange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // 1. FormData taiyar karein
+  const formData = new FormData();
+  formData.append("photo", file); // ⚠️ "image" ki jagah "photo" karein (Backend se match karne ke liye)
+  formData.append("employeeId", user.employeeId);
+
+  try {
+    setLoading(true);
+    
+    // 2. API Call
+    const res = await axios.post("http://localhost:5000/api/profile/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+
+    if (res.data.success) {
+      // Backend se "/uploads/filename.jpg" aa raha hai
+      const fullPhotoPath = `http://localhost:5000${res.data.photo}`;
+
+      // 3. Global aur Local State update karein
+      const updatedUser = { ...user, photo: fullPhotoPath };
       
-      const imageRef = sRef(
-        storage,
-        `profileImages/${user.firebaseId}.jpg`
-      );
-
-      await uploadBytes(imageRef, file);
-      const downloadURL = await getDownloadURL(imageRef);
-
-      await update(ref(db, `employees/${user.firebaseId}`), {
-        photo: downloadURL,
-        photoURL: downloadURL,
-      });
-
-      const updatedUser = {
-        ...user,
-        photo: downloadURL,
-        photoURL: downloadURL,
-      };
-
-      localStorage.setItem("user", JSON.stringify(updatedUser));
       setUser(updatedUser);
-      setPhotoURL(downloadURL);
+      setPhotoURL(fullPhotoPath); // Preview update
+      
+      // LocalStorage update taaki refresh pe image na jaye
+      localStorage.setItem("user", JSON.stringify(updatedUser));
 
-      showMsg("✅ Profile image updated!", "success");
-    } catch (err) {
-      console.error(err);
-      showMsg("❌ Image upload failed: " + err.message, "error");
-    } finally {
-      setLoading(false);
+      showMsg("✅ Profile image updated successfully!", "success");
     }
-  };
+  } catch (err) {
+    console.error("Upload Error:", err);
+    showMsg("❌ Image upload failed: " + (err.response?.data?.message || "Server Error"), "error");
+  } finally {
+    setLoading(false);
+  }
+};
 
   /* ================= LOGOUT ================= */
   const logout = async () => {
     try {
       setLoading(true);
-      await update(ref(db, `employees/${user.firebaseId}`), {
-        currentSessionId: null,
-        lastLogoutAt: new Date().toISOString(),
+
+      await fetch("http://localhost:5000/api/profile/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId: user.employeeId }),
       });
     } catch (e) {
-      console.error("Logout error:", e);
+      console.error(e);
     } finally {
       localStorage.removeItem("user");
       setUser(null);
@@ -152,7 +151,6 @@ export default function Profile({ user, setUser }) {
     }
   };
 
-  // UI Security: Jab loading ho tab Loader overlay dikhao
   if (loading) return <Loader />;
 
   return (
@@ -160,38 +158,32 @@ export default function Profile({ user, setUser }) {
       <div className="profile-card-3d">
         {/* PROFILE IMAGE */}
         <div className="profile-img">
-          <img src={photoURL} alt="profile" style={{ objectFit: 'cover' }} />
-          <label className="img-edit" title="Change Photo">
+          <img src={photoURL} alt="profile" style={{ objectFit: "cover" }} />
+          <label className="img-edit">
             📸
-            <input
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={handleImageChange}
-              disabled={loading}
-            />
+            <input type="file" hidden onChange={handleImageChange} />
           </label>
         </div>
 
         <h2 className="profile-title">{user?.role} Profile</h2>
 
         <div className="field">
-          <label>Employee ID (Login User)</label>
-          <input value={user?.employeeId || user?.firebaseId || ""} disabled style={{ background: 'rgba(255,255,255,0.05)' }} />
+          <label>Employee ID</label>
+          <input value={user?.employeeId} disabled />
         </div>
 
         <div className="field">
           <label>Full Name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter name" disabled={loading} />
+          <input value={name} onChange={(e) => setName(e.target.value)} />
         </div>
 
         <div className="field">
           <label>Phone Number</label>
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Enter phone" disabled={loading} />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
 
-        <button onClick={updateProfile} disabled={loading} className="update-btn">
-          {loading ? "Updating..." : "Update Details"}
+        <button onClick={updateProfile} className="update-btn">
+          Update Details
         </button>
 
         <div className="divider">Security & Password</div>
@@ -200,28 +192,25 @@ export default function Profile({ user, setUser }) {
           <label>New Password</label>
           <input
             type="password"
-            placeholder="Min 4 characters"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            disabled={loading}
           />
         </div>
 
-        <button onClick={changePassword} disabled={loading || !newPassword}>
-          {loading ? "Saving..." : "Change Password"}
+        <button onClick={changePassword} disabled={!newPassword}>
+          Change Password
         </button>
 
-        <button className="danger" onClick={logout} disabled={loading} style={{ marginTop: '20px' }}>
-          {loading ? "Logging out..." : "🔒 Logout from Device"}
+        <button className="danger" onClick={logout} style={{ marginTop: "20px" }}>
+          🔒 Logout
         </button>
       </div>
 
-      {/* 🔔 CUSTOM SNACKBAR */}
-      <CustomSnackbar 
-        open={snackbar.open} 
-        message={snackbar.message} 
-        severity={snackbar.severity} 
-        onClose={() => setSnackbar({ ...snackbar, open: false })} 
+      <CustomSnackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        severity={snackbar.severity}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
       />
     </div>
   );

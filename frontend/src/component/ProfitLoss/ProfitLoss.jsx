@@ -1,85 +1,46 @@
 import React, { useState, useEffect } from "react";
-import { getDatabase, ref, onValue } from "firebase/database";
-import { app } from "../../redux/api/firebase/firebase";
-import Loader from "../Core_Component/Loader/Loader"; // ✅ Loader import kiya
+import axios from "axios"; // 🛠️ Firebase ki jagah Axios
+import Loader from "../Core_Component/Loader/Loader";
 import "./ProfitLoss.css";
 
 const ProfitLoss = () => {
-  const db = getDatabase(app);
   const [data, setData] = useState({ sales: 0, purchases: 0, expenses: 0 });
-  const [loading, setLoading] = useState(true); // ⏳ Loading state
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
-    
-    // Sabhi listeners ko track karne ke liye variables
-    let salesDone = false;
-    let purchaseDone = false;
-    let expenseDone = false;
-
-    const checkAllDone = () => {
-      if (salesDone && purchaseDone && expenseDone) {
-        // Sabhi data aane ke baad thoda delay taaki calculation smooth dikhe
+    const fetchAnalytics = async () => {
+      try {
+        setLoading(true);
+        // Backend se consolidated financial data lana
+        const res = await axios.get("http://localhost:5000/api/analytics/profit-loss");
+        
+        if (res.data.success) {
+          setData({
+            sales: res.data.totalSales,
+            purchases: res.data.totalPurchases,
+            expenses: res.data.totalExpenses
+          });
+        }
+      } catch (err) {
+        console.error("Financial data fetch error:", err);
+      } finally {
+        // Smooth transition ke liye halka delay
         setTimeout(() => setLoading(false), 800);
       }
     };
 
-    // 1. Sales Calculation
-    const salesRef = ref(db, "sales");
-    onValue(salesRef, (snapshot) => {
-      let total = 0;
-      if (snapshot.exists()) {
-        const val = snapshot.val();
-        Object.values(val).forEach(item => {
-          total += Number(item.amountReceived || item.totalAmount || 0);
-        });
-      }
-      setData(prev => ({ ...prev, sales: total }));
-      salesDone = true;
-      checkAllDone();
-    });
-
-    // 2. Purchases Calculation
-    const purchaseRef = ref(db, "purchases");
-    onValue(purchaseRef, (snapshot) => {
-      let total = 0;
-      if (snapshot.exists()) {
-        const val = snapshot.val();
-        Object.values(val).forEach(item => {
-          total += Number(item.amountReceived || item.totalAmount || item.amount || 0);
-        });
-      }
-      setData(prev => ({ ...prev, purchases: total }));
-      purchaseDone = true;
-      checkAllDone();
-    });
-
-    // 3. Daily Expenses Calculation
-    const expenseRef = ref(db, "dailyExpenses");
-    onValue(expenseRef, (snapshot) => {
-      let total = 0;
-      if (snapshot.exists()) {
-        const val = snapshot.val();
-        Object.values(val).forEach(item => {
-          total += Number(item.amount || item.amountReceived || 0);
-        });
-      }
-      setData(prev => ({ ...prev, expenses: total }));
-      expenseDone = true;
-      checkAllDone();
-    });
-  }, [db]);
+    fetchAnalytics();
+  }, []);
 
   const totalOut = data.purchases + data.expenses;
   const netProfit = data.sales - totalOut;
 
-  // ✅ Loader check
   if (loading) return <Loader />;
 
   return (
     <div className="pl-container">
       <div className="pl-header">
-        <h3>📊 Financial Analytics (Live)</h3>
+        <h3>📊 Financial Analytics (MongoDB Live)</h3>
       </div>
 
       <div className="pl-table-wrapper">
@@ -111,8 +72,6 @@ const ProfitLoss = () => {
               <td className="text-right amount-minus">-{data.expenses.toLocaleString()}</td>
               <td>💸 Paid</td>
             </tr>
-            
-            
 
             <tr className="final-row">
               <td colSpan="2"><strong>NET SETTLEMENT (Profit/Loss)</strong></td>
