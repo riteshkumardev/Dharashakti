@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import "./Sales.css";
 import axios from "axios"; 
 import Loader from "../Core_Component/Loader/Loader";
-import Alert from "../Core_Component/Alert/Alert";
+import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar"; // Snackbar Import
 
 const SalesTable = ({ role }) => {
   const isAuthorized = role === "Admin" || role === "Accountant";
@@ -17,13 +17,19 @@ const SalesTable = ({ role }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
-  // Live Backend URL dynamically handle karne ke liye
+  // Live Backend URL handle karne ke liye
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-  const [alertData, setAlertData] = useState({ show: false, title: "", message: "" });
+  // Snackbar State
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
-  const showAlert = (title, message) => setAlertData({ show: true, title, message });
-  const closeAlert = () => setAlertData((prev) => ({ ...prev, show: false }));
+  const showMsg = (msg, type = "success") => {
+    setSnackbar({ open: true, message: msg, severity: type });
+  };
 
   // 1️⃣ Fetch Data from MongoDB (Live API)
   const fetchSales = async () => {
@@ -34,7 +40,7 @@ const SalesTable = ({ role }) => {
         setSalesList(res.data.data);
       }
     } catch (err) {
-      showAlert("Error", "Server se data nahi mil raha.");
+      showMsg("Server se data nahi mil raha.", "error");
     } finally {
       setLoading(false);
     }
@@ -82,7 +88,7 @@ const SalesTable = ({ role }) => {
   // 4️⃣ Actions (Live MongoDB Integration)
   const handleDelete = async (id) => {
     if (!isAuthorized) {
-      alert("Denied ❌: Aapke paas delete karne ki permission nahi hai.");
+      showMsg("Denied ❌: Aapke paas permission nahi hai.", "error");
       return;
     }
 
@@ -93,11 +99,11 @@ const SalesTable = ({ role }) => {
       setLoading(true);
       const res = await axios.delete(`${API_URL}/api/sales/${id}`);
       if (res.data.success) {
+        showMsg("Record Deleted Successfully! 🗑️", "success");
         fetchSales(); 
       }
     } catch (err) {
-      console.error(err);
-      alert("Error ❌: Record delete nahi ho paya.");
+      showMsg("Error ❌: Record delete nahi ho paya.", "error");
     } finally {
       setLoading(false);
     }
@@ -105,20 +111,23 @@ const SalesTable = ({ role }) => {
 
   const handleSave = async () => {
     try {
+      setLoading(true);
       const res = await axios.put(`${API_URL}/api/sales/${editId}`, editData);
       if (res.data.success) {
-        showAlert("Updated! ✅", "Record update ho gaya.");
+        showMsg("Updated! ✅ Record update ho gaya.");
         setEditId(null);
         fetchSales();
       }
     } catch (err) {
-      showAlert("Error ❌", "Update fail ho gaya.");
+      showMsg("Error ❌ Update fail ho gaya.", "error");
+    } finally {
+        setLoading(false);
     }
   };
 
   const startEdit = (sale) => {
     if (!isAuthorized) {
-      showAlert("Denied ❌", "Permission Denied.");
+      showMsg("Denied ❌ Permission Required.", "warning");
       return;
     }
     setEditId(sale._id); 
@@ -183,9 +192,15 @@ const SalesTable = ({ role }) => {
                     <td>{sale.billDueDate}</td>
                     <td>
                       {editId === sale._id ? (
-                        <><button onClick={handleSave}>💾</button> <button onClick={() => setEditId(null)}>✖</button></>
+                        <div className="btn-group-row">
+                            <button className="save-btn-ui" onClick={handleSave}>💾</button> 
+                            <button className="cancel-btn-ui" onClick={() => setEditId(null)}>✖</button>
+                        </div>
                       ) : (
-                        <><button onClick={() => startEdit(sale)} disabled={!isAuthorized}>✏️</button> <button onClick={() => handleDelete(sale._id)} disabled={!isAuthorized}>🗑️</button></>
+                        <div className="btn-group-row">
+                            <button className="row-edit-btn" onClick={() => startEdit(sale)} disabled={!isAuthorized}>✏️</button> 
+                            <button className="row-delete-btn" onClick={() => handleDelete(sale._id)} disabled={!isAuthorized}>🗑️</button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -201,7 +216,14 @@ const SalesTable = ({ role }) => {
           </div>
         </div>
       </div>
-      <Alert show={alertData.show} title={alertData.title} message={alertData.message} onClose={closeAlert} />
+
+      {/* Snackbar Integration */}
+      <CustomSnackbar 
+        open={snackbar.open} 
+        message={snackbar.message} 
+        severity={snackbar.severity} 
+        onClose={() => setSnackbar({ ...snackbar, open: false })} 
+      />
     </>
   );
 };
