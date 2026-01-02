@@ -129,6 +129,8 @@ function App() {
 
   return (
     <Router>
+
+      "hhhhhh"
       <div className="app-container">
         {/* Screen Lock Overlay */}
         {isLocked && user && <ScreenLock user={user} setIsLocked={setIsLocked} />}
