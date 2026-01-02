@@ -2,14 +2,17 @@ import mongoose from "mongoose";
 
 const saleSchema = new mongoose.Schema(
   {
-    customer: { type: String, required: true },
+    si: { type: Number, required: true },
+    date: { type: String, required: true },
+    customerName: { type: String, required: true },
+    productName: { type: String, required: true },
     billNo: { type: String, required: true },
     quantity: { type: Number, required: true },
     rate: { type: Number, required: true },
-    total: { type: Number, required: true },
-    received: { type: Number, default: 0 },
-    due: { type: Number, default: 0 },
-    date: { type: Date, default: Date.now },
+    totalPrice: { type: Number, required: true },
+    amountReceived: { type: Number, default: 0 },
+    paymentDue: { type: Number, default: 0 },
+    billDueDate: { type: String },
     remarks: { type: String }
   },
   { timestamps: true }
