@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { getDatabase, ref, onValue, off } from "firebase/database";
 import { app } from "../redux/api/firebase/firebase";
 import "../App.css";
-import dharasakti from "../component/dharasakti.png";
+import dharasakti from "./dharasakti.png";
 import DashboardSidebar from "./Dashboard/DashboardSidebar";
 
 export default function Navbar({ user, setUser }) {
