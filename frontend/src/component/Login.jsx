@@ -25,6 +25,9 @@ function Login({ setUser }) {
 
   const navigate = useNavigate();
 
+  // Live Backend URL dynamically handle karne ke liye
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
   const showMsg = (msg, type = "error") =>
     setSnackbar({ open: true, message: msg, severity: type });
 
@@ -44,7 +47,7 @@ function Login({ setUser }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Captcha
+    // Captcha validation
     if (parseInt(userCaptcha) !== captcha.total) {
       showMsg("❌ Invalid Captcha. Try again.");
       refreshCaptcha();
@@ -59,7 +62,8 @@ function Login({ setUser }) {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
+      // Yahan ab live API URL use ho raha hai
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -88,6 +92,7 @@ function Login({ setUser }) {
         navigate("/", { replace: true });
       }, 500);
     } catch (err) {
+      console.error("Login error:", err);
       showMsg("Server error. Please try again.");
       refreshCaptcha();
       setLoading(false);
