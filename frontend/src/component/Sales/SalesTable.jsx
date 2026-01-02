@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import "./Sales.css";
-import axios from "axios"; // 🛠️ MongoDB Integration
+import axios from "axios"; 
 import Loader from "../Core_Component/Loader/Loader";
 import Alert from "../Core_Component/Alert/Alert";
 
@@ -17,16 +17,19 @@ const SalesTable = ({ role }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
+  // Live Backend URL dynamically handle karne ke liye
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
   const [alertData, setAlertData] = useState({ show: false, title: "", message: "" });
 
   const showAlert = (title, message) => setAlertData({ show: true, title, message });
   const closeAlert = () => setAlertData((prev) => ({ ...prev, show: false }));
 
-  // 1️⃣ Fetch Data from MongoDB
+  // 1️⃣ Fetch Data from MongoDB (Live API)
   const fetchSales = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:5000/api/sales");
+      const res = await axios.get(`${API_URL}/api/sales`);
       if (res.data.success) {
         setSalesList(res.data.data);
       }
@@ -39,7 +42,7 @@ const SalesTable = ({ role }) => {
 
   useEffect(() => {
     fetchSales();
-  }, []);
+  }, [API_URL]);
 
   // 2️⃣ Auto Calculation in Edit Mode
   useEffect(() => {
@@ -76,29 +79,20 @@ const SalesTable = ({ role }) => {
   const currentRows = processedList.slice(indexOfFirstRow, indexOfLastRow);
   const totalPages = Math.ceil(processedList.length / rowsPerPage);
 
-  // 4️⃣ Actions
-  // 4️⃣ Actions
-// 4️⃣ Actions (Clean Version: Only Browser Popup)
+  // 4️⃣ Actions (Live MongoDB Integration)
   const handleDelete = async (id) => {
-    // Permission check
     if (!isAuthorized) {
       alert("Denied ❌: Aapke paas delete karne ki permission nahi hai.");
       return;
     }
 
-    // Sirf window popup confirmation लेगा
     const isConfirmed = window.confirm("Kya aap sach me delete karna chahte hain?");
-    
-    // Agar user ne OK nahi kiya toh function yahi ruk jayega
     if (!isConfirmed) return;
 
     try {
       setLoading(true);
-      const res = await axios.delete(`http://localhost:5000/api/sales/${id}`);
-      
+      const res = await axios.delete(`${API_URL}/api/sales/${id}`);
       if (res.data.success) {
-        // Successful delete ke baad bhi humne showAlert hata diya hai
-        // Taki extra popup na aaye. Bas data refresh ho jayega.
         fetchSales(); 
       }
     } catch (err) {
@@ -108,9 +102,10 @@ const SalesTable = ({ role }) => {
       setLoading(false);
     }
   };
+
   const handleSave = async () => {
     try {
-      const res = await axios.put(`http://localhost:5000/api/sales/${editId}`, editData);
+      const res = await axios.put(`${API_URL}/api/sales/${editId}`, editData);
       if (res.data.success) {
         showAlert("Updated! ✅", "Record update ho gaya.");
         setEditId(null);
@@ -126,7 +121,7 @@ const SalesTable = ({ role }) => {
       showAlert("Denied ❌", "Permission Denied.");
       return;
     }
-    setEditId(sale._id); // MongoDB uses _id
+    setEditId(sale._id); 
     setEditData({ ...sale });
   };
 
@@ -137,7 +132,7 @@ const SalesTable = ({ role }) => {
       <div className="table-container-wide">
         <div className="table-card-wide">
           <div className="table-header-flex">
-            <h2 className="table-title">SALES RECORDS (MongoDB)</h2>
+            <h2 className="table-title">SALES RECORDS (Live)</h2>
             <div className="table-controls-row">
               <select className="table-select-custom" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                 <option value="dateNewest">Newest Date</option>

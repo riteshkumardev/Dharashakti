@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import "./Sales.css";
-import axios from "axios"; // 🛠️ Firebase ki jagah Axios
+import axios from "axios"; 
 
 // 🏗️ Core Components Import
 import Loader from "../Core_Component/Loader/Loader";
@@ -29,16 +29,18 @@ const SalesEntry = ({ role }) => {
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
+  // Live Backend URL handle karne ke liye dynamic logic
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
   const showMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  // 1️⃣ Get Next SI No from MongoDB
+  // 1️⃣ Get Next SI No from MongoDB (Live URL optimized)
   const fetchNextSi = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/sales");
+      const res = await axios.get(`${API_URL}/api/sales`);
       if (res.data.success && res.data.data.length > 0) {
-        // Sabse bada SI number dhoond kar +1 karein
         const lastSi = Math.max(...res.data.data.map(s => s.si || 0));
         setNextSi(lastSi + 1);
       } else {
@@ -51,7 +53,7 @@ const SalesEntry = ({ role }) => {
 
   useEffect(() => {
     fetchNextSi();
-  }, []);
+  }, [API_URL]);
 
   // 2️⃣ Live Calculations
   useEffect(() => {
@@ -93,8 +95,8 @@ const SalesEntry = ({ role }) => {
     setLoading(true);
 
     try {
-      // 🛠️ MongoDB API Call
-      const res = await axios.post("http://localhost:5000/api/sales", {
+      // 🛠️ MongoDB API Call using dynamic API_URL
+      const res = await axios.post(`${API_URL}/api/sales`, {
         ...formData,
         si: nextSi
       });
@@ -102,7 +104,7 @@ const SalesEntry = ({ role }) => {
       if (res.data.success) {
         showMsg(`Sale Saved! SI No: ${nextSi}`, "success");
         handleReset();
-        fetchNextSi(); // Agla SI number update karein
+        fetchNextSi(); 
       }
     } catch (error) {
       showMsg("Data save nahi ho paya. Backend check karein.", "error");
@@ -116,7 +118,7 @@ const SalesEntry = ({ role }) => {
       {loading && <Loader />}
       <div className="sales-card-wide">
         <div className="form-header-flex" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 className="form-title">Sales Entry (MongoDB)</h2>
+          <h2 className="form-title">Sales Entry (Live MongoDB)</h2>
           <div style={{ display: "flex", gap: "10px" }}>
             <div className="si-badge">SI No: {nextSi}</div>
             <div className="due-badge">Due: {formData.billDueDate}</div>

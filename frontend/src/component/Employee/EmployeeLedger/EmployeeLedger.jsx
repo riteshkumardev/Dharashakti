@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios'; // 🛠️ Firebase ki jagah Axios
+import axios from 'axios'; 
 import Calendar from 'react-calendar'; 
 import 'react-calendar/dist/Calendar.css'; 
 import './EmployeeLedger.css';
@@ -19,6 +19,9 @@ const EmployeeLedger = ({ role, user }) => {
   const [loading, setLoading] = useState(true); 
   const [fetchingDetail, setFetchingDetail] = useState(false);
 
+  // Live Backend URL handle karne ke liye
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
   const maskID = (id) => {
     if (!id) return "---";
     const strID = id.toString();
@@ -33,13 +36,16 @@ const EmployeeLedger = ({ role, user }) => {
         return;
       }
       try {
-        const res = await axios.get("http://localhost:5000/api/employees");
+        const res = await axios.get(`${API_URL}/api/employees`);
         if (res.data.success) setEmployees(res.data.data);
-      } catch (err) { console.error("Staff load failed"); }
-      finally { setLoading(false); }
+      } catch (err) { 
+        console.error("Staff load failed"); 
+      } finally { 
+        setLoading(false); 
+      }
     };
     fetchEmployees();
-  }, [isBoss]);
+  }, [isBoss, API_URL]);
 
   // 2️⃣ Auto-View for Self (Workers/Operators)
   useEffect(() => {
@@ -57,15 +63,15 @@ const EmployeeLedger = ({ role, user }) => {
 
     try {
       // Fetch Payment History (Advance)
-      const payRes = await axios.get(`http://localhost:5000/api/salary-payments/${empId}`);
+      const payRes = await axios.get(`${API_URL}/api/salary-payments/${empId}`);
       if (payRes.data.success) setPaymentHistory(payRes.data.data.reverse());
 
-      // Fetch Attendance Data (Assuming you have an attendance API)
+      // Fetch Attendance Data
       const currentMonth = new Date().toISOString().slice(0, 7); 
-      const attRes = await axios.get(`http://localhost:5000/api/attendance/report/${empId}`);
+      const attRes = await axios.get(`${API_URL}/api/attendance/report/${empId}`);
       
       if (attRes.data.success) {
-        const history = attRes.data.data; // Expected format: { "2023-10-01": "Present", ... }
+        const history = attRes.data.data; 
         let p = 0, a = 0;
         
         Object.keys(history).forEach(date => {
@@ -106,7 +112,7 @@ const EmployeeLedger = ({ role, user }) => {
     if(!advanceAmount || !selectedEmp) return;
 
     try {
-      const res = await axios.post("http://localhost:5000/api/salary-payments", {
+      const res = await axios.post(`${API_URL}/api/salary-payments`, {
         employeeId: selectedEmp.employeeId || selectedEmp._id,
         amount: advanceAmount,
         date: new Date().toISOString().split('T')[0],
@@ -118,7 +124,9 @@ const EmployeeLedger = ({ role, user }) => {
         alert("✅ Advance Added!");
         viewLedger(selectedEmp); // UI Refresh
       }
-    } catch (err) { alert("Save failed: " + err.message); }
+    } catch (err) { 
+      alert("Save failed: " + err.message); 
+    }
   };
 
   if (loading) return <Loader />;

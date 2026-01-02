@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios"; // 🛠️ Firebase ki jagah Axios
+import axios from "axios"; 
 import Loader from "../Core_Component/Loader/Loader";
 import "./ProfitLoss.css";
 
@@ -7,12 +7,15 @@ const ProfitLoss = () => {
   const [data, setData] = useState({ sales: 0, purchases: 0, expenses: 0 });
   const [loading, setLoading] = useState(true);
 
+  // Live Backend URL handle karne ke liye dynamic logic
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
         setLoading(true);
-        // Backend se consolidated financial data lana
-        const res = await axios.get("http://localhost:5000/api/analytics/profit-loss");
+        // Backend se live data fetch karne ke liye API_URL ka use
+        const res = await axios.get(`${API_URL}/api/analytics/profit-loss`);
         
         if (res.data.success) {
           setData({
@@ -24,13 +27,13 @@ const ProfitLoss = () => {
       } catch (err) {
         console.error("Financial data fetch error:", err);
       } finally {
-        // Smooth transition ke liye halka delay
+        // Smooth transition
         setTimeout(() => setLoading(false), 800);
       }
     };
 
     fetchAnalytics();
-  }, []);
+  }, [API_URL]);
 
   const totalOut = data.purchases + data.expenses;
   const netProfit = data.sales - totalOut;
@@ -40,7 +43,7 @@ const ProfitLoss = () => {
   return (
     <div className="pl-container">
       <div className="pl-header">
-        <h3>📊 Financial Analytics (MongoDB Live)</h3>
+        <h3>📊 Financial Analytics (Live MongoDB)</h3>
       </div>
 
       <div className="pl-table-wrapper">

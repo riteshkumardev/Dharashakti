@@ -11,6 +11,9 @@ const EmployeeAdd = ({ onEntrySaved }) => {
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
+  // Live Backend URL handled dynamically
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
   const [formData, setFormData] = useState({
     name: "",
     fatherName: "",
@@ -49,69 +52,66 @@ const EmployeeAdd = ({ onEntrySaved }) => {
     setFormData({ ...formData, [name]: value });
   };
 
- // ... baaki imports same rahenge
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  if (!formData.name || !formData.aadhar || !formData.salary || !formData.password) {
-    showMsg("Please fill Name, Aadhar, Salary and Password!", "warning");
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    // 🛠️ Yahan 'role' field add ki gayi hai jo 'designation' se value legi
-    const dataToSubmit = {
-      ...formData,
-      role: formData.designation // Taki backend ko sahi role mile
-    };
-
-    const res = await fetch("http://localhost:5000/api/employees", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(dataToSubmit),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      showMsg(data.message || "Employee registration failed", "error");
-      setLoading(false);
+    if (!formData.name || !formData.aadhar || !formData.salary || !formData.password) {
+      showMsg("Please fill Name, Aadhar, Salary and Password!", "warning");
       return;
     }
 
-    // ✅ SUCCESS
-    showMsg(`🎉 Employee Registered! ID: ${data.employeeId}`, "success");
+    setLoading(true);
 
-    if (onEntrySaved) onEntrySaved();
+    try {
+      // Role field mapping
+      const dataToSubmit = {
+        ...formData,
+        role: formData.designation 
+      };
 
-    // Reset Form
-    setFormData({
-      name: "", fatherName: "", phone: "", emergencyPhone: "",
-      aadhar: "", address: "", designation: "Worker",
-      joiningDate: new Date().toISOString().split("T")[0],
-      salary: "", bankName: "", accountNo: "", ifscCode: "",
-      photo: "", password: ""
-    });
+      // Live API call using API_URL
+      const res = await fetch(`${API_URL}/api/employees`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dataToSubmit),
+      });
 
-  } catch (err) {
-    showMsg("Registration Error: Server not reachable", "error");
-  } finally {
-    setLoading(false);
-  }
-};
+      const data = await res.json();
+
+      if (!res.ok) {
+        showMsg(data.message || "Employee registration failed", "error");
+        setLoading(false);
+        return;
+      }
+
+      // ✅ SUCCESS
+      showMsg(`🎉 Employee Registered! ID: ${data.employeeId}`, "success");
+
+      if (onEntrySaved) onEntrySaved();
+
+      // Reset Form
+      setFormData({
+        name: "", fatherName: "", phone: "", emergencyPhone: "",
+        aadhar: "", address: "", designation: "Worker",
+        joiningDate: new Date().toISOString().split("T")[0],
+        salary: "", bankName: "", accountNo: "", ifscCode: "",
+        photo: "", password: ""
+      });
+
+    } catch (err) {
+      showMsg("Registration Error: Server not reachable", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="table-card-wide">
       {loading && <Loader />}
 
-      <h2 className="table-title">Employee Registration Form</h2>
+      <h2 className="table-title">Employee Registration Form (Live)</h2>
 
       <form onSubmit={handleSubmit} className="stock-form-grid">
-        {/* --- FORM JSX COMPLETELY UNCHANGED --- */}
-
         <div className="input-group">
           <label>Employee Name *</label>
           <input type="text" name="name" value={formData.name} onChange={handleChange} required disabled={loading} />

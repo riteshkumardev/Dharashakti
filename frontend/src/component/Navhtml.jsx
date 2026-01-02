@@ -1,7 +1,5 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { getDatabase, ref, onValue, off } from "firebase/database";
-import { app } from "../redux/api/firebase/firebase";
 import "../App.css";
 import dharasakti from "./dharasakti.png";
 import DashboardSidebar from "./Dashboard/DashboardSidebar";
@@ -9,9 +7,8 @@ import DashboardSidebar from "./Dashboard/DashboardSidebar";
 export default function Navbar({ user, setUser }) {
   const [showSidebar, setShowSidebar] = useState(false);
   const navigate = useNavigate();
-  const db = getDatabase(app);
 
-  // 🔓 FORCE LOGOUT (SESSION HIJACK / BLOCK CASE)
+  // 🔓 FORCE LOGOUT
   const forceLogout = (reason) => {
     if (reason) alert(reason);
     localStorage.removeItem("user");
@@ -20,28 +17,15 @@ export default function Navbar({ user, setUser }) {
     navigate("/login");
   };
 
-  // 🔐 SESSION LISTENER (ONE ID → ONE LOGIN)
+  // 🔐 SESSION CHECK (MongoDB integration ke baad yahan se API call kar sakte hain)
   useEffect(() => {
-    if (!user?.firebaseId || !user?.currentSessionId) return;
-
-    const sessionRef = ref(
-      db,
-      `employees/${user.firebaseId}/currentSessionId`
-    );
-
-    const unsubscribe = onValue(sessionRef, (snapshot) => {
-      const activeSessionId = snapshot.val();
-
-      if (
-        activeSessionId &&
-        activeSessionId !== user.currentSessionId
-      ) {
-        forceLogout("⚠️ This ID was logged in on another device.");
-      }
-    });
-
-    return () => off(sessionRef);
-  }, [user?.firebaseId, user?.currentSessionId]);
+    if (!user) return;
+    
+    // Note: Agar aapko "One ID One Login" feature MongoDB se chahiye, 
+    // toh aapko ek API endpoint banana hoga jo backend par session check kare.
+    // Filhal Firebase remove kar diya gaya hai taaki crash na ho.
+    
+  }, [user]);
 
   return (
     <>
@@ -97,7 +81,7 @@ export default function Navbar({ user, setUser }) {
             >
               <img
                 src={
-                  user.photoURL ||
+                  user.photo || 
                   "https://i.imgur.com/6VBx3io.png"
                 }
                 alt="profile"

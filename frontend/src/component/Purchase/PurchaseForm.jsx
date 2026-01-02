@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
+import axios from 'axios'; // Firebase ki jagah Axios use karenge
 import './Purchase.css';
-import { getDatabase, ref, push, set } from "firebase/database";
-import { app } from "../../redux/api/firebase/firebase";
 
 // 🏗️ Core Components Import
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
 const PurchaseForm = ({ onCancel, role }) => {
-  const db = getDatabase(app);
-
   // 🔐 Permission Check
   const isAuthorized = role === "Admin" || role === "Accountant";
+
+  // Live Backend URL dynamically handle karne ke liye
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   const [formData, setFormData] = useState({
     item: '',
@@ -22,14 +22,13 @@ const PurchaseForm = ({ onCancel, role }) => {
 
   const [loading, setLoading] = useState(false);
 
-  /* 🔔 Snackbar State (Modern Notification) */
+  /* 🔔 Snackbar State */
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
     severity: "success",
   });
 
-  // Function to trigger Snackbar
   const triggerSnackbar = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
@@ -39,50 +38,44 @@ const PurchaseForm = ({ onCancel, role }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 🛑 Security Check: Snackbar used instead of alert
     if (!isAuthorized) {
       triggerSnackbar("Unauthorized: Aapko data save karne ki permission nahi hai!", "error");
       return;
     }
 
-    setLoading(true); // 🔄 Start Global Loader
+    setLoading(true);
 
     const purchaseEntry = {
-      ...formData,
+      productName: formData.item, // Backend field name se match karne ke liye
       quantity: Number(formData.quantity),
-      date: new Date().toISOString().split('T')[0],
-      timestamp: new Date().getTime()
+      unit: formData.unit,
+      remarks: formData.remarks,
+      date: new Date().toISOString().split('T')[0]
     };
 
     try {
-      const purchaseRef = ref(db, "purchases");
-      const newEntryRef = push(purchaseRef);
-      
-      await set(newEntryRef, purchaseEntry);
+      // 🛠️ Live MongoDB POST Request
+      const res = await axios.post(`${API_URL}/api/purchases`, purchaseEntry);
 
-      // ✅ Success Notification using Snackbar
-      triggerSnackbar("✅ Purchase Stock Saved Successfully!", "success");
-      
-      // Reset Form Fields
-      setFormData({ item: '', quantity: '', unit: 'kg', remarks: '' });
-
+      if (res.data.success) {
+        triggerSnackbar("✅ Purchase Stock Saved Successfully!", "success");
+        setFormData({ item: '', quantity: '', unit: 'kg', remarks: '' });
+      }
     } catch (error) {
-      console.error("Firebase Error:", error);
-      triggerSnackbar("❌ Data save nahi ho paya. Error: " + error.message, "error");
+      console.error("API Error:", error);
+      triggerSnackbar("❌ Data save nahi ho paya. Error: " + (error.response?.data?.message || error.message), "error");
     } finally {
-      // Small delay for professional UI transition
       setTimeout(() => setLoading(false), 500);
     }
   };
 
   return (
     <div className="table-container-wide">
-      {/* 🔄 Global Loader Integration */}
       {loading && <Loader />}
 
       <div className="table-card-wide no-scroll-card">
         <div className="form-header-row">
-          <h2 className="table-title">PURCHASE ENTRY FORM (CLOUD)</h2>
+          <h2 className="table-title">PURCHASE ENTRY FORM (LIVE)</h2>
           {!isAuthorized && <span className="locked-badge" style={{color: 'red', fontSize: '12px'}}>🔒 Read Only Mode</span>}
         </div>
 
@@ -170,7 +163,6 @@ const PurchaseForm = ({ onCancel, role }) => {
         </form>
       </div>
 
-      {/* 🔔 MUI CustomSnackbar Integration */}
       <CustomSnackbar 
         open={snackbar.open} 
         message={snackbar.message} 

@@ -12,6 +12,9 @@ const Attendance = ({ role }) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
+  // Live Backend URL handle karne ke liye dynamic logic
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
   const maskID = (id) => {
     if (!id) return "---";
     const strID = id.toString();
@@ -22,7 +25,7 @@ const Attendance = ({ role }) => {
   // 1️⃣ Fetch All Employees from MongoDB
   const fetchEmployees = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/employees");
+      const res = await axios.get(`${API_URL}/api/employees`);
       if (res.data.success) setEmployees(res.data.data);
     } catch (err) {
       console.error("Error fetching employees:", err);
@@ -34,9 +37,8 @@ const Attendance = ({ role }) => {
   // 2️⃣ Fetch Attendance for Selected Date from MongoDB
   const fetchAttendance = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/attendance/${date}`);
+      const res = await axios.get(`${API_URL}/api/attendance/${date}`);
       if (res.data.success) {
-        // Convert array to object format for easy lookup: { empId: { status, time } }
         const attObj = {};
         res.data.data.forEach(item => {
           attObj[item.employeeId] = item;
@@ -50,11 +52,11 @@ const Attendance = ({ role }) => {
 
   useEffect(() => {
     fetchEmployees();
-  }, []);
+  }, [API_URL]); // dependency array updated
 
   useEffect(() => {
     fetchAttendance();
-  }, [date]);
+  }, [date, API_URL]); // dependency array updated
 
   // 3️⃣ Mark Attendance in MongoDB
   const markAttendance = async (empId, empName, status) => {
@@ -64,7 +66,7 @@ const Attendance = ({ role }) => {
     }
 
     try {
-      const res = await axios.post("http://localhost:5000/api/attendance", {
+      const res = await axios.post(`${API_URL}/api/attendance`, {
         employeeId: empId,
         name: empName,
         status: status,
@@ -72,7 +74,6 @@ const Attendance = ({ role }) => {
       });
 
       if (res.data.success) {
-        // Local state update karein taki UI turant change ho
         setAttendance(prev => ({
           ...prev,
           [empId]: { status, time: new Date().toLocaleTimeString() }
@@ -99,7 +100,7 @@ const Attendance = ({ role }) => {
       <div className="table-card-wide">
         <div className="table-header-row">
           <div>
-            <h2 className="table-title">DAILY ATTENDANCE (MongoDB)</h2>
+            <h2 className="table-title">DAILY ATTENDANCE (Live)</h2>
             <p style={{fontSize: '12px', color: '#666', margin: 0}}>
               {isAuthorized 
                 ? "Hazri lagane ke liye P, A, ya H dabayein" 

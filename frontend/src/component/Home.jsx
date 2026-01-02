@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios"; // 🛠️ Firebase ki jagah Axios
+import axios from "axios"; 
 import Loader from "./Core_Component/Loader/Loader";
 import "../App.css";
 
@@ -15,15 +15,17 @@ const Home = ({ user }) => {
     return strID.length > 4 ? "XXXX" + strID.slice(-4) : strID;
   };
 
+  // Live Backend URL handle karne ke liye
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
   useEffect(() => {
     const fetchDashboardStats = async () => {
       try {
         setLoading(true);
         
-        // 1️⃣ Backend se Sales aur Stock ka data ek sath fetch karna
-        // Aapne jo pehle endpoints banaye hain wahi use honge
-        const salesRes = await axios.get("http://localhost:5000/api/sales");
-        const stockRes = await axios.get("http://localhost:5000/api/stocks");
+        // Backend se Sales aur Stock fetch karne ke liye Live URL use kar rahe hain
+        const salesRes = await axios.get(`${API_URL}/api/sales`);
+        const stockRes = await axios.get(`${API_URL}/api/stocks`);
 
         setStats({
           sales: salesRes.data.data?.length || 0,
@@ -33,13 +35,13 @@ const Home = ({ user }) => {
       } catch (err) {
         console.error("Dashboard data load error:", err);
       } finally {
-        // Smooth UI feel ke liye 800ms ka delay
+        // Smooth UI feel ke liye
         setTimeout(() => setLoading(false), 800);
       }
     };
 
     fetchDashboardStats();
-  }, []);
+  }, [API_URL]); // dependency array mein API_URL add kiya
 
   // ✅ Global Loader check
   if (loading) return <Loader />;

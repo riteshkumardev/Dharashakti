@@ -23,6 +23,9 @@ const StockAddForm = ({ role }) => {
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
+  // Live Backend URL handle karne ke liye dynamic logic
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
   const triggerMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
@@ -49,8 +52,8 @@ const StockAddForm = ({ role }) => {
 
     setLoading(true);
     try {
-      // 🛠️ MongoDB POST Request
-      const res = await axios.post("http://localhost:5000/api/purchases", formData);
+      // 🛠️ MongoDB POST Request to Live Backend using API_URL
+      const res = await axios.post(`${API_URL}/api/purchases`, formData);
       
       if (res.data.success) {
         triggerMsg("✅ Purchase record saved and Inventory updated!", "success");
@@ -68,7 +71,7 @@ const StockAddForm = ({ role }) => {
       {loading && <Loader />}
       <div className="sales-card-wide">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 className="form-title">Purchase Entry (MongoDB)</h2>
+            <h2 className="form-title">Purchase Entry (Live)</h2>
             {!isAuthorized && <span style={{ color: 'red', fontSize: '12px', fontWeight: 'bold' }}>🔒 READ ONLY</span>}
         </div>
 

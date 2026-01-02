@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import "./Stock.css";
 import axios from "axios";
+import "./Stock.css";
 import Loader from '../Core_Component/Loader/Loader';
 
 const StockManagement = ({ role }) => {
@@ -12,11 +12,15 @@ const StockManagement = ({ role }) => {
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({});
 
+  // Live Backend URL handle karne ke liye dynamic logic
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
   // 1️⃣ Fetch Data from MongoDB
   const fetchStocks = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:5000/api/stocks");
+      // Live API call using API_URL
+      const res = await axios.get(`${API_URL}/api/stocks`);
       if (res.data.success) {
         setStocks(res.data.data);
       }
@@ -29,24 +33,23 @@ const StockManagement = ({ role }) => {
 
   useEffect(() => {
     fetchStocks();
-  }, []);
+  }, [API_URL]);
 
-  // 🗑️ Delete Logic (Clean: Only Browser Popup)
+  // 🗑️ Delete Logic (Live MongoDB DELETE)
   const handleDelete = async (id) => {
     if (!isAuthorized) {
       alert("Denied ❌: Aapke paas delete karne ki permission nahi hai.");
       return;
     }
 
-    // Sirf standard browser confirmation
     const isConfirmed = window.confirm("Kya aap sach mein is item ko delete karna chahte hain?");
     if (!isConfirmed) return;
 
     try {
       setLoading(true);
-      const res = await axios.delete(`http://localhost:5000/api/stocks/${id}`);
+      const res = await axios.delete(`${API_URL}/api/stocks/${id}`);
       if (res.data.success) {
-        fetchStocks(); // List refresh karein bina extra popup ke
+        fetchStocks(); 
       }
     } catch (err) {
       alert("Error ❌: Delete nahi ho paya.");
@@ -67,7 +70,8 @@ const StockManagement = ({ role }) => {
   const handleSave = async () => {
     try {
       setLoading(true);
-      const res = await axios.put(`http://localhost:5000/api/stocks/${editId}`, {
+      // Live MongoDB PUT Request
+      const res = await axios.put(`${API_URL}/api/stocks/${editId}`, {
         ...editData,
         updatedDate: new Date().toISOString().split("T")[0]
       });
@@ -92,7 +96,7 @@ const StockManagement = ({ role }) => {
     <div className="table-container-wide">
       <div className="table-card-wide">
         <div className="table-header-row">
-          <h2 className="table-title">STOCK INVENTORY (MongoDB)</h2>
+          <h2 className="table-title">STOCK INVENTORY (Live)</h2>
           <div className="search-wrapper">
             <span className="search-icon">🔍</span>
             <input 

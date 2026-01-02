@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios'; // 🛠️ Firebase ki jagah Axios
+import axios from 'axios'; 
 import './ExpenseManager.css';
 
 // 🏗️ Core Components Import
@@ -21,6 +21,9 @@ const ExpenseManager = ({ role }) => {
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
+  // Live Backend URL dynamically handle karne ke liye
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
   const showMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
@@ -29,7 +32,8 @@ const ExpenseManager = ({ role }) => {
   const fetchExpenses = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:5000/api/expenses");
+      // Live API call using API_URL
+      const res = await axios.get(`${API_URL}/api/expenses`);
       if (res.data.success) {
         setAllExpenses(res.data.data);
         setGrandTotal(res.data.totalSum);
@@ -43,7 +47,7 @@ const ExpenseManager = ({ role }) => {
 
   useEffect(() => {
     fetchExpenses();
-  }, []);
+  }, [API_URL]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -60,8 +64,8 @@ const ExpenseManager = ({ role }) => {
 
     setLoading(true);
     try {
-      // 🛠️ MongoDB POST Request
-      const res = await axios.post("http://localhost:5000/api/expenses", {
+      // 🛠️ MongoDB POST Request to Live Backend
+      const res = await axios.post(`${API_URL}/api/expenses`, {
         ...formData,
         date: selectedDate
       });
@@ -69,7 +73,7 @@ const ExpenseManager = ({ role }) => {
       if (res.data.success) {
         setFormData({ category: 'Khana-Pina', amount: '', detail: '' });
         showMsg("✅ Expense Saved Successfully!", "success");
-        fetchExpenses(); // List aur Total refresh karein
+        fetchExpenses(); 
       }
     } catch (error) { 
       showMsg("Error: " + error.message, "error"); 
@@ -86,7 +90,7 @@ const ExpenseManager = ({ role }) => {
 
       <div className="expense-top-section">
         <div className="table-header-row">
-          <h2 className="table-title">COMPANY EXPENSES (MongoDB)</h2>
+          <h2 className="table-title">COMPANY EXPENSES (Live)</h2>
           <div className="grand-total-badge">
              <small>Grand Total</small>
              <span>₹{grandTotal}</span>

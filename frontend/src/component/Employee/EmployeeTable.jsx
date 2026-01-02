@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import './Emp.css';
-import axios from 'axios'; // Firebase ki jagah axios use karenge
+import axios from 'axios'; 
 import { useNavigate } from "react-router-dom";
 import Loader from '../Core_Component/Loader/Loader';
+import './Emp.css';
 
 const EmployeeTable = ({ role }) => { 
   // 🔐 Permission Check
@@ -11,23 +11,24 @@ const EmployeeTable = ({ role }) => {
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [editId, setEditId] = useState(null); // Ab ye MongoDB ki '_id' store karega
+  const [editId, setEditId] = useState(null); 
   const [editData, setEditData] = useState({});
   const navigate = useNavigate();
+
+  // Live Backend URL handle karne ke liye
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   // 1️⃣ Fetch Data from MongoDB
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      // Backend route jo humne pehle banaya tha
-      const res = await axios.get("http://localhost:5000/api/employees");
+      const res = await axios.get(`${API_URL}/api/employees`);
       if (res.data.success) {
-        // Data ko reverse karke dikhayenge (Newest first)
         setEmployees(res.data.data);
       }
     } catch (err) {
       console.error("Fetch Error:", err);
-      alert("Error loading employee data");
+      alert("Error loading employee data from live server");
     } finally {
       setLoading(false);
     }
@@ -35,14 +36,14 @@ const EmployeeTable = ({ role }) => {
 
   useEffect(() => {
     fetchEmployees();
-  }, []);
+  }, [API_URL]);
 
   const startEdit = (emp) => {
     if (!isAuthorized) {
       alert("Unauthorized: Aapko edit karne ki permission nahi hai.");
       return;
     }
-    setEditId(emp._id); // MongoDB ki unique ID use karein
+    setEditId(emp._id); 
     setEditData({ ...emp });
   };
 
@@ -55,26 +56,26 @@ const EmployeeTable = ({ role }) => {
     navigate(path);
   };
 
-  // 2️⃣ Update Logic (MongoDB PUT)
+  // 2️⃣ Update Logic (Live MongoDB PUT)
   const handleSave = async () => {
     if (!isAuthorized) return;
     try {
-      const res = await axios.put(`http://localhost:5000/api/employees/${editData.employeeId}`, {
+      const res = await axios.put(`${API_URL}/api/employees/${editData.employeeId}`, {
         ...editData,
-        adminName: "Admin" // Activity log ke liye
+        adminName: "Admin" 
       });
 
       if (res.data.success) {
-        alert("Employee Updated Successfully!");
+        alert("✅ Employee Updated Successfully!");
         setEditId(null);
-        fetchEmployees(); // Table refresh karein
+        fetchEmployees(); 
       }
     } catch (err) {
-      alert("Error: " + (err.response?.data?.message || err.message));
+      alert("Update Error: " + (err.response?.data?.message || err.message));
     }
   };
 
-  // 3️⃣ Delete Logic (MongoDB DELETE)
+  // 3️⃣ Delete Logic (Live MongoDB DELETE)
   const handleDelete = async (id, empName) => {
     if (!isAuthorized) {
       alert("Unauthorized: Aapko delete karne ki permission nahi hai.");
@@ -83,10 +84,9 @@ const EmployeeTable = ({ role }) => {
 
     if (window.confirm(`Are you sure you want to delete ${empName}?`)) {
       try {
-        // Backend controller me delete function hona zaroori hai
-        const res = await axios.delete(`http://localhost:5000/api/employees/${id}`);
+        const res = await axios.delete(`${API_URL}/api/employees/${id}`);
         if (res.data.success) {
-          alert("Employee Deleted!");
+          alert("🗑️ Employee Deleted!");
           fetchEmployees();
         }
       } catch (err) {
@@ -107,7 +107,7 @@ const EmployeeTable = ({ role }) => {
     <div className="table-container-wide">
       <div className="table-card-wide">
         <div className="table-header-row">
-          <h2 className="table-title">EMPLOYEE DIRECTORY (MongoDB)</h2>
+          <h2 className="table-title">EMPLOYEE DIRECTORY (Live)</h2>
           <div className="search-wrapper">
             <input 
               type="text" 
@@ -143,7 +143,6 @@ const EmployeeTable = ({ role }) => {
                   <td>
                     <div className="emp-profile-circle">
                       {emp.photo ? (
-                        // MongoDB me agar photo base64 hai toh direct dikhega
                         <img src={emp.photo} alt="Profile" />
                       ) : (
                         <div className="placeholder-avatar">

@@ -11,6 +11,10 @@ export default function Profile({ user, setUser }) {
   const [name, setName] = useState(user?.name || "");
   const [phone, setPhone] = useState(user?.phone || "");
   const [newPassword, setNewPassword] = useState("");
+  
+  // Live Backend URL dynamically handle karne ke liye
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
   const [photoURL, setPhotoURL] = useState(
     user?.photo || "https://i.imgur.com/6VBx3io.png"
   );
@@ -33,7 +37,7 @@ export default function Profile({ user, setUser }) {
     try {
       setLoading(true);
 
-      const res = await fetch("http://localhost:5000/api/profile/update", {
+      const res = await fetch(`${API_URL}/api/profile/update`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -67,7 +71,7 @@ export default function Profile({ user, setUser }) {
     try {
       setLoading(true);
 
-      const res = await fetch("http://localhost:5000/api/profile/password", {
+      const res = await fetch(`${API_URL}/api/profile/password`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -89,54 +93,48 @@ export default function Profile({ user, setUser }) {
   };
 
   /* ================= IMAGE UPLOAD ================= */
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-// Profile.jsx ke handleImageChange function ke andar
-const handleImageChange = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+    const formData = new FormData();
+    formData.append("photo", file); 
+    formData.append("employeeId", user.employeeId);
 
-  // 1. FormData taiyar karein
-  const formData = new FormData();
-  formData.append("photo", file); // ⚠️ "image" ki jagah "photo" karein (Backend se match karne ke liye)
-  formData.append("employeeId", user.employeeId);
-
-  try {
-    setLoading(true);
-    
-    // 2. API Call
-    const res = await axios.post("http://localhost:5000/api/profile/upload", formData, {
-      headers: { "Content-Type": "multipart/form-data" }
-    });
-
-    if (res.data.success) {
-      // Backend se "/uploads/filename.jpg" aa raha hai
-      const fullPhotoPath = `http://localhost:5000${res.data.photo}`;
-
-      // 3. Global aur Local State update karein
-      const updatedUser = { ...user, photo: fullPhotoPath };
+    try {
+      setLoading(true);
       
-      setUser(updatedUser);
-      setPhotoURL(fullPhotoPath); // Preview update
-      
-      // LocalStorage update taaki refresh pe image na jaye
-      localStorage.setItem("user", JSON.stringify(updatedUser));
+      const res = await axios.post(`${API_URL}/api/profile/upload`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
 
-      showMsg("✅ Profile image updated successfully!", "success");
+      if (res.data.success) {
+        // Live URL handle karne ke liye (Agar Vercel hai toh usi URL ko use karein)
+        const photoPath = res.data.photo;
+        const fullPhotoPath = photoPath.startsWith('http') ? photoPath : `${API_URL}${photoPath}`;
+
+        const updatedUser = { ...user, photo: fullPhotoPath };
+        
+        setUser(updatedUser);
+        setPhotoURL(fullPhotoPath); 
+        
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        showMsg("✅ Profile image updated successfully!", "success");
+      }
+    } catch (err) {
+      console.error("Upload Error:", err);
+      showMsg("❌ Image upload failed: " + (err.response?.data?.message || "Server Error"), "error");
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error("Upload Error:", err);
-    showMsg("❌ Image upload failed: " + (err.response?.data?.message || "Server Error"), "error");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   /* ================= LOGOUT ================= */
   const logout = async () => {
     try {
       setLoading(true);
 
-      await fetch("http://localhost:5000/api/profile/logout", {
+      await fetch(`${API_URL}/api/profile/logout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeId: user.employeeId }),
@@ -156,7 +154,6 @@ const handleImageChange = async (e) => {
   return (
     <div className="profile-wrapper">
       <div className="profile-card-3d">
-        {/* PROFILE IMAGE */}
         <div className="profile-img">
           <img src={photoURL} alt="profile" style={{ objectFit: "cover" }} />
           <label className="img-edit">

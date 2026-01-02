@@ -1,38 +1,56 @@
 import React, { useState, useEffect } from 'react';
-import Calendar from 'react-calendar'; // Install: npm install react-calendar
+import Calendar from 'react-calendar'; 
 import 'react-calendar/dist/Calendar.css';
-import { getDatabase, ref, onValue } from "firebase/database";
-import { app } from "../../../redux/api/firebase/firebase";
+import axios from 'axios'; // Firebase ki jagah Axios use karenge
 import './AttendancePopup.css';
+
 const AttendancePopup = ({ employeeId, onClose }) => {
   const [attendanceData, setAttendanceData] = useState({});
-  const db = getDatabase(app);
+  const [loading, setLoading] = useState(true);
+
+  // Live Backend URL dynamically handle karne ke liye
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   useEffect(() => {
-    // Firebase se us specific employee ki attendance fetch karein
-    const attendanceRef = ref(db, `attendance`);
-    onValue(attendanceRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const filteredData = {};
+    const fetchEmployeeAttendance = async () => {
+      try {
+        setLoading(true);
+        // MongoDB backend se is specific employee ki puri history fetch karein
+        const res = await axios.get(`${API_URL}/api/attendance/employee/${employeeId}`);
         
-        // Data format: { "2023-12-01": { empId: "Present" }, ... }
-        Object.keys(data).forEach(date => {
-          if (data[date][employeeId]) {
-            filteredData[date] = data[date][employeeId].status; // Present/Absent
-          }
-        });
-        setAttendanceData(filteredData);
+        if (res.data.success) {
+          const filteredData = {};
+          // MongoDB data format ko Calendar format mein convert karein
+          // Expected data: [{ date: "2023-12-01", status: "Present" }, ...]
+          res.data.data.forEach(record => {
+             // Date format: "2023-12-01T00:00:00.000Z" se sirf date part nikalna
+             const dateStr = record.date.split('T')[0];
+             filteredData[dateStr] = record.status;
+          });
+          setAttendanceData(filteredData);
+        }
+      } catch (err) {
+        console.error("Error fetching individual attendance:", err);
+      } finally {
+        setLoading(false);
       }
-    });
-  }, [employeeId, db]);
+    };
+
+    if (employeeId) {
+      fetchEmployeeAttendance();
+    }
+  }, [employeeId, API_URL]);
 
   // Calendar ke tiles ko color karne ka function
   const tileClassName = ({ date, view }) => {
     if (view === 'month') {
-      const dateStr = date.toISOString().split('T')[0];
-      if (attendanceData[dateStr] === 'Present') return 'bg-success'; // Green
-      if (attendanceData[dateStr] === 'Absent') return 'bg-danger';  // Red
+      // Locale handling ke liye date string sahi format mein chahiye
+      const dateStr = date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+      
+      const status = attendanceData[dateStr];
+      if (status === 'Present') return 'bg-success';   // Green (CSS mein handle karein)
+      if (status === 'Absent') return 'bg-danger';    // Red
+      if (status === 'Half-Day') return 'bg-warning'; // Yellow
     }
   };
 
@@ -40,20 +58,24 @@ const AttendancePopup = ({ employeeId, onClose }) => {
     <div className="attendance-modal-overlay">
       <div className="attendance-modal-content">
         <div className="modal-header">
-          <h3>📅 Attendance History: {employeeId}</h3>
+          <h3>📅 History: {employeeId}</h3>
           <button onClick={onClose} className="close-btn">&times;</button>
         </div>
         
         <div className="calendar-container">
-          <Calendar 
-            tileClassName={tileClassName}
-            // Customization ke liye aur options add kar sakte hain
-          />
+          {loading ? (
+            <p>Loading records...</p>
+          ) : (
+            <Calendar 
+              tileClassName={tileClassName}
+            />
+          )}
         </div>
 
         <div className="legend">
-          <span className="dot green"></span> Present 
-          <span className="dot red"></span> Absent
+          <div className="legend-item"><span className="dot green"></span> Present</div>
+          <div className="legend-item"><span className="dot red"></span> Absent</div>
+          <div className="legend-item"><span className="dot yellow"></span> Half-Day</div>
         </div>
       </div>
     </div>

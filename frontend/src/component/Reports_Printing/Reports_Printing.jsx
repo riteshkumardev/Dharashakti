@@ -19,15 +19,18 @@ const Reports_Printing = () => {
     const [personList, setPersonList] = useState([]);
     const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
 
+    // Live Backend URL handled dynamically
+    const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
     const productCategories = ["Corn Grit", "Corn Flour", "Cattle Feed", "Rice Grit", "Rice Flour", "Packing Bag"];
 
-    // 1️⃣ Fetch Data from MongoDB (Optimized with useCallback)
+    // 1️⃣ Fetch Data from MongoDB (Optimized with Live URL)
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            // Humare backend routes: /api/sales, /api/stocks, /api/purchases
             const endpoint = category === "stock" ? "stocks" : category;
-            const res = await axios.get(`http://localhost:5000/api/${endpoint}`);
+            // Humare live backend endpoints call kar rahe hain
+            const res = await axios.get(`${API_URL}/api/${endpoint}`);
             
             if (res.data.success) {
                 const list = res.data.data;
@@ -41,11 +44,11 @@ const Reports_Printing = () => {
                 }
             }
         } catch (err) {
-            setSnackbar({ open: true, message: "Server error while fetching data!", severity: "error" });
+            setSnackbar({ open: true, message: "Live server error while fetching data!", severity: "error" });
         } finally {
             setTimeout(() => setLoading(false), 500);
         }
-    }, [category]);
+    }, [category, API_URL]);
 
     useEffect(() => {
         fetchData();
@@ -73,24 +76,21 @@ const Reports_Printing = () => {
         generatePersonList(rawData, val);
     };
 
-    // 3️⃣ Auto-Filter Logic (No Manual Refresh Required)
+    // 3️⃣ Auto-Filter Logic
     const handleFilter = () => {
         let temp = [...rawData];
 
-        // Date Range Filter
         if (startDate && endDate) {
             temp = temp.filter(item => {
-                const itemDate = item.date; // Format YYYY-MM-DD
+                const itemDate = item.date; 
                 return itemDate >= startDate && itemDate <= endDate;
             });
         }
 
-        // Product Filter
         if (productFilter !== "All") {
             temp = temp.filter(item => item.productName === productFilter);
         }
         
-        // Person/Party Filter
         if (category !== "stock" && selectedPerson !== "All") {
             temp = temp.filter(item => 
                 (item.customerName === selectedPerson) || (item.supplierName === selectedPerson)
@@ -158,7 +158,6 @@ const Reports_Printing = () => {
                 </div>
             </div>
 
-            {/* PROFESSIONAL PRINTABLE AREA */}
             <div className="printable-invoice A4">
                 <div className="invoice-header only-print">
                     <div className="company-info-center">

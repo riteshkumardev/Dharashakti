@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from "react-router-dom"; 
-import axios from "axios"; // Firebase hata kar Axios use karenge
+import axios from "axios"; 
 import Loader from "../Core_Component/Loader/Loader"; 
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar"; 
 import './MasterPanel.css';
@@ -15,6 +15,9 @@ const MasterPanel = ({ user }) => {
   const [actionLoading, setActionLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
+  // Live Backend URL handled dynamically
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
   const showMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
@@ -23,9 +26,9 @@ const MasterPanel = ({ user }) => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Backend routes jo aapne banaye hain
-      const usersRes = await axios.get("http://localhost:5000/api/employees");
-      const logsRes = await axios.get("http://localhost:5000/api/activity-logs"); // Ensure ye route backend me ho
+      // Backend routes using Live API URL
+      const usersRes = await axios.get(`${API_URL}/api/employees`);
+      const logsRes = await axios.get(`${API_URL}/api/activity-logs`);
 
       if (usersRes.data.success) setUsers(usersRes.data.data);
       if (logsRes.data.success) setLogs(logsRes.data.data);
@@ -39,9 +42,9 @@ const MasterPanel = ({ user }) => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [API_URL]);
 
-  // --- 🔑 Password Reset Logic (MongoDB) ---
+  // --- 🔑 Password Reset Logic (Live MongoDB) ---
   const handlePasswordReset = async (employeeId, targetName) => {
     const newPass = window.prompt(`Enter new password for ${targetName}:`);
     
@@ -50,34 +53,34 @@ const MasterPanel = ({ user }) => {
 
     setActionLoading(true);
     try {
-      // API call to profile.controller.js -> changePassword
-      await axios.put("http://localhost:5000/api/profile/password", {
+      // API call to live backend
+      await axios.put(`${API_URL}/api/profile/password`, {
         employeeId: employeeId,
         password: newPass
       });
 
       showMsg(`Password for ${targetName} updated!`, "success");
-      fetchData(); // Refresh list to show logs
+      fetchData(); 
     } catch (err) {
-      showMsg("Reset Failed: " + err.response?.data?.message || err.message, "error");
+      showMsg("Reset Failed: " + (err.response?.data?.message || err.message), "error");
     } finally {
       setActionLoading(false);
     }
   };
 
-  // --- 🛡️ Role & Access Toggle Logic (MongoDB) ---
+  // --- 🛡️ Role & Access Toggle Logic (Live MongoDB) ---
   const handleSystemUpdate = async (employeeId, targetName, field, value) => {
     setActionLoading(true);
     try {
-      // Dynamic update route
-      await axios.put(`http://localhost:5000/api/employees/${employeeId}`, {
+      // Dynamic update route to live backend
+      await axios.put(`${API_URL}/api/employees/${employeeId}`, {
         [field]: value,
-        adminAction: true, // Backend logic ke liye flag
+        adminAction: true, 
         adminName: user?.name
       });
 
       showMsg(`System Updated: ${field.toUpperCase()} set to ${value}`, "success");
-      fetchData(); // UI refresh
+      fetchData(); 
     } catch (err) {
       showMsg("System Error: " + err.message, "error");
     } finally {
@@ -103,7 +106,7 @@ const MasterPanel = ({ user }) => {
       <div className="master-hero">
         <div className="hero-text">
           <h1>🛡️ Master Admin Control</h1>
-          <p>Global system management (MongoDB Engine)</p>
+          <p>Global system management (Live MongoDB Engine)</p>
         </div>
 
         <div className="admin-actions-area">
@@ -123,7 +126,6 @@ const MasterPanel = ({ user }) => {
       <div className="master-main-layout">
         <div className="users-grid-section">
           {filtered.length > 0 ? filtered.map(userItem => (
-            // MongoDB me '_id' ya 'employeeId' use hota hai firebaseId ki jagah
             <div key={userItem._id} className={`user-control-card ${userItem.isBlocked ? 'is-blocked' : ''}`}>
               <div className="card-header">
                 <div className="user-profile-img">
@@ -159,7 +161,7 @@ const MasterPanel = ({ user }) => {
                     </button>
 
                     <button 
-                      className={`access-toggle-btn ${userItem.isBlocked ? 'btn-enable' : 'btn-disable'}`}
+                      className="access-toggle-btn ${userItem.isBlocked ? 'btn-enable' : 'btn-disable'}"
                       onClick={() => handleSystemUpdate(userItem.employeeId, userItem.name, 'isBlocked', !userItem.isBlocked)}
                       disabled={actionLoading}
                     >
