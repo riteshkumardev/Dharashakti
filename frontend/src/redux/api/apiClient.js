@@ -1,6 +1,6 @@
 import axios from "axios";
 
-// React variables load karne ke liye process.env use hota hai
+// Ye check karega ki agar Vercel variable hai toh wo use kare, warna localhost
 const baseURL = process.env.REACT_APP_API_URL 
   ? `${process.env.REACT_APP_API_URL}/api` 
   : "http://localhost:5000/api";
