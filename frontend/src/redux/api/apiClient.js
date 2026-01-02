@@ -1,7 +1,12 @@
 import axios from "axios";
 
+// React variables load karne ke liye process.env use hota hai
+const baseURL = process.env.REACT_APP_API_URL 
+  ? `${process.env.REACT_APP_API_URL}/api` 
+  : "http://localhost:5000/api";
+
 export const api = axios.create({
-  baseURL: "http://localhost:5000/api", // future backend
+  baseURL: baseURL,
   headers: {
     "Content-Type": "application/json",
   },
