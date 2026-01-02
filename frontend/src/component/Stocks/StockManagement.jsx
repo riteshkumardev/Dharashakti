@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from "axios";
 import "./Stock.css";
 import Loader from '../Core_Component/Loader/Loader';
+import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar"; // Import Snackbar
 
 const StockManagement = ({ role }) => {
   const isAuthorized = role === "Admin" || role === "Accountant";
@@ -12,20 +13,26 @@ const StockManagement = ({ role }) => {
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({});
 
-  // Live Backend URL handle karne ke liye dynamic logic
+  // Snackbar State
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
+  const showMsg = (msg, type = "success") => {
+    setSnackbar({ open: true, message: msg, severity: type });
+  };
 
   // 1️⃣ Fetch Data from MongoDB
   const fetchStocks = async () => {
     try {
       setLoading(true);
-      // Live API call using API_URL
       const res = await axios.get(`${API_URL}/api/stocks`);
       if (res.data.success) {
         setStocks(res.data.data);
       }
     } catch (err) {
       console.error("Stock load error:", err);
+      showMsg("Stock load karne mein dikkat hui", "error");
     } finally {
       setLoading(false);
     }
@@ -35,10 +42,10 @@ const StockManagement = ({ role }) => {
     fetchStocks();
   }, [API_URL]);
 
-  // 🗑️ Delete Logic (Live MongoDB DELETE)
+  // 🗑️ Delete Logic
   const handleDelete = async (id) => {
     if (!isAuthorized) {
-      alert("Denied ❌: Aapke paas delete karne ki permission nahi hai.");
+      showMsg("Denied ❌: Permission missing.", "error");
       return;
     }
 
@@ -49,10 +56,11 @@ const StockManagement = ({ role }) => {
       setLoading(true);
       const res = await axios.delete(`${API_URL}/api/stocks/${id}`);
       if (res.data.success) {
+        showMsg("Item successfully delete ho gaya", "success");
         fetchStocks(); 
       }
     } catch (err) {
-      alert("Error ❌: Delete nahi ho paya.");
+      showMsg("Error ❌: Delete fail ho gaya.", "error");
     } finally {
       setLoading(false);
     }
@@ -60,7 +68,7 @@ const StockManagement = ({ role }) => {
 
   const startEdit = (stock) => {
     if (!isAuthorized) {
-      alert("Denied ❌: Permission missing.");
+      showMsg("Denied ❌: Permission missing.", "warning");
       return;
     }
     setEditId(stock._id);
@@ -70,17 +78,17 @@ const StockManagement = ({ role }) => {
   const handleSave = async () => {
     try {
       setLoading(true);
-      // Live MongoDB PUT Request
       const res = await axios.put(`${API_URL}/api/stocks/${editId}`, {
         ...editData,
         updatedDate: new Date().toISOString().split("T")[0]
       });
       if (res.data.success) {
+        showMsg("Stock update ho gaya! ✅", "success");
         setEditId(null);
         fetchStocks();
       }
     } catch (err) {
-      alert("Error ❌: Update fail ho gaya.");
+      showMsg("Error ❌: Update fail ho gaya.", "error");
     } finally {
       setLoading(false);
     }
@@ -155,25 +163,23 @@ const StockManagement = ({ role }) => {
                     </td>
                     <td className="action-btns-cell">
                       {isEditing ? (
-                        <>
+                        <div className="btn-group-row">
                           <button className="save-btn-ui" onClick={handleSave}>💾</button> 
                           <button className="cancel-btn-ui" onClick={() => setEditId(null)}>✖</button>
-                        </>
+                        </div>
                       ) : (
-                        <>
+                        <div className="btn-group-row">
                           <button 
                             className="row-edit-btn" 
                             onClick={() => startEdit(stock)} 
                             disabled={!isAuthorized}
-                            style={{ opacity: isAuthorized ? 1 : 0.5 }}
                           >✏️</button> 
                           <button 
                             className="row-delete-btn" 
                             onClick={() => handleDelete(stock._id)} 
                             disabled={!isAuthorized}
-                            style={{ opacity: isAuthorized ? 1 : 0.5 }}
                           >🗑️</button>
-                        </>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -183,6 +189,14 @@ const StockManagement = ({ role }) => {
           </table>
         </div>
       </div>
+
+      {/* Snackbar Integration */}
+      <CustomSnackbar 
+        open={snackbar.open} 
+        message={snackbar.message} 
+        severity={snackbar.severity} 
+        onClose={() => setSnackbar({ ...snackbar, open: false })} 
+      />
     </div>
   );
 };

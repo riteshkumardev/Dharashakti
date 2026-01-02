@@ -188,7 +188,7 @@ const EmployeeTable = ({ role }) => {
 
                         <button 
                           className="ledger-btn-ui" 
-                          onClick={() => handleNavigate(`/staff-ledger/${emp.employeeId}`)}
+                          onClick={() => handleNavigate(`/staff-ledger/${emp._id}`)}
                           title="View Details"
                         >👁️</button>
                       </div>
