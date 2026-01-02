@@ -82,11 +82,11 @@ function App() {
 
     return children;
   };
-    console.log(user, "user app.js");
+ 
 
   return (
     <Router>
-      <EmployeeAdd/>
+      {/* <EmployeeAdd/> */}
       <div className="app-container">
         {/* Screen Lock Overlay */}
         {isLocked && user && <ScreenLock user={user} setIsLocked={setIsLocked} />}
