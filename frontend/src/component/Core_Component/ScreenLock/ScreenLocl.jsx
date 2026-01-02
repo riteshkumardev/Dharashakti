@@ -5,28 +5,35 @@ const ScreenLock = ({ user, setIsLocked }) => {
   const [passInput, setPassInput] = useState("");
   const [error, setError] = useState(false);
 
-const handleUnlock = async () => {
-  const res = await fetch("http://localhost:5000/api/auth/unlock", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      employeeId: user.employeeId,
-      password: passInput,
-    }),
-  });
+  // Live Backend URL handle karne ke liye dynamic logic
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-  const data = await res.json();
+  const handleUnlock = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/unlock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employeeId: user.employeeId,
+          password: passInput,
+        }),
+      });
 
-  if (data.success) {
-    setIsLocked(false);
-    setError(false);
-  } else {
-    setError(true);
-    setPassInput("");
-    alert("❌ Galat Password!");
-  }
-};
+      const data = await res.json();
 
+      if (data.success) {
+        setIsLocked(false);
+        setError(false);
+      } else {
+        setError(true);
+        setPassInput("");
+        alert("❌ Galat Password!");
+      }
+    } catch (err) {
+      console.error("Unlock error:", err);
+      alert("❌ Server connection error!");
+    }
+  };
 
   return (
     <div className="screen-lock-overlay">
