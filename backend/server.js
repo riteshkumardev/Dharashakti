@@ -15,6 +15,9 @@ import stockRoutes from "./routes/stock.routes.js";
 import attendanceRoutes from "./routes/attendance.routes.js";
 import expenseRoutes from "./routes/expense.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
+import purchaseRoutes from "./routes/purchase.routes.js";
+import stockRoutes from "./routes/stock.routes.js";
+
 
 dotenv.config();
 
@@ -41,10 +44,14 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/activity-logs", logRoutes);
 app.use("/api/attendance", attendanceRoutes);
-app.use("/api/purchases", stockRoutes); 
-app.use("/api/stocks", stockRoutes);
+
+app.use("/api/purchases", purchaseRoutes); // ✅ ONLY PURCHASE DATA
+app.use("/api/stocks", stockRoutes);       // ✅ ONLY STOCK DATA
+
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/salary-payments", salaryRoutes);
+
+   
 
 // Test Route
 app.get("/", (req, res) => {
