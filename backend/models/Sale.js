@@ -10,7 +10,7 @@ const saleSchema = new mongoose.Schema(
     quantity: { type: Number, required: true },
     rate: { type: Number, required: true },
      travelingCost: { type: Number, default: 0 }, 
-    totalPrice: { type: Number, required: true },
+    totalPrice: { type: Number, default: 0  },
     cashDiscount: { type: Number, required: true },
     amountReceived: { type: Number, default: 0 },
     paymentDue: { type: Number, default: 0 },
