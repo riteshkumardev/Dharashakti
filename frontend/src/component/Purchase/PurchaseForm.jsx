@@ -18,6 +18,7 @@ const PurchaseForm = ({ onCancel, role }) => {
     vehicleNo: "",
     quantity: "",
     rate: "",
+    travelingCost: "", // 🆕 नया फ़ील्ड जोड़ा गया
     cashDiscount: "", // % में CD
     totalAmount: 0,
     paidAmount: "",
@@ -37,16 +38,18 @@ const PurchaseForm = ({ onCancel, role }) => {
 
   const productList = ["Corn", "Corn Greet", "Cattlefeed", "Aatarice", "Rice Greet", "Packing Bag"];
 
-  // 2️⃣ Live Calculations (Purchase logic with CD%)
+  // 2️⃣ Live Calculations (Qty*Rate - CD% + Travel)
   useEffect(() => {
     const qty = Number(formData.quantity) || 0;
     const rate = Number(formData.rate) || 0;
+    const travel = Number(formData.travelingCost) || 0;
     const cdPercent = Number(formData.cashDiscount) || 0;
 
     const basePrice = qty * rate;
     const discountAmount = (basePrice * cdPercent) / 100;
 
-    const total = basePrice - discountAmount; 
+    // परचेज़ लॉजिक: सामान की कीमत - डिस्काउंट + भाड़ा (यदि लागू हो)
+    const total = basePrice - discountAmount + travel; 
     const balance = total - (Number(formData.paidAmount) || 0);
 
     setFormData((prev) => ({
@@ -54,7 +57,7 @@ const PurchaseForm = ({ onCancel, role }) => {
       totalAmount: total,
       balanceAmount: balance,
     }));
-  }, [formData.quantity, formData.rate, formData.cashDiscount, formData.paidAmount]);
+  }, [formData.quantity, formData.rate, formData.cashDiscount, formData.paidAmount, formData.travelingCost]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -74,12 +77,22 @@ const PurchaseForm = ({ onCancel, role }) => {
 
     setLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/api/purchases`, formData);
+      // डेटा भेजने से पहले सुनिश्चित करें कि नंबर्स सही फ़ॉर्मेट में हैं
+      const payload = {
+        ...formData,
+        quantity: Number(formData.quantity),
+        rate: Number(formData.rate),
+        travelingCost: Number(formData.travelingCost) || 0,
+        cashDiscount: Number(formData.cashDiscount) || 0,
+        paidAmount: Number(formData.paidAmount) || 0
+      };
+
+      const res = await axios.post(`${API_URL}/api/purchases`, payload);
 
       if (res.data.success) {
         showMsg("✅ Purchase Record Saved Successfully!", "success");
         handleReset();
-        if (onCancel) onCancel(); // फॉर्म क्लोज करने के लिए
+        if (onCancel) setTimeout(() => onCancel(), 1000); 
       }
     } catch (error) {
       showMsg("❌ Data save nahi ho paya. Backend check karein.", "error");
@@ -105,7 +118,7 @@ const PurchaseForm = ({ onCancel, role }) => {
 
           <div className="input-group">
             <label>Supplier Name</label>
-            <input name="supplierName" value={formData.supplierName} onChange={handleChange} required placeholder="Enter Supplier Name" disabled={loading || !isAuthorized} />
+            <input name="supplierName" value={formData.supplierName} onChange={handleChange} required placeholder="Supplier Name" disabled={loading || !isAuthorized} />
           </div>
 
           <div className="input-group">
@@ -123,27 +136,40 @@ const PurchaseForm = ({ onCancel, role }) => {
 
           <div className="input-group">
             <label>Vehicle No</label>
-            <input name="vehicleNo" value={formData.vehicleNo} onChange={handleChange} placeholder="e.g. BR-01-1234" disabled={loading || !isAuthorized} />
+            <input name="vehicleNo" value={formData.vehicleNo} onChange={handleChange} placeholder="BR-01-XXXX" disabled={loading || !isAuthorized} />
           </div>
 
           <div className="input-group">
-            <label>Quantity</label>
-            <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} required placeholder="0.00" disabled={loading || !isAuthorized} />
+            <label>Quantity (Kg/Unit)</label>
+            <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} required placeholder="0" disabled={loading || !isAuthorized} />
           </div>
 
           <div className="input-group">
-            <label>Rate</label>
+            <label>Rate (Per Unit)</label>
             <input type="number" name="rate" value={formData.rate} onChange={handleChange} required placeholder="0.00" disabled={loading || !isAuthorized} />
           </div>
 
           <div className="input-group">
+            <label>Traveling Cost (₹)</label>
+            <input type="number" name="travelingCost" value={formData.travelingCost} onChange={handleChange} placeholder="0" disabled={loading || !isAuthorized} />
+          </div>
+
+          {/* 🆕 Cash Discount Input Field */}
+          <div className="input-group">
             <label>Cash Discount (CD %)</label>
-            <input type="number" name="cashDiscount" value={formData.cashDiscount} onChange={handleChange} placeholder="0" disabled={loading || !isAuthorized} />
+            <input 
+               type="number" 
+               name="cashDiscount" 
+               value={formData.cashDiscount} 
+               onChange={handleChange} 
+               placeholder="0 %" 
+               disabled={loading || !isAuthorized} 
+            />
           </div>
 
           <div className="input-group readonly-group">
-            <label>Total Amount (₹) <small>(Qty*Rate - CD%)</small></label>
-            <input value={formData.totalAmount} readOnly style={{backgroundColor: '#f9f9f9'}} />
+            <label>Total Amount (₹) <small>(Qty*Rate - CD% + Travel)</small></label>
+            <input value={formData.totalAmount.toFixed(2)} readOnly style={{backgroundColor: '#f9f9f9', fontWeight: 'bold'}} />
           </div>
 
           <div className="input-group">
@@ -153,12 +179,12 @@ const PurchaseForm = ({ onCancel, role }) => {
 
           <div className="input-group readonly-group">
             <label>Balance Amount (₹)</label>
-            <input value={formData.balanceAmount} readOnly style={{color: 'red', fontWeight: 'bold'}} />
+            <input value={formData.balanceAmount.toFixed(2)} readOnly style={{color: 'red', fontWeight: 'bold'}} />
           </div>
 
           <div className="input-group span-2">
             <label>Remarks</label>
-            <input name="remarks" value={formData.remarks} onChange={handleChange} placeholder="Add notes here..." disabled={loading || !isAuthorized} />
+            <input name="remarks" value={formData.remarks} onChange={handleChange} placeholder="Purchase details..." disabled={loading || !isAuthorized} />
           </div>
 
           <div className="button-container-full">
