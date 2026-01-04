@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import "./Sales.css";
 import axios from "axios"; 
 import Loader from "../Core_Component/Loader/Loader";
-import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar"; // Snackbar Import
+import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
 const SalesTable = ({ role }) => {
   const isAuthorized = role === "Admin" || role === "Accountant";
@@ -17,10 +17,8 @@ const SalesTable = ({ role }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
-  // Live Backend URL handle karne ke liye
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-  // Snackbar State
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
@@ -31,7 +29,6 @@ const SalesTable = ({ role }) => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  // 1️⃣ Fetch Data from MongoDB (Live API)
   const fetchSales = async () => {
     try {
       setLoading(true);
@@ -50,16 +47,20 @@ const SalesTable = ({ role }) => {
     fetchSales();
   }, [API_URL]);
 
-  // 2️⃣ Auto Calculation in Edit Mode
+  // 2️⃣ Auto Calculation in Edit Mode (Traveling Cost included)
   useEffect(() => {
     if (editId) {
-      const total = (Number(editData.quantity) || 0) * (Number(editData.rate) || 0);
+      const qty = Number(editData.quantity) || 0;
+      const rate = Number(editData.rate) || 0;
+      const travel = Number(editData.travelingCost) || 0;
+
+      const total = (qty * rate) - travel; // Total Calculation Logic
       const due = total - (Number(editData.amountReceived) || 0);
+
       setEditData((prev) => ({ ...prev, totalPrice: total, paymentDue: due }));
     }
-  }, [editData.quantity, editData.rate, editData.amountReceived, editId]);
+  }, [editData.quantity, editData.rate, editData.travelingCost, editData.amountReceived, editId]);
 
-  // 3️⃣ Filter & Sort Logic
   const getProcessedList = () => {
     let list = salesList.filter((s) => {
       const matchesSearch =
@@ -85,13 +86,11 @@ const SalesTable = ({ role }) => {
   const currentRows = processedList.slice(indexOfFirstRow, indexOfLastRow);
   const totalPages = Math.ceil(processedList.length / rowsPerPage);
 
-  // 4️⃣ Actions (Live MongoDB Integration)
   const handleDelete = async (id) => {
     if (!isAuthorized) {
       showMsg("Denied ❌: Aapke paas permission nahi hai.", "error");
       return;
     }
-
     const isConfirmed = window.confirm("Kya aap sach me delete karna chahte hain?");
     if (!isConfirmed) return;
 
@@ -121,7 +120,7 @@ const SalesTable = ({ role }) => {
     } catch (err) {
       showMsg("Error ❌ Update fail ho gaya.", "error");
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -171,25 +170,35 @@ const SalesTable = ({ role }) => {
                   <th>Product</th>
                   <th>Customer</th>
                   <th>Qty</th>
+                  <th>Rate</th>
+                  <th>Travel</th> {/* 🆕 New Header */}
                   <th>Total</th>
                   <th>Received</th>
                   <th>Due</th>
-                  <th>Due Date</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {currentRows.map((sale) => (
                   <tr key={sale._id} className={editId === sale._id ? "active-edit" : ""}>
-                    <td>{editId === sale._id ? <input type="date" name="date" value={editData.date} onChange={(e) => setEditData({...editData, date: e.target.value})} /> : sale.date}</td>
-                    <td>{editId === sale._id ? <input name="billNo" value={editData.billNo} onChange={(e) => setEditData({...editData, billNo: e.target.value})} /> : <span className="bill-tag">{sale.billNo}</span>}</td>
+                    <td>{editId === sale._id ? <input type="date" value={editData.date} onChange={(e) => setEditData({...editData, date: e.target.value})} /> : sale.date}</td>
+                    <td>{editId === sale._id ? <input value={editData.billNo} onChange={(e) => setEditData({...editData, billNo: e.target.value})} /> : <span className="bill-tag">{sale.billNo}</span>}</td>
                     <td>{sale.productName}</td>
-                    <td>{editId === sale._id ? <input name="customerName" value={editData.customerName} onChange={(e) => setEditData({...editData, customerName: e.target.value})} /> : sale.customerName}</td>
-                    <td>{editId === sale._id ? <input type="number" name="quantity" value={editData.quantity} onChange={(e) => setEditData({...editData, quantity: e.target.value})} /> : sale.quantity}</td>
-                    <td>₹{editId === sale._id ? editData.totalPrice : sale.totalPrice}</td>
-                    <td>₹{editId === sale._id ? <input type="number" name="amountReceived" value={editData.amountReceived} onChange={(e) => setEditData({...editData, amountReceived: e.target.value})} /> : sale.amountReceived}</td>
-                    <td style={{color: 'red'}}>₹{editId === sale._id ? editData.paymentDue : sale.paymentDue}</td>
-                    <td>{sale.billDueDate}</td>
+                    <td>{editId === sale._id ? <input value={editData.customerName} onChange={(e) => setEditData({...editData, customerName: e.target.value})} /> : sale.customerName}</td>
+                    <td>{editId === sale._id ? <input type="number" value={editData.quantity} onChange={(e) => setEditData({...editData, quantity: e.target.value})} /> : sale.quantity}</td>
+                    <td>{editId === sale._id ? <input type="number" value={editData.rate} onChange={(e) => setEditData({...editData, rate: e.target.value})} /> : `₹${sale.rate}`}</td>
+                    
+                    {/* 🆕 Traveling Cost Row */}
+                    <td>
+                        {editId === sale._id ? 
+                        <input type="number" value={editData.travelingCost} onChange={(e) => setEditData({...editData, travelingCost: e.target.value})} placeholder="0" /> 
+                        : `₹${sale.travelingCost || 0}`}
+                    </td>
+
+                    <td style={{fontWeight: 'bold'}}>₹{editId === sale._id ? editData.totalPrice : sale.totalPrice}</td>
+                    <td>{editId === sale._id ? <input type="number" value={editData.amountReceived} onChange={(e) => setEditData({...editData, amountReceived: e.target.value})} /> : `₹${sale.amountReceived}`}</td>
+                    <td style={{color: 'red', fontWeight: 'bold'}}>₹{editId === sale._id ? editData.paymentDue : sale.paymentDue}</td>
+                    
                     <td>
                       {editId === sale._id ? (
                         <div className="btn-group-row">
@@ -217,7 +226,6 @@ const SalesTable = ({ role }) => {
         </div>
       </div>
 
-      {/* Snackbar Integration */}
       <CustomSnackbar 
         open={snackbar.open} 
         message={snackbar.message} 

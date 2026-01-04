@@ -17,6 +17,7 @@ const SalesEntry = ({ role }) => {
     billNo: "",
     quantity: "",
     rate: "",
+    travelingCost: "", // 🆕 नया फील्ड: Traveling Cost
     totalPrice: 0,
     amountReceived: "",
     paymentDue: 0,
@@ -29,14 +30,12 @@ const SalesEntry = ({ role }) => {
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
-  // Live Backend URL handle karne ke liye dynamic logic
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   const showMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  // 1️⃣ Get Next SI No from MongoDB (Live URL optimized)
   const fetchNextSi = async () => {
     try {
       const res = await axios.get(`${API_URL}/api/sales`);
@@ -55,9 +54,15 @@ const SalesEntry = ({ role }) => {
     fetchNextSi();
   }, [API_URL]);
 
-  // 2️⃣ Live Calculations
+  // 2️⃣ Live Calculations (Traveling Cost Logic Added)
   useEffect(() => {
-    const total = (Number(formData.quantity) || 0) * (Number(formData.rate) || 0);
+    const qty = Number(formData.quantity) || 0;
+    const rate = Number(formData.rate) || 0;
+    const travel = Number(formData.travelingCost) || 0;
+
+    // लॉजिक: (मात्रा * दर) - ट्रैवलिंग कॉस्ट
+    const total = (qty * rate) - travel; 
+    
     const due = total - (Number(formData.amountReceived) || 0);
 
     let calculatedDueDate = "";
@@ -73,7 +78,7 @@ const SalesEntry = ({ role }) => {
       paymentDue: due,
       billDueDate: calculatedDueDate,
     }));
-  }, [formData.quantity, formData.rate, formData.amountReceived, formData.date]);
+  }, [formData.quantity, formData.rate, formData.travelingCost, formData.amountReceived, formData.date]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -93,9 +98,7 @@ const SalesEntry = ({ role }) => {
     }
 
     setLoading(true);
-
     try {
-      // 🛠️ MongoDB API Call using dynamic API_URL
       const res = await axios.post(`${API_URL}/api/sales`, {
         ...formData,
         si: nextSi
@@ -126,6 +129,7 @@ const SalesEntry = ({ role }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="sales-form-grid">
+          {/* ... बाकि Fields वैसे ही रहेंगे ... */}
           <div className="input-group">
             <label>Date</label>
             <input type="date" name="date" value={formData.date} onChange={handleChange} disabled={loading || !isAuthorized} />
@@ -163,8 +167,14 @@ const SalesEntry = ({ role }) => {
             <input type="number" name="rate" value={formData.rate} onChange={handleChange} disabled={loading || !isAuthorized} />
           </div>
 
+          {/* 🆕 नया इनपुट: Traveling Cost */}
+          <div className="input-group">
+            <label>Traveling Cost (₹)</label>
+            <input type="number" name="travelingCost" value={formData.travelingCost} onChange={handleChange} placeholder="0" disabled={loading || !isAuthorized} />
+          </div>
+
           <div className="input-group readonly-group">
-            <label>Total Price (₹)</label>
+            <label>Total Price (₹) <small>(Qty * Rate - Travel)</small></label>
             <input value={formData.totalPrice} readOnly style={{backgroundColor: '#f9f9f9'}} />
           </div>
 
