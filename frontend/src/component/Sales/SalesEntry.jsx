@@ -82,12 +82,13 @@ useEffect(() => {
 
   const handleReset = () => {
     setFormData(initialState);
-    if (isAuthorized) showMsg("Form cleared", "info");
+    if (isAuthorized) showMsg("Added sucesfully", "info");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isAuthorized) {
+      showMsg(`Sale Saved! SI No: ${nextSi}`, "success");
       showMsg("Unauthorized: Permission Denied!", "error");
       return;
     }
@@ -100,7 +101,7 @@ useEffect(() => {
       });
 
       if (res.data.success) {
-        showMsg(`Sale Saved! SI No: ${nextSi}`, "success");
+        
         handleReset();
         fetchNextSi(); 
       }
@@ -169,7 +170,7 @@ useEffect(() => {
           {/* 🆕 नया इनपुट: Cash Discount (CD) */}
           <div className="input-group">
             <label>Cash Discount / CD %(₹)</label>
-            <input type="number" name="cashDiscount" value={formData.cashDiscount} onChange={handleChange} placeholder="0" disabled={loading || !isAuthorized} />
+            <input type="number" name="cashDiscount" value={formData.cashDiscount?formData.cashDiscount:0} onChange={handleChange} placeholder="0" disabled={loading || !isAuthorized} />
           </div>
 
           <div className="input-group readonly-group">
