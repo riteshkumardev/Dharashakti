@@ -2,24 +2,62 @@ import Purchase from "../models/Purchase.js";
 import Stock from "../models/Stock.js";
 
 // ➕ Add Purchase and Update Stock
-
 export const addPurchase = async (req, res) => {
   try {
-    const purchase = await Purchase.create(req.body);
+    const {
+      date,
+      supplierName,
+      productName,
+      billNo,
+      vehicleNo,
+      quantity = 0,
+      rate = 0,
+      travelingCost = 0,
+      cashDiscount = 0,
+      totalAmount = 0,
+      paidAmount = 0,
+      balanceAmount = 0,
+      remarks
+    } = req.body;
 
-    const updatedStock = await Stock.findOneAndUpdate(
-      { productName: req.body.productName },
-      { $inc: { totalQuantity: req.body.quantity } },
+    const purchase = await Purchase.create({
+      date,
+      supplierName,
+      productName,
+      billNo,
+      vehicleNo,
+      quantity: Number(quantity),
+      rate: Number(rate),
+      travelingCost: Number(travelingCost),
+      cashDiscount: Number(cashDiscount),
+      totalAmount: Number(totalAmount),
+      paidAmount: Number(paidAmount),
+      balanceAmount: Number(balanceAmount),
+      remarks
+    });
+
+    // 🔄 STOCK UPDATE
+    const stock = await Stock.findOneAndUpdate(
+      { productName },
+      {
+        $inc: { totalQuantity: purchase.quantity },
+        $set: { updatedAt: new Date() }
+      },
       { upsert: true, new: true }
     );
 
-    res.status(201).json({ 
-      success: true, 
-      message: "Purchase saved & Stock updated", 
-      stock: updatedStock 
+    res.status(201).json({
+      success: true,
+      message: "Purchase saved & Stock updated ✅",
+      purchase,
+      stock
     });
+
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 
