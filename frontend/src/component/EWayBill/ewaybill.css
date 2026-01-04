@@ -23,13 +23,35 @@ body {
   box-sizing: border-box;
 }
 
-/* Print button */
-.no-print {
-  text-align: right;
+/* =========================
+   TOP BAR
+========================= */
+
+.eway-top {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 8px;
 }
 
-/* Title */
+/* Print button */
+.no-print {
+  text-align: center;
+  width: 80%;
+}
+
+/* QR normal screen view */
+/* .qr-box {
+  top: 10mm;
+  margin-left: auto;
+  text-align: right;
+} */
+
+/* =========================
+   TEXT / TITLES
+========================= */
+
 .eway-title {
   text-align: center;
   font-weight: bold;
@@ -37,13 +59,11 @@ body {
   margin: 6px 0;
 }
 
-/* Meta info */
 .eway-meta {
   font-size: 12px;
   margin-bottom: 6px;
 }
 
-/* Divider */
 .hr-line {
   border-top: 2px solid #000;
   margin: 6px 0 10px;
@@ -72,14 +92,12 @@ th {
   text-align: center;
 }
 
-/* Section heading */
 .section-title {
   font-weight: bold;
   margin-top: 8px;
   margin-bottom: 4px;
 }
 
-/* Footer */
 .eway-footer {
   text-align: center;
   margin-top: 12px;
@@ -88,7 +106,7 @@ th {
 }
 
 /* =========================
-   PRINT VIEW (PDF / Paper)
+   PRINT VIEW (PDF / PAPER)
 ========================= */
 
 @media print {
@@ -114,6 +132,18 @@ th {
   .eway-container {
     box-shadow: none;
     padding: 10mm;
+    width: 210mm;
+    min-height: 297mm;
+    box-sizing: border-box;
+    page-break-inside: avoid;
+  }
+
+  /* ✅ QR FIX – ALWAYS TOP RIGHT */
+  .qr-box {
+    position: absolute;
+    top: -15mm;     /* ✅ positive value */
+    right: 10mm;
+    text-align: right;
   }
 
   /* Avoid unwanted page breaks */
@@ -129,35 +159,27 @@ th {
 .page-break {
   page-break-before: always;
 }
-/* ===== TOP BAR ===== */
-
-.eway-top {
+/* ===== WATERMARK ===== */
+.eway-container {
   position: relative;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 6px;
 }
 
-/* QR normal screen view */
-.qr-box {
-  text-align: right;
+.eway-container::before {
+  content: "DHARA SHAKTI";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-30deg);
+  font-size: 80px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.06); /* 👈 light watermark */
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 0;
 }
 
-/* ===== PRINT FIX ===== */
-@media print {
-
-  /* QR ko force right lock */
-  .qr-box {
-    position: absolute;
-    top: -10mm;
-    right: 10mm;
-
-    text-align: right;
-  }
-
-  /* Print button hide */
-  .no-print {
-    display: none !important;
-  }
+/* Make sure content stays above watermark */
+.eway-container > * {
+  position: relative;
+  z-index: 1;
 }

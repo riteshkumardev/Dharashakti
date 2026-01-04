@@ -22,7 +22,8 @@ import ProfitLoss from "./component/ProfitLoss/ProfitLoss";
 import Profile from "./component/Profile/Profile";
 import ScreenLock from "./component/Core_Component/ScreenLock/ScreenLocl";
 import Reports_Printing from "./component/Reports_Printing/Reports_Printing";
-import EWayBillContainer from "./component/EWayBill/EWayBillContainer";
+
+import InvoicePage from "./component/Invoice/InvoicePage";
 
 
 function App() {
@@ -159,7 +160,7 @@ const sampleEwayData = {
             <Route path="/profile" element={<ProtectedRoute><Profile user={user} setUser={setUser} /></ProtectedRoute>} />
             <Route path="/attendance" element={<ProtectedRoute><Attendance role={user?.role} user={user} /></ProtectedRoute>} />
             <Route path="/staff-ledger" element={<ProtectedRoute><EmployeeLedger role={user?.role} user={user} /></ProtectedRoute>} />
-            <Route path="/invoice" element={<ProtectedRoute><EWayBillContainer data={sampleEwayData} /></ProtectedRoute>} />
+            <Route path="/invoice" element={<ProtectedRoute><InvoicePage  role={user?.role} user={user}/></ProtectedRoute>} />
             
 
             {/* MANAGEMENT */}

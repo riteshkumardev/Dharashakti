@@ -1,22 +1,21 @@
-
 import React from "react";
 
 const PartyDetails = ({ from, to }) => (
-  <table>
+  <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", marginTop: "10px" }}>
     <tbody>
       <tr>
-        <th>From</th>
-        <th>To</th>
+        <th style={{ width: "50%", border: "1px solid #000", padding: "8px", background: "#f2f2f2" }}>From</th>
+        <th style={{ width: "50%", border: "1px solid #000", padding: "8px", background: "#f2f2f2" }}>To</th>
       </tr>
       <tr>
-        <td>
-          <b>{from.name}</b><br/>
-          GSTIN: {from.gstin}<br/>
+        <td style={{ border: "1px solid #000", padding: "10px", verticalAlign: "top" }}>
+          <b>{from.name}</b><br />
+          GSTIN: {from.gst}<br />
           {from.address}
         </td>
-        <td>
-          <b>{to.name}</b><br/>
-          GSTIN: {to.gstin}<br/>
+        <td style={{ border: "1px solid #000", padding: "10px", verticalAlign: "top" }}>
+          <b>{to.name}</b><br />
+          GSTIN: {to.gst}<br />
           {to.address}
         </td>
       </tr>

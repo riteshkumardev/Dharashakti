@@ -12,46 +12,53 @@ import EWayFooter from "./EWayFooter";
 
 const EWayBillContainer = ({ data }) => {
   if (!data) return null;
+console.log(data,"data");
 
-  // 🔹 QR DATA (important info only)
+  // ✅ SAFE DESTRUCTURING (NO RUNTIME ERROR)
+  const {
+    ewayBillNo = "",
+    validUpto = "",
+    from = {},
+    to = {},
+    goods = [],
+    transport = {},
+    vehicle = {},
+    taxSummary = { total: 0 }
+  } = data;
+
+  // 🔹 SAFE QR DATA
   const qrData = `
-E-Way Bill No: ${data.ewayBillNo}
-From: ${data.from.name}
-To: ${data.to.name}
-Vehicle: ${data.vehicle.vehicleNo}
-Total Amount: ${data.taxSummary.total}
-Valid Upto: ${data.validUpto}
-  `.trim();
+E-Way Bill No: ${ewayBillNo}
+From: ${from?.name || ""}
+To: ${to?.name || ""}
+Vehicle: ${vehicle?.vehicleNo || ""}
+Total Amount: ${taxSummary?.total || 0}
+Valid Upto: ${validUpto}
+`.trim();
 
   return (
     <div className="eway-wrapper">
       <div className="eway-container">
 
         {/* ===== TOP BAR ===== */}
-    <div className="eway-top">
-  <div className="no-print">
-    <button onClick={() => window.print()}>
-      🖨️ Print E-Way Bill
-    </button>
-  </div>
+        <div className="eway-top">
+          <button className="print-btn no-print" onClick={() => window.print()}>
+            🖨️ Print E-Way Bill
+          </button>
 
-  <div className="qr-box">
-    <QRCodeCanvas
-      value={qrData}
-      size={90}
-      level="M"
-    />
-  </div>
-</div>
+          <div className="qr-box">
+            <QRCodeCanvas value={qrData} size={90} level="M" />
+          </div>
+        </div>
 
         {/* ===== BILL CONTENT ===== */}
         <EWayHeader data={data} />
-        <PartyDetails from={data.from} to={data.to} />
-        <GoodsTable goods={data.goods} />
-        <TaxSummary tax={data.taxSummary} />
-        <TransportDetails transport={data.transport} />
-        <VehicleDetails vehicle={data.vehicle} />
-        <EWayFooter ewayBillNo={data.ewayBillNo} />
+        <PartyDetails from={from} to={to} />
+        <GoodsTable goods={goods} />
+        <TaxSummary tax={taxSummary} />
+        <TransportDetails transport={transport} />
+        <VehicleDetails vehicle={vehicle} />
+        <EWayFooter ewayBillNo={ewayBillNo} />
 
       </div>
     </div>

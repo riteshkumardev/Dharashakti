@@ -1,23 +1,75 @@
 import React, { useState } from "react";
 import EWayBillForm from "./EWayBillForm";
-import EWayBillContainer from "./EWayBillContainer";
+import EWayBillContainer from "../EWayBill/EWayBillContainer";
 
 const InvoicePage = () => {
   const [ewayData, setEwayData] = useState({
     ewayBillNo: "871615409896",
-    generatedDate: "11/12/2025 03:12 PM",
-    validUpto: "13/12/2025",
-    from: { name: "", gst: "", address: "" },
+    generatedDate: new Date().toLocaleDateString(),
+    validUpto: "",
+    date: "",
+    from: {
+      name: "M/S DHARA SHAKTI AGRO PRODUCTS",
+      gst: "10DZTPM1457E1ZE",
+      address: "Sripur Gahar, Samastipur, BIHAR - 848117"
+    },
     to: { name: "", gst: "", address: "" },
-    goods: [],
-    transport: {},
-    vehicle: {}
+    goods: [
+      {
+        hsn: "",
+        product: "",
+        quantity: "",
+        rate: "", // Naya field
+        taxableAmount: 0,
+        taxRate: ""
+      }
+    ],
+    taxSummary: {
+      taxable: 0,
+      cgst: 0,
+      sgst: 0,
+      igst: 0,
+      total: 0
+    },
+    transport: { docNo: "", docDate: "" },
+    vehicle: { vehicleNo: "", from: "" }
   });
+
+  const [showPreview, setShowPreview] = useState(false);
 
   return (
     <>
-      <EWayBillForm data={ewayData} setData={setEwayData} />
-      <EWayBillContainer data={ewayData} />
+      {!showPreview && (
+        <>
+          <EWayBillForm 
+            data={ewayData} 
+            setData={setEwayData} 
+            onPreview={() => setShowPreview(true)} 
+          />
+        </>
+      )}
+
+      {showPreview && (
+        <>
+          <div className="no-print" style={{ textAlign: "center", marginBottom: 20 }}>
+            <button
+              onClick={() => setShowPreview(false)}
+              style={{
+                padding: "10px 24px",
+                fontSize: 16,
+                borderRadius: 8,
+                cursor: "pointer",
+                backgroundColor: "#f44336",
+                color: "white",
+                border: "none"
+              }}
+            >
+              ✏️ Edit Form
+            </button>
+          </div>
+          <EWayBillContainer data={ewayData} />
+        </>
+      )}
     </>
   );
 };
