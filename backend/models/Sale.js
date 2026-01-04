@@ -9,8 +9,7 @@ const saleSchema = new mongoose.Schema(
     billNo: { type: String, required: true },
     quantity: { type: Number, required: true },
     rate: { type: Number, required: true },
-    // 🆕 यहाँ हमने travelingCost जोड़ दिया है
-    travelingCost: { type: Number, default: 0 }, 
+     travelingCost: { type: Number, default: 0 }, 
     totalPrice: { type: Number, required: true },
     amountReceived: { type: Number, default: 0 },
     paymentDue: { type: Number, default: 0 },
