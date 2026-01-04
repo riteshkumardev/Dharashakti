@@ -15,7 +15,7 @@ const SalesTable = ({ role }) => {
   const [editData, setEditData] = useState({});
   const [sortBy, setSortBy] = useState("dateNewest");
   const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 10;
+  const rowsPerPage = 5;
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -47,19 +47,40 @@ const SalesTable = ({ role }) => {
     fetchSales();
   }, [API_URL]);
 
-  // 2️⃣ Auto Calculation in Edit Mode (Traveling Cost included)
+  // 2️⃣ Auto Calculation in Edit Mode (Travel और CD दोनों शामिल हैं)
   useEffect(() => {
-    if (editId) {
-      const qty = Number(editData.quantity) || 0;
-      const rate = Number(editData.rate) || 0;
-      const travel = Number(editData.travelingCost) || 0;
+  if (editId) {
+    const qty = Number(editData.quantity) || 0;
+    const rate = Number(editData.rate) || 0;
+    const travel = Number(editData.travelingCost) || 0;
+    const cdPercent = Number(editData.cashDiscount) || 0; // अब यह प्रतिशत (%) है
 
-      const total = (qty * rate) - travel; // Total Calculation Logic
-      const due = total - (Number(editData.amountReceived) || 0);
+    // 1. बेस प्राइस निकालें (Qty * Rate)
+    const basePrice = qty * rate;
 
-      setEditData((prev) => ({ ...prev, totalPrice: total, paymentDue: due }));
-    }
-  }, [editData.quantity, editData.rate, editData.travelingCost, editData.amountReceived, editId]);
+    // 2. प्रतिशत के हिसाब से डिस्काउंट की राशि निकालें
+    const discountAmount = (basePrice * cdPercent) / 100;
+
+    // 3. नया लॉजिक: (बेस प्राइस) - ट्रेवल - डिस्काउंट राशि
+    const total = basePrice - travel - discountAmount; 
+    
+    // 4. पेमेंट ड्यू निकालें
+    const due = total - (Number(editData.amountReceived) || 0);
+
+    setEditData((prev) => ({ 
+      ...prev, 
+      totalPrice: total, 
+      paymentDue: due 
+    }));
+  }
+}, [
+  editData.quantity, 
+  editData.rate, 
+  editData.travelingCost, 
+  editData.cashDiscount, 
+  editData.amountReceived, 
+  editId
+]);
 
   const getProcessedList = () => {
     let list = salesList.filter((s) => {
@@ -140,8 +161,9 @@ const SalesTable = ({ role }) => {
       <div className="table-container-wide">
         <div className="table-card-wide">
           <div className="table-header-flex">
-            <h2 className="table-title">SALES RECORDS (Live)</h2>
+            <h2 className="table-title">SALES RECORDS</h2>
             <div className="table-controls-row">
+              {/* ... Selects and Search Input ... */}
               <select className="table-select-custom" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                 <option value="dateNewest">Newest Date</option>
                 <option value="dateOldest">Oldest Date</option>
@@ -167,14 +189,15 @@ const SalesTable = ({ role }) => {
                 <tr>
                   <th>Date</th>
                   <th>Bill No</th>
-                  <th>Product</th>
                   <th>Customer</th>
                   <th>Qty</th>
-                  <th>Rate</th>
-                  <th>Travel</th> {/* 🆕 New Header */}
+                  <th>Travel</th>
+                  <th>CD (₹)</th> {/* 🆕 New Header for CD */}
                   <th>Total</th>
                   <th>Received</th>
                   <th>Due</th>
+                  <th>Due Date</th>
+                  <th>Remarks</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -183,21 +206,28 @@ const SalesTable = ({ role }) => {
                   <tr key={sale._id} className={editId === sale._id ? "active-edit" : ""}>
                     <td>{editId === sale._id ? <input type="date" value={editData.date} onChange={(e) => setEditData({...editData, date: e.target.value})} /> : sale.date}</td>
                     <td>{editId === sale._id ? <input value={editData.billNo} onChange={(e) => setEditData({...editData, billNo: e.target.value})} /> : <span className="bill-tag">{sale.billNo}</span>}</td>
-                    <td>{sale.productName}</td>
                     <td>{editId === sale._id ? <input value={editData.customerName} onChange={(e) => setEditData({...editData, customerName: e.target.value})} /> : sale.customerName}</td>
                     <td>{editId === sale._id ? <input type="number" value={editData.quantity} onChange={(e) => setEditData({...editData, quantity: e.target.value})} /> : sale.quantity}</td>
-                    <td>{editId === sale._id ? <input type="number" value={editData.rate} onChange={(e) => setEditData({...editData, rate: e.target.value})} /> : `₹${sale.rate}`}</td>
                     
-                    {/* 🆕 Traveling Cost Row */}
                     <td>
                         {editId === sale._id ? 
-                        <input type="number" value={editData.travelingCost} onChange={(e) => setEditData({...editData, travelingCost: e.target.value})} placeholder="0" /> 
+                        <input type="number" value={editData.travelingCost} onChange={(e) => setEditData({...editData, travelingCost: e.target.value})} /> 
                         : `₹${sale.travelingCost || 0}`}
+                    </td>
+
+                    {/* 🆕 Cash Discount Row */}
+                    <td>
+                        {editId === sale._id ? 
+                        <input type="number" value={editData.cashDiscount} onChange={(e) => setEditData({...editData, cashDiscount: e.target.value})} placeholder="CD" /> 
+                        : `₹${sale.cashDiscount || 0}`}
                     </td>
 
                     <td style={{fontWeight: 'bold'}}>₹{editId === sale._id ? editData.totalPrice : sale.totalPrice}</td>
                     <td>{editId === sale._id ? <input type="number" value={editData.amountReceived} onChange={(e) => setEditData({...editData, amountReceived: e.target.value})} /> : `₹${sale.amountReceived}`}</td>
                     <td style={{color: 'red', fontWeight: 'bold'}}>₹{editId === sale._id ? editData.paymentDue : sale.paymentDue}</td>
+                    <td>{editId === sale._id ? <input value={editData.billDueDate} onChange={(e) => setEditData({...editData, billDueDate: e.target.value})} /> : sale.billDueDate}</td>
+
+                    <td>{editId === sale._id ? <input value={editData.remarks} onChange={(e) => setEditData({...editData, remarks: e.target.value})} /> : sale.remarks}</td>
                     
                     <td>
                       {editId === sale._id ? (

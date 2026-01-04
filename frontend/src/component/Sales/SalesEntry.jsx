@@ -17,7 +17,8 @@ const SalesEntry = ({ role }) => {
     billNo: "",
     quantity: "",
     rate: "",
-    travelingCost: "", // 🆕 नया फील्ड: Traveling Cost
+    travelingCost: "",
+    cashDiscount: "", // 🆕 नया फील्ड: Cash Discount (CD)
     totalPrice: 0,
     amountReceived: "",
     paymentDue: 0,
@@ -54,31 +55,25 @@ const SalesEntry = ({ role }) => {
     fetchNextSi();
   }, [API_URL]);
 
-  // 2️⃣ Live Calculations (Traveling Cost Logic Added)
-  useEffect(() => {
-    const qty = Number(formData.quantity) || 0;
-    const rate = Number(formData.rate) || 0;
-    const travel = Number(formData.travelingCost) || 0;
+  // 2️⃣ Live Calculations (Travel और CD दोनों को घटाया गया है)
+useEffect(() => {
+  const qty = Number(formData.quantity) || 0;
+  const rate = Number(formData.rate) || 0;
+  const travel = Number(formData.travelingCost) || 0;
+  const cdPercent = Number(formData.cashDiscount) || 0; // अब यह % है
 
-    // लॉजिक: (मात्रा * दर) - ट्रैवलिंग कॉस्ट
-    const total = (qty * rate) - travel; 
-    
-    const due = total - (Number(formData.amountReceived) || 0);
+  const basePrice = qty * rate;
+  const discountAmount = (basePrice * cdPercent) / 100; // % से रुपया निकाला
 
-    let calculatedDueDate = "";
-    if (formData.date) {
-      const d = new Date(formData.date);
-      d.setDate(d.getDate() + 15);
-      calculatedDueDate = d.toISOString().split("T")[0];
-    }
+  const total = basePrice - travel - discountAmount; 
+  const due = total - (Number(formData.amountReceived) || 0);
 
-    setFormData((prev) => ({
-      ...prev,
-      totalPrice: total,
-      paymentDue: due,
-      billDueDate: calculatedDueDate,
-    }));
-  }, [formData.quantity, formData.rate, formData.travelingCost, formData.amountReceived, formData.date]);
+  setFormData((prev) => ({
+    ...prev,
+    totalPrice: total,
+    paymentDue: due,
+  }));
+}, [formData.quantity, formData.rate, formData.travelingCost, formData.cashDiscount, formData.amountReceived]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -121,7 +116,7 @@ const SalesEntry = ({ role }) => {
       {loading && <Loader />}
       <div className="sales-card-wide">
         <div className="form-header-flex" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 className="form-title">Sales Entry (Live MongoDB)</h2>
+          <h2 className="form-title">Sales Entry</h2>
           <div style={{ display: "flex", gap: "10px" }}>
             <div className="si-badge">SI No: {nextSi}</div>
             <div className="due-badge">Due: {formData.billDueDate}</div>
@@ -129,7 +124,6 @@ const SalesEntry = ({ role }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="sales-form-grid">
-          {/* ... बाकि Fields वैसे ही रहेंगे ... */}
           <div className="input-group">
             <label>Date</label>
             <input type="date" name="date" value={formData.date} onChange={handleChange} disabled={loading || !isAuthorized} />
@@ -167,14 +161,19 @@ const SalesEntry = ({ role }) => {
             <input type="number" name="rate" value={formData.rate} onChange={handleChange} disabled={loading || !isAuthorized} />
           </div>
 
-          {/* 🆕 नया इनपुट: Traveling Cost */}
           <div className="input-group">
             <label>Traveling Cost (₹)</label>
             <input type="number" name="travelingCost" value={formData.travelingCost} onChange={handleChange} placeholder="0" disabled={loading || !isAuthorized} />
           </div>
 
+          {/* 🆕 नया इनपुट: Cash Discount (CD) */}
+          <div className="input-group">
+            <label>Cash Discount / CD %(₹)</label>
+            <input type="number" name="cashDiscount" value={formData.cashDiscount} onChange={handleChange} placeholder="0" disabled={loading || !isAuthorized} />
+          </div>
+
           <div className="input-group readonly-group">
-            <label>Total Price (₹) <small>(Qty * Rate - Travel)</small></label>
+            <label>Total Price (₹) <small>(Qty*Rate - Travel - CD)</small></label>
             <input value={formData.totalPrice} readOnly style={{backgroundColor: '#f9f9f9'}} />
           </div>
 
