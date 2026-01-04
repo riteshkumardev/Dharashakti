@@ -76,6 +76,7 @@ const DashboardSidebar = ({ closeSidebar }) => {
             {/* <li onClick={() => handleNavigate("/stock-add")}>➤ Add New Stock</li> */}
             <li onClick={() => handleNavigate("/purchase-form")}>➤ Purchase Entry</li>
             <li onClick={() => handleNavigate("/purchase-table")}>➤ Purchase Table</li>
+            <li onClick={() => handleNavigate("/invoice")}>➤ Bill Print</li>
           </ul>
         )}
       </div>
