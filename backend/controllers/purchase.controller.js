@@ -1,24 +1,31 @@
 import Purchase from "../models/Purchase.js";
 import Stock from "../models/Stock.js";
 
-// 1️⃣ ➕ Add New Purchase (नयी खरीद और स्टॉक सिंक)
+// 1️⃣ ➕ Add New Purchase
 export const addPurchase = async (req, res) => {
   try {
-    // डेटा को Number में सुरक्षित रूप से बदलें
+    // सारी फ़ील्ड्स को एक साथ प्रोसेस करना
+    const { 
+      date, supplierName, productName, billNo, vehicleNo, 
+      quantity, rate, travelingCost, cashDiscount, 
+      totalAmount, paidAmount, balanceAmount, remarks 
+    } = req.body;
+
     const purchaseData = {
-      ...req.body,
-      quantity: Number(req.body.quantity) || 0,
-      rate: Number(req.body.rate) || 0,
-      travelingCost: Number(req.body.travelingCost) || 0,
-      cashDiscount: Number(req.body.cashDiscount) || 0,
-      paidAmount: Number(req.body.paidAmount) || 0,
-      totalAmount: Number(req.body.totalAmount) || 0,
-      balanceAmount: Number(req.body.balanceAmount) || 0,
+      date, supplierName, productName, billNo, vehicleNo,
+      quantity: Number(quantity) || 0,
+      rate: Number(rate) || 0,
+      travelingCost: Number(travelingCost) || 0,
+      cashDiscount: Number(cashDiscount) || 0,
+      paidAmount: Number(paidAmount) || 0,
+      totalAmount: Number(totalAmount) || 0,
+      balanceAmount: Number(balanceAmount) || 0,
+      remarks
     };
 
     const purchase = await Purchase.create(purchaseData);
 
-    // 🔄 स्टॉक ऑटो-अपडेट: खरीद होने पर स्टॉक बढ़ाएं (+)
+    // 🔄 स्टॉक अपडेट
     const updatedStock = await Stock.findOneAndUpdate(
       { productName: purchase.productName },
       { 
@@ -31,7 +38,7 @@ export const addPurchase = async (req, res) => {
     res.status(201).json({ 
       success: true, 
       message: "Purchase saved & Stock updated! ✅", 
-      data: purchase, 
+      data: purchase, // यहाँ अब सारी फ़ील्ड्स वापस आएँगी
       stock: updatedStock 
     });
   } catch (error) {
@@ -49,12 +56,13 @@ export const getPurchases = async (req, res) => {
   }
 };
 
-// 3️⃣ 🛠️ Update Purchase (एडिट लॉजिक)
+// 3️⃣ 🛠️ Update Purchase
 export const updatePurchase = async (req, res) => {
   try {
     const oldPurchase = await Purchase.findById(req.params.id);
-    if (!oldPurchase) return res.status(404).json({ success: false, message: "Not found" });
+    if (!oldPurchase) return res.status(404).json({ success: false, message: "Record not found" });
 
+    // नई वैल्यूज को नंबर्स में बदलना
     const updateBody = {
       ...req.body,
       quantity: Number(req.body.quantity),
@@ -68,7 +76,7 @@ export const updatePurchase = async (req, res) => {
 
     const updatedPurchase = await Purchase.findByIdAndUpdate(req.params.id, updateBody, { new: true });
 
-    // 🔄 स्टॉक एडजस्टमेंट: (नयी मात्रा - पुरानी मात्रा)
+    // 🔄 स्टॉक एडजस्टमेंट
     const qtyDiff = Number(updateBody.quantity) - Number(oldPurchase.quantity);
     
     const updatedStock = await Stock.findOneAndUpdate(
@@ -87,9 +95,9 @@ export const updatePurchase = async (req, res) => {
 export const deletePurchase = async (req, res) => {
   try {
     const purchase = await Purchase.findById(req.params.id);
-    if (!purchase) return res.status(404).json({ success: false, message: "Not found" });
+    if (!purchase) return res.status(404).json({ success: false, message: "Record not found" });
 
-    // 🔄 स्टॉक वापस घटाएं (-): क्योंकि खरीद डिलीट हो गई है
+    // 🔄 स्टॉक वापस कम करें
     const updatedStock = await Stock.findOneAndUpdate(
       { productName: purchase.productName },
       { $inc: { totalQuantity: -Number(purchase.quantity) } },
@@ -97,7 +105,7 @@ export const deletePurchase = async (req, res) => {
     );
 
     await Purchase.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: "Deleted & Stock reverted", stock: updatedStock });
+    res.json({ success: true, message: "Purchase deleted and Stock adjusted", stock: updatedStock });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
