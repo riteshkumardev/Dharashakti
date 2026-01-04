@@ -53,6 +53,7 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
           <select value={data.goods[0].product} onChange={e => updateGoods("product", e.target.value)}>
             <option value="">Select Product</option>
             <option value="Corn Grit">Corn Grit</option>
+            <option value="Rice Grit">Rice Grit</option>
             <option value="Cattle Feed">Cattle Feed</option>
             <option value="Corn Flour">Corn Flour</option>
           </select>
