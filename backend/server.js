@@ -16,7 +16,7 @@ import attendanceRoutes from "./routes/attendance.routes.js";
 import expenseRoutes from "./routes/expense.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
 import purchaseRoutes from "./routes/purchase.routes.js";
-import stockRoutes from "./routes/stock.routes.js";
+
 
 
 dotenv.config();
