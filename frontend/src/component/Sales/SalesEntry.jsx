@@ -15,10 +15,11 @@ const SalesEntry = ({ role }) => {
     customerName: "",
     productName: "",
     billNo: "",
+    vehicleNo: "", // 🆕 नया फील्ड जोड़ा गया
     quantity: "",
     rate: "",
     travelingCost: "",
-    cashDiscount: "", // 🆕 नया फील्ड: Cash Discount (CD)
+    cashDiscount: "", 
     totalPrice: 0,
     amountReceived: "",
     paymentDue: 0,
@@ -55,25 +56,25 @@ const SalesEntry = ({ role }) => {
     fetchNextSi();
   }, [API_URL]);
 
-  // 2️⃣ Live Calculations (Travel और CD दोनों को घटाया गया है)
-useEffect(() => {
-  const qty = Number(formData.quantity) || 0;
-  const rate = Number(formData.rate) || 0;
-  const travel = Number(formData.travelingCost) || 0;
-  const cdPercent = Number(formData.cashDiscount) || 0; // अब यह % है
+  // 2️⃣ Live Calculations
+  useEffect(() => {
+    const qty = Number(formData.quantity) || 0;
+    const rate = Number(formData.rate) || 0;
+    const travel = Number(formData.travelingCost) || 0;
+    const cdPercent = Number(formData.cashDiscount) || 0;
 
-  const basePrice = qty * rate;
-  const discountAmount = (basePrice * cdPercent) / 100; // % से रुपया निकाला
+    const basePrice = qty * rate;
+    const discountAmount = (basePrice * cdPercent) / 100;
 
-  const total = basePrice - travel - discountAmount; 
-  const due = total - (Number(formData.amountReceived) || 0);
+    const total = basePrice - travel - discountAmount; 
+    const due = total - (Number(formData.amountReceived) || 0);
 
-  setFormData((prev) => ({
-    ...prev,
-    totalPrice: total,
-    paymentDue: due,
-  }));
-}, [formData.quantity, formData.rate, formData.travelingCost, formData.cashDiscount, formData.amountReceived]);
+    setFormData((prev) => ({
+      ...prev,
+      totalPrice: total,
+      paymentDue: due,
+    }));
+  }, [formData.quantity, formData.rate, formData.travelingCost, formData.cashDiscount, formData.amountReceived]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -82,13 +83,11 @@ useEffect(() => {
 
   const handleReset = () => {
     setFormData(initialState);
-    if (isAuthorized) showMsg("Added sucesfully", "info");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isAuthorized) {
-      showMsg(`Sale Saved! SI No: ${nextSi}`, "success");
       showMsg("Unauthorized: Permission Denied!", "error");
       return;
     }
@@ -101,7 +100,7 @@ useEffect(() => {
       });
 
       if (res.data.success) {
-        
+        showMsg(`Sale Saved Successfully! SI No: ${nextSi}`, "success");
         handleReset();
         fetchNextSi(); 
       }
@@ -148,6 +147,17 @@ useEffect(() => {
           </div>
 
           <div className="input-group">
+            <label>Vehicle No</label> {/* 🆕 नया इनपुट फील्ड */}
+            <input 
+              name="vehicleNo" 
+              value={formData.vehicleNo} 
+              onChange={handleChange} 
+              placeholder="e.g. BR-01-1234" 
+              disabled={loading || !isAuthorized} 
+            />
+          </div>
+
+          <div className="input-group">
             <label>Customer Name</label>
             <input name="customerName" value={formData.customerName} onChange={handleChange} required disabled={loading || !isAuthorized} />
           </div>
@@ -167,10 +177,9 @@ useEffect(() => {
             <input type="number" name="travelingCost" value={formData.travelingCost} onChange={handleChange} placeholder="0" disabled={loading || !isAuthorized} />
           </div>
 
-          {/* 🆕 नया इनपुट: Cash Discount (CD) */}
           <div className="input-group">
             <label>Cash Discount / CD %(₹)</label>
-            <input type="number" name="cashDiscount" value={formData.cashDiscount?formData.cashDiscount:0} onChange={handleChange} placeholder="0" disabled={loading || !isAuthorized} />
+            <input type="number" name="cashDiscount" value={formData.cashDiscount ? formData.cashDiscount : 0} onChange={handleChange} placeholder="0" disabled={loading || !isAuthorized} />
           </div>
 
           <div className="input-group readonly-group">
@@ -194,7 +203,7 @@ useEffect(() => {
           </div>
 
           <div className="button-container-full">
-            <button type="button" onClick={handleReset} className="btn-reset-3d" disabled={loading || !isAuthorized}>Reset</button>
+            <button type="button" onClick={() => { handleReset(); showMsg("Form cleared", "info"); }} className="btn-reset-3d" disabled={loading || !isAuthorized}>Reset</button>
             <button type="submit" className="btn-submit-colored" disabled={loading || !isAuthorized}>
               {loading ? "Saving..." : !isAuthorized ? "🔒 Read Only" : "✅ Save Sale"}
             </button>
