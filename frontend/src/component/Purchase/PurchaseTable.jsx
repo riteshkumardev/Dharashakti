@@ -23,19 +23,29 @@ const PurchaseTable = ({ role }) => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  const fetchPurchases = async () => {
-    try {
-      setLoading(true);
-      const res = await axios.get(`${API_URL}/api/purchases`);
-      if (res.data.success) {
-        setPurchaseData(res.data.data);
-      }
-    } catch (err) {
-      showMsg("Server se data load nahi ho paya", "error");
-    } finally {
-      setLoading(false);
+const fetchPurchases = async () => {
+  try {
+    setLoading(true);
+
+    const res = await axios.get(`${API_URL}/api/purchases`);
+    console.log("PURCHASE API RESPONSE 👉", res.data); // 👈 MUST
+
+    if (res.data?.success && Array.isArray(res.data.data)) {
+      setPurchaseData(res.data.data);
+    } else {
+      setPurchaseData([]);
+      showMsg("Purchase data empty hai", "warning");
     }
-  };
+
+  } catch (err) {
+    console.error("FETCH ERROR ❌", err);
+    setPurchaseData([]);
+    showMsg("Server se data load nahi ho paya", "error");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     fetchPurchases();
@@ -126,7 +136,7 @@ const PurchaseTable = ({ role }) => {
       <div className="table-container-wide">
         <div className="table-card-wide">
           <div className="table-header-flex">
-            <h2 className="table-title">PURCHASE RECORDS (LIVE)</h2>
+            <h2 className="table-title">PURCHASE RECORDS</h2>
             <input 
               className="table-search-input"
               placeholder="Search Supplier, Product or Vehicle..." 
