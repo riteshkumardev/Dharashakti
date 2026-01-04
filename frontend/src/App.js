@@ -22,7 +22,8 @@ import ProfitLoss from "./component/ProfitLoss/ProfitLoss";
 import Profile from "./component/Profile/Profile";
 import ScreenLock from "./component/Core_Component/ScreenLock/ScreenLocl";
 import Reports_Printing from "./component/Reports_Printing/Reports_Printing";
-import InvoiceContainer from "./component/Invoice/InvoiceContainer";
+import EWayBillContainer from "./component/EWayBill/EWayBillContainer";
+
 
 function App() {
   // ✅ SAFE localStorage read (NO JSON crash)
@@ -85,6 +86,57 @@ function App() {
   };
  
 
+const sampleEwayData = {
+  ewayBillNo: "871615409896",
+  generatedDate: "11/12/2025 03:12 PM",
+  validUpto: "13/12/2025",
+  mode: "Road",
+  distance: "242 km",
+  transactionType: "Outward - Supply",
+
+  from: {
+    gstin: "10DZTPM1457E1ZE",
+    name: "M/S DHARA SHAKTI AGRO PRODUCTS",
+    address: "Samastipur, BIHAR-848117"
+  },
+
+  to: {
+    gstin: "10CLTPS3951E1ZY",
+    name: "Kranti Food",
+    address: "Kasba, BIHAR-854330"
+  },
+
+  goods: [
+    {
+      hsn: "11031300",
+      name: "CORN GRITS",
+      qty: "16500 KGS",
+      taxableAmount: 462000,
+      taxRate: "0%"
+    }
+  ],
+
+  taxSummary: {
+    taxable: 462000,
+    cgst: 0,
+    sgst: 0,
+    igst: 0,
+    total: 462000
+  },
+
+  transport: {
+    docNo: "162",
+    docDate: "11/12/2025"
+  },
+
+  vehicle: {
+    vehicleNo: "BR01GE0166",
+    enteredFrom: "Samastipur"
+  }
+};
+
+
+
   return (
     <Router>
       {/* <EmployeeAdd/> */}
@@ -107,7 +159,7 @@ function App() {
             <Route path="/profile" element={<ProtectedRoute><Profile user={user} setUser={setUser} /></ProtectedRoute>} />
             <Route path="/attendance" element={<ProtectedRoute><Attendance role={user?.role} user={user} /></ProtectedRoute>} />
             <Route path="/staff-ledger" element={<ProtectedRoute><EmployeeLedger role={user?.role} user={user} /></ProtectedRoute>} />
-            <Route path="/invoice" element={<ProtectedRoute><InvoiceContainer role={user?.role} user={user} /></ProtectedRoute>} />
+            <Route path="/invoice" element={<ProtectedRoute><EWayBillContainer data={sampleEwayData} /></ProtectedRoute>} />
             
 
             {/* MANAGEMENT */}
