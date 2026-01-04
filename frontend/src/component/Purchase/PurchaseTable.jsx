@@ -1,34 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios'; // Firebase ki jagah Axios use karenge
+import axios from "axios";
+import './Purchase.css';
 import Loader from '../Core_Component/Loader/Loader';
+import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
 const PurchaseTable = ({ role }) => {
-  // 🔐 Permission Check: Sirf Admin aur Accountant edit/delete kar sakte hain
   const isAuthorized = role === "Admin" || role === "Accountant";
 
   const [purchaseData, setPurchaseData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
-
-  // Live Backend URL handle karne ke liye
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
-
-  // --- Edit States ---
   const [editId, setEditId] = useState(null); 
   const [editData, setEditData] = useState({}); 
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 5;
 
-  // 1️⃣ Fetch Data from MongoDB
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+
+  const showMsg = (msg, type = "success") => {
+    setSnackbar({ open: true, message: msg, severity: type });
+  };
+
   const fetchPurchases = async () => {
     try {
       setLoading(true);
       const res = await axios.get(`${API_URL}/api/purchases`);
       if (res.data.success) {
-        // Data ko reverse karke dikhayenge (Newest first)
         setPurchaseData(res.data.data);
       }
     } catch (err) {
-      console.error("Fetch Error:", err);
-      alert("Error loading purchase records from live server");
+      showMsg("Server se data load nahi ho paya", "error");
     } finally {
       setLoading(false);
     }
@@ -38,56 +41,67 @@ const PurchaseTable = ({ role }) => {
     fetchPurchases();
   }, [API_URL]);
 
-  // ✏️ Edit Start with Guard
+  // 2️⃣ Auto Calculation in Edit Mode (Qty * Rate - CD%)
+  useEffect(() => {
+    if (editId) {
+      const qty = Number(editData.quantity) || 0;
+      const rate = Number(editData.rate) || 0;
+      const cdPercent = Number(editData.cashDiscount) || 0;
+
+      const basePrice = qty * rate;
+      const discountAmount = (basePrice * cdPercent) / 100;
+      const total = basePrice - discountAmount; 
+      
+      const balance = total - (Number(editData.paidAmount) || 0);
+
+      setEditData((prev) => ({ 
+        ...prev, 
+        totalAmount: total, 
+        balanceAmount: balance 
+      }));
+    }
+  }, [editData.quantity, editData.rate, editData.cashDiscount, editData.paidAmount, editId]);
+
   const startEdit = (item) => {
     if (!isAuthorized) {
-      alert("Aapko edit karne ki permission nahi hai.");
+      showMsg("Aapko permission nahi hai", "warning");
       return;
     }
-    setEditId(item._id); // MongoDB ki unique ID use karein
+    setEditId(item._id);
     setEditData({ ...item });
   };
 
-  const handleEditChange = (e) => {
-    const { name, value } = e.target;
-    setEditData(prev => ({ ...prev, [name]: value }));
-  };
-
-  // ✅ Save Update with Guard (Live MongoDB PUT)
   const handleSave = async () => {
-    if (!isAuthorized) return;
     try {
       setLoading(true);
       const res = await axios.put(`${API_URL}/api/purchases/${editId}`, editData);
-      
       if (res.data.success) {
-        alert("Update Successful! ✅");
+        showMsg("Purchase Record Updated! ✅");
         setEditId(null);
-        fetchPurchases(); // Table refresh karein
+        fetchPurchases();
       }
     } catch (err) {
-      alert("Error updating: " + (err.response?.data?.message || err.message));
+      showMsg("Update fail ho gaya", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  // 🗑️ Delete with Guard (Live MongoDB DELETE)
   const handleDelete = async (id) => {
     if (!isAuthorized) {
-      alert("Aapko delete karne ki permission nahi hai.");
+      showMsg("Permission Denied ❌", "error");
       return;
     }
-    if (window.confirm("Are you sure you want to delete this record?")) {
+    if (window.confirm("Kya aap delete karna chahte hain?")) {
       try {
         setLoading(true);
         const res = await axios.delete(`${API_URL}/api/purchases/${id}`);
         if (res.data.success) {
-          alert("Record Deleted! 🗑️");
+          showMsg("Record Deleted! 🗑️");
           fetchPurchases();
         }
       } catch (err) {
-        alert("Delete Failed: " + err.message);
+        showMsg("Delete fail ho gaya", "error");
       } finally {
         setLoading(false);
       }
@@ -96,105 +110,153 @@ const PurchaseTable = ({ role }) => {
 
   const filteredData = purchaseData.filter(item =>
     item.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.remarks?.toLowerCase().includes(searchTerm.toLowerCase())
+    item.supplierName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.vehicleNo?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const indexOfLastRow = currentPage * rowsPerPage;
+  const indexOfFirstRow = indexOfLastRow - rowsPerPage;
+  const currentRows = filteredData.slice(indexOfFirstRow, indexOfLastRow);
+  const totalPages = Math.ceil(filteredData.length / rowsPerPage);
 
   if (loading) return <Loader />;
 
   return (
-    <div className="table-container-wide">
-      <div className="table-card-wide">
-        <div className="table-header-row">
-          <h2 className="table-title">PURCHASE RECORDS (LIVE)</h2>
-          <input 
-            type="text" 
-            placeholder="Search Product or Remarks..." 
-            className="table-search-box"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+    <>
+      <div className="table-container-wide">
+        <div className="table-card-wide">
+          <div className="table-header-flex">
+            <h2 className="table-title">PURCHASE RECORDS (LIVE)</h2>
+            <input 
+              className="table-search-input"
+              placeholder="Search Supplier, Product or Vehicle..." 
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+            />
+          </div>
 
-        <div className="table-responsive-wrapper">
-          <table className="modern-sales-table">
-            <thead>
-              <tr>
-                <th>SI</th>
-                <th>Date</th>
-                <th>Item Name</th>
-                <th>Qty</th>
-                <th>Unit</th>
-                <th>Remarks</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredData.map((item, index) => (
-                <tr key={item._id} className={editId === item._id ? "active-edit" : ""}>
-                  <td>{index + 1}</td>
-                  <td>{item.date}</td>
-                  
-                  <td>
-                    {editId === item._id ? 
-                      <input name="productName" value={editData.productName} onChange={handleEditChange} className="edit-input-field" /> 
-                      : item.productName}
-                  </td>
-                  <td>
-                    {editId === item._id ? 
-                      <input type="number" name="quantity" value={editData.quantity} onChange={handleEditChange} className="edit-input-field small-input" /> 
-                      : item.quantity}
-                  </td>
-                  <td>{item.unit}</td>
-                  <td>
-                    {editId === item._id ? 
-                      <input name="remarks" value={editData.remarks} onChange={handleEditChange} className="edit-input-field" /> 
-                      : item.remarks}
-                  </td>
-
-                  <td className="action-btns-cell">
-                    {editId === item._id ? (
-                      <>
-                        <button className="save-btn-ui" onClick={handleSave}>💾 Save</button>
-                        <button className="cancel-btn-ui" onClick={() => setEditId(null)}>✖</button>
-                      </>
-                    ) : (
-                      <>
-                        <button 
-                          className="row-edit-btn" 
-                          onClick={() => startEdit(item)}
-                          disabled={!isAuthorized}
-                          title={!isAuthorized ? "Permission Required" : "Edit"}
-                          style={{ 
-                            opacity: isAuthorized ? 1 : 0.5, 
-                            cursor: isAuthorized ? "pointer" : "not-allowed" 
-                          }}
-                        >✏️</button>
-                        
-                        <button 
-                          className="row-delete-btn" 
-                          onClick={() => handleDelete(item._id)}
-                          disabled={!isAuthorized}
-                          title={!isAuthorized ? "Permission Required" : "Delete"}
-                          style={{ 
-                            opacity: isAuthorized ? 1 : 0.5, 
-                            cursor: isAuthorized ? "pointer" : "not-allowed" 
-                          }}
-                        >🗑️</button>
-                      </>
-                    )}
-                  </td>
+          <div className="table-responsive-wrapper">
+            <table className="modern-sales-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Bill/Vehicle</th>
+                  <th>Supplier / Item</th>
+                  <th>Qty / Rate</th>
+                  <th>CD (%)</th>
+                  <th>Total</th>
+                  <th>Paid</th>
+                  <th>Balance</th>
+                  <th>Remarks</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {filteredData.length === 0 && (
-            <div style={{textAlign: 'center', padding: '20px', color: '#666'}}>
-              No records found.
-            </div>
-          )}
+              </thead>
+              <tbody>
+                {currentRows.map((item) => (
+                  <tr key={item._id} className={editId === item._id ? "active-edit" : ""}>
+                    <td>
+                      {editId === item._id ? 
+                        <input type="date" value={editData.date} onChange={(e) => setEditData({...editData, date: e.target.value})} /> 
+                        : item.date}
+                    </td>
+
+                    <td>
+                      {editId === item._id ? (
+                        <>
+                          <input placeholder="Bill No" value={editData.billNo} onChange={(e) => setEditData({...editData, billNo: e.target.value})} />
+                          <input placeholder="Vehicle No" value={editData.vehicleNo} onChange={(e) => setEditData({...editData, vehicleNo: e.target.value})} />
+                        </>
+                      ) : (
+                        <div style={{fontSize: '0.85rem'}}>
+                          <span className="bill-tag">{item.billNo || "No Bill"}</span><br/>
+                          <small style={{color: '#666'}}>{item.vehicleNo || "N/A"}</small>
+                        </div>
+                      )}
+                    </td>
+
+                    <td>
+                      {editId === item._id ? (
+                        <>
+                          <input placeholder="Supplier" value={editData.supplierName} onChange={(e) => setEditData({...editData, supplierName: e.target.value})} />
+                          <input placeholder="Product" value={editData.productName} onChange={(e) => setEditData({...editData, productName: e.target.value})} />
+                        </>
+                      ) : (
+                        <div>
+                          <strong>{item.supplierName}</strong><br/>
+                          <small>{item.productName}</small>
+                        </div>
+                      )}
+                    </td>
+
+                    <td>
+                      {editId === item._id ? (
+                        <>
+                          <input type="number" placeholder="Qty" value={editData.quantity} onChange={(e) => setEditData({...editData, quantity: e.target.value})} />
+                          <input type="number" placeholder="Rate" value={editData.rate} onChange={(e) => setEditData({...editData, rate: e.target.value})} />
+                        </>
+                      ) : (
+                        <span>{item.quantity} @ ₹{item.rate}</span>
+                      )}
+                    </td>
+
+                    <td>
+                        {editId === item._id ? 
+                          <input type="number" value={editData.cashDiscount} onChange={(e) => setEditData({...editData, cashDiscount: e.target.value})} /> 
+                          : `${item.cashDiscount || 0}%`}
+                    </td>
+
+                    <td style={{fontWeight: 'bold'}}>₹{editId === item._id ? editData.totalAmount : item.totalAmount}</td>
+
+                    <td>
+                      {editId === item._id ? 
+                        <input type="number" value={editData.paidAmount} onChange={(e) => setEditData({...editData, paidAmount: e.target.value})} /> 
+                        : `₹${item.paidAmount}`
+                      }
+                    </td>
+
+                    <td style={{color: 'red', fontWeight: 'bold'}}>₹{editId === item._id ? editData.balanceAmount : item.balanceAmount}</td>
+
+                    <td>
+                      {editId === item._id ? 
+                        <input value={editData.remarks} onChange={(e) => setEditData({...editData, remarks: e.target.value})} /> 
+                        : <small>{item.remarks}</small>
+                      }
+                    </td>
+
+                    <td>
+                      {editId === item._id ? (
+                        <div className="btn-group-row">
+                          <button className="save-btn-ui" onClick={handleSave}>💾</button> 
+                          <button className="cancel-btn-ui" onClick={() => setEditId(null)}>✖</button>
+                        </div>
+                      ) : (
+                        <div className="btn-group-row">
+                          <button className="row-edit-btn" onClick={() => startEdit(item)} disabled={!isAuthorized}>✏️</button> 
+                          <button className="row-delete-btn" onClick={() => handleDelete(item._id)} disabled={!isAuthorized}>🗑️</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="pagination-container">
+            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="pg-btn">◀ Prev</button>
+            <span className="pg-info">Page {currentPage} of {totalPages || 1}</span>
+            <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="pg-btn">Next ▶</button>
+          </div>
         </div>
       </div>
-    </div>
+
+      <CustomSnackbar 
+        open={snackbar.open} 
+        message={snackbar.message} 
+        severity={snackbar.severity} 
+        onClose={() => setSnackbar({ ...snackbar, open: false })} 
+      />
+    </>
   );
 };
 

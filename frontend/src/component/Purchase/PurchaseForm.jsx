@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import axios from 'axios'; // Firebase ki jagah Axios use karenge
+import React, { useState, useEffect } from "react";
 import './Purchase.css';
+import axios from "axios"; 
 
 // 🏗️ Core Components Import
 import Loader from "../Core_Component/Loader/Loader";
@@ -10,165 +10,167 @@ const PurchaseForm = ({ onCancel, role }) => {
   // 🔐 Permission Check
   const isAuthorized = role === "Admin" || role === "Accountant";
 
-  // Live Backend URL dynamically handle karne ke liye
+  const initialState = {
+    date: new Date().toISOString().split("T")[0],
+    supplierName: "",
+    productName: "",
+    billNo: "",
+    vehicleNo: "",
+    quantity: "",
+    rate: "",
+    cashDiscount: "", // % में CD
+    totalAmount: 0,
+    paidAmount: "",
+    balanceAmount: 0,
+    remarks: "",
+  };
+
+  const [formData, setFormData] = useState(initialState);
+  const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-  const [formData, setFormData] = useState({
-    item: '',
-    quantity: '',
-    unit: 'kg',
-    remarks: ''
-  });
-
-  const [loading, setLoading] = useState(false);
-
-  /* 🔔 Snackbar State */
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success",
-  });
-
-  const triggerSnackbar = (msg, type = "success") => {
+  const showMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
   const productList = ["Corn", "Corn Greet", "Cattlefeed", "Aatarice", "Rice Greet", "Packing Bag"];
 
+  // 2️⃣ Live Calculations (Purchase logic with CD%)
+  useEffect(() => {
+    const qty = Number(formData.quantity) || 0;
+    const rate = Number(formData.rate) || 0;
+    const cdPercent = Number(formData.cashDiscount) || 0;
+
+    const basePrice = qty * rate;
+    const discountAmount = (basePrice * cdPercent) / 100;
+
+    const total = basePrice - discountAmount; 
+    const balance = total - (Number(formData.paidAmount) || 0);
+
+    setFormData((prev) => ({
+      ...prev,
+      totalAmount: total,
+      balanceAmount: balance,
+    }));
+  }, [formData.quantity, formData.rate, formData.cashDiscount, formData.paidAmount]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleReset = () => {
+    setFormData(initialState);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!isAuthorized) {
-      triggerSnackbar("Unauthorized: Aapko data save karne ki permission nahi hai!", "error");
+      showMsg("Unauthorized: Permission Denied!", "error");
       return;
     }
 
     setLoading(true);
-
-    const purchaseEntry = {
-      productName: formData.item, // Backend field name se match karne ke liye
-      quantity: Number(formData.quantity),
-      unit: formData.unit,
-      remarks: formData.remarks,
-      date: new Date().toISOString().split('T')[0]
-    };
-
     try {
-      // 🛠️ Live MongoDB POST Request
-      const res = await axios.post(`${API_URL}/api/purchases`, purchaseEntry);
+      const res = await axios.post(`${API_URL}/api/purchases`, formData);
 
       if (res.data.success) {
-        triggerSnackbar("✅ Purchase Stock Saved Successfully!", "success");
-        setFormData({ item: '', quantity: '', unit: 'kg', remarks: '' });
+        showMsg("✅ Purchase Record Saved Successfully!", "success");
+        handleReset();
+        if (onCancel) onCancel(); // फॉर्म क्लोज करने के लिए
       }
     } catch (error) {
-      console.error("API Error:", error);
-      triggerSnackbar("❌ Data save nahi ho paya. Error: " + (error.response?.data?.message || error.message), "error");
+      showMsg("❌ Data save nahi ho paya. Backend check karein.", "error");
     } finally {
-      setTimeout(() => setLoading(false), 500);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="table-container-wide">
+    <div className="sales-container">
       {loading && <Loader />}
-
-      <div className="table-card-wide no-scroll-card">
-        <div className="form-header-row">
-          <h2 className="table-title">PURCHASE ENTRY FORM (LIVE)</h2>
-          {!isAuthorized && <span className="locked-badge" style={{color: 'red', fontSize: '12px'}}>🔒 Read Only Mode</span>}
+      <div className="sales-card-wide">
+        <div className="form-header-flex" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 className="form-title">Purchase Entry (Live Stock)</h2>
+          {!isAuthorized && <span className="locked-badge" style={{color: 'red', fontSize: '12px'}}>🔒 Read Only</span>}
         </div>
 
-        <form onSubmit={handleSubmit} className="purchase-form-grid">
+        <form onSubmit={handleSubmit} className="sales-form-grid">
           <div className="input-group">
-            <label>Item Name</label>
-            <select 
-              value={formData.item} 
-              onChange={(e) => setFormData({...formData, item: e.target.value})} 
-              required
-              className="styled-select"
-              disabled={loading || !isAuthorized}
-            >
+            <label>Date</label>
+            <input type="date" name="date" value={formData.date} onChange={handleChange} disabled={loading || !isAuthorized} />
+          </div>
+
+          <div className="input-group">
+            <label>Supplier Name</label>
+            <input name="supplierName" value={formData.supplierName} onChange={handleChange} required placeholder="Enter Supplier Name" disabled={loading || !isAuthorized} />
+          </div>
+
+          <div className="input-group">
+            <label>Product Name</label>
+            <select name="productName" value={formData.productName} onChange={handleChange} required disabled={loading || !isAuthorized}>
               <option value="">-- Select Product --</option>
               {productList.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
 
           <div className="input-group">
+            <label>Bill No</label>
+            <input name="billNo" value={formData.billNo} onChange={handleChange} placeholder="Optional" disabled={loading || !isAuthorized} />
+          </div>
+
+          <div className="input-group">
+            <label>Vehicle No</label>
+            <input name="vehicleNo" value={formData.vehicleNo} onChange={handleChange} placeholder="e.g. BR-01-1234" disabled={loading || !isAuthorized} />
+          </div>
+
+          <div className="input-group">
             <label>Quantity</label>
-            <input 
-              type="number" 
-              value={formData.quantity} 
-              onChange={(e) => setFormData({...formData, quantity: e.target.value})} 
-              required 
-              placeholder="0.00" 
-              disabled={loading || !isAuthorized}
-            />
+            <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} required placeholder="0.00" disabled={loading || !isAuthorized} />
           </div>
 
           <div className="input-group">
-            <label>Unit</label>
-            <select 
-              value={formData.unit} 
-              onChange={(e) => setFormData({...formData, unit: e.target.value})}
-              className="styled-select"
-              disabled={loading || !isAuthorized}
-            >
-              <option value="kg">kg</option>
-              <option value="Bags">Bags</option>
-              <option value="Tons">Tons</option>
-              <option value="Pcs">Pcs</option>
-            </select>
+            <label>Rate</label>
+            <input type="number" name="rate" value={formData.rate} onChange={handleChange} required placeholder="0.00" disabled={loading || !isAuthorized} />
           </div>
 
           <div className="input-group">
-            <label>Purchase Date</label>
-            <input 
-              type="text" 
-              value={new Date().toISOString().split('T')[0]} 
-              readOnly 
-              className="readonly-input" 
-              style={{backgroundColor: '#f0f0f0'}}
-            />
+            <label>Cash Discount (CD %)</label>
+            <input type="number" name="cashDiscount" value={formData.cashDiscount} onChange={handleChange} placeholder="0" disabled={loading || !isAuthorized} />
           </div>
 
-          <div className="input-group span-4">
-            <label>Remarks / Notes</label>
-            <input 
-              type="text"
-              name="remarks"
-              placeholder={isAuthorized ? "Enter purchase details..." : "🔒 Access Restricted"} 
-              value={formData.remarks} 
-              onChange={(e) => setFormData({...formData, remarks: e.target.value})} 
-              disabled={loading || !isAuthorized}
-            />
+          <div className="input-group readonly-group">
+            <label>Total Amount (₹) <small>(Qty*Rate - CD%)</small></label>
+            <input value={formData.totalAmount} readOnly style={{backgroundColor: '#f9f9f9'}} />
+          </div>
+
+          <div className="input-group">
+            <label>Paid Amount (₹)</label>
+            <input type="number" name="paidAmount" value={formData.paidAmount} onChange={handleChange} placeholder="0" disabled={loading || !isAuthorized} />
+          </div>
+
+          <div className="input-group readonly-group">
+            <label>Balance Amount (₹)</label>
+            <input value={formData.balanceAmount} readOnly style={{color: 'red', fontWeight: 'bold'}} />
+          </div>
+
+          <div className="input-group span-2">
+            <label>Remarks</label>
+            <input name="remarks" value={formData.remarks} onChange={handleChange} placeholder="Add notes here..." disabled={loading || !isAuthorized} />
           </div>
 
           <div className="button-container-full">
-            <button type="button" className="btn-reset-3d" onClick={onCancel} disabled={loading}>
-              Cancel
-            </button>
-            <button 
-              type="submit" 
-              className="btn-submit-colored" 
-              disabled={loading || !isAuthorized}
-              style={{ 
-                opacity: isAuthorized ? 1 : 0.6, 
-                cursor: isAuthorized ? "pointer" : "not-allowed" 
-              }}
-            >
-              {loading ? "Saving..." : !isAuthorized ? "🔒 Locked" : "✅ Save Purchase Stock"}
+            <button type="button" onClick={onCancel} className="btn-reset-3d" disabled={loading}>Cancel</button>
+            <button type="submit" className="btn-submit-colored" disabled={loading || !isAuthorized}>
+              {loading ? "Saving..." : !isAuthorized ? "🔒 Locked" : "✅ Save Purchase"}
             </button>
           </div>
         </form>
       </div>
 
-      <CustomSnackbar 
-        open={snackbar.open} 
-        message={snackbar.message} 
-        severity={snackbar.severity} 
-        onClose={() => setSnackbar({ ...snackbar, open: false })} 
-      />
+      <CustomSnackbar open={snackbar.open} message={snackbar.message} severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })} />
     </div>
   );
 };
