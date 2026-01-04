@@ -103,7 +103,6 @@ export const deletePurchase = async (req, res) => {
       { $inc: { totalQuantity: -Number(purchase.quantity) } },
       { new: true }
     );
-
     await Purchase.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: "Purchase deleted and Stock adjusted", stock: updatedStock });
   } catch (error) {
