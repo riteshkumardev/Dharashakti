@@ -73,7 +73,7 @@ const DashboardSidebar = ({ closeSidebar }) => {
         {openMenu === "stock" && (
           <ul className="sidebar-list" style={{ paddingLeft: "15px" }}>
             <li onClick={() => handleNavigate("/stock-management")}>➤ Stock View</li>
-            <li onClick={() => handleNavigate("/stock-add")}>➤ Add New Stock</li>
+            {/* <li onClick={() => handleNavigate("/stock-add")}>➤ Add New Stock</li> */}
             <li onClick={() => handleNavigate("/purchase-form")}>➤ Purchase Entry</li>
             <li onClick={() => handleNavigate("/purchase-table")}>➤ Purchase Table</li>
           </ul>
