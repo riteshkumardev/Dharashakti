@@ -1,44 +1,63 @@
 import React from "react";
 
-const TaxSummary = ({ tax = {} }) => {
-  const { taxable = 0, cgst = 0, sgst = 0, igst = 0, total = 0 } = tax;
+const TaxSummary = ({ tax = {}, freight = 0 }) => {
+  // ✅ Sabhi tax fields ko destructure karein
+  const { 
+    taxable = 0, 
+    cgst = 0, 
+    sgst = 0, 
+    igst = 0, 
+    total = 0 
+  } = tax;
 
-  const tableStyle = {
-    width: "100%",
-    borderCollapse: "collapse",
-    marginTop: "10px",
-    border: "1px solid #000"
+  const cellStyle = { 
+    border: "1px solid #000", 
+    padding: "8px", 
+    textAlign: "right",
+    fontSize: "14px"
   };
 
-  const cellStyle = {
-    border: "1px solid #000",
-    padding: "8px",
-    textAlign: "right"
+  const labelStyle = {
+    ...cellStyle,
+    textAlign: "left",
+    fontWeight: "500"
   };
 
   return (
     <div style={{ width: "100%", display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
-      <table style={{ width: "40%", borderCollapse: "collapse" }}>
+      <table style={{ width: "45%", borderCollapse: "collapse", border: "1px solid #000" }}>
         <tbody>
+          {/* Goods ki Basic Taxable Value */}
+        
+
+          {/* Freight / Transport Charges [cite: 7] */}
           <tr>
-            <td style={cellStyle}>Total Taxable</td>
-            <td style={cellStyle}>{taxable.toFixed(2)}</td>
+            <td style={labelStyle}>Freight / Transport Charges</td>
+            <td style={cellStyle}>{Number(freight).toFixed(2)}</td>
           </tr>
+
+          {/* CGST Calculation  */}
           <tr>
-            <td style={cellStyle}>CGST (0%)</td>
+            <td style={labelStyle}>CGST</td>
             <td style={cellStyle}>{cgst.toFixed(2)}</td>
           </tr>
+
+          {/* SGST Calculation  */}
           <tr>
-            <td style={cellStyle}>SGST (0%)</td>
+            <td style={labelStyle}>SGST</td>
             <td style={cellStyle}>{sgst.toFixed(2)}</td>
           </tr>
+
+          {/* IGST Calculation  */}
           <tr>
-            <td style={cellStyle}>IGST</td>
+            <td style={labelStyle}>IGST</td>
             <td style={cellStyle}>{igst.toFixed(2)}</td>
           </tr>
-          <tr style={{ background: "#f2f2f2" }}>
-            <td style={{ ...cellStyle, fontWeight: "bold" }}>Total Amount</td>
-            <td style={{ ...cellStyle, fontWeight: "bold" }}>{total.toFixed(2)}</td>
+
+          {/* Grand Total  */}
+          <tr style={{ background: "#f2f2f2", fontWeight: "bold" }}>
+            <td style={labelStyle}>Total Amount (Grand Total)</td>
+            <td style={cellStyle}>{total.toFixed(2)}</td>
           </tr>
         </tbody>
       </table>

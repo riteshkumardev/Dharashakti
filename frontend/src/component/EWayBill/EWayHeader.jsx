@@ -21,7 +21,7 @@ const EWayHeader = ({ data }) => {
         </div>
         <div style={{ textAlign: "right" }}>
           <strong>Generated Date:</strong> {data.date || "N/A"} <br />
-          <strong>Valid Upto:</strong> {calculateValidUpto(data.date)}
+          {/* <strong>Valid Upto:</strong> {calculateValidUpto(data.date)} */}
         </div>
       </div>
     </div>

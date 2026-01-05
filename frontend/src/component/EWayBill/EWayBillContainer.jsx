@@ -12,9 +12,8 @@ import EWayFooter from "./EWayFooter";
 
 const EWayBillContainer = ({ data }) => {
   if (!data) return null;
-console.log(data,"data");
 
-  // ✅ SAFE DESTRUCTURING (NO RUNTIME ERROR)
+  // ✅ Added freight to destructuring
   const {
     ewayBillNo = "",
     validUpto = "",
@@ -23,10 +22,10 @@ console.log(data,"data");
     goods = [],
     transport = {},
     vehicle = {},
-    taxSummary = { total: 0 }
+    taxSummary = { taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0 },
+    freight = 0 
   } = data;
 
-  // 🔹 SAFE QR DATA
   const qrData = `
 E-Way Bill No: ${ewayBillNo}
 From: ${from?.name || ""}
@@ -39,27 +38,25 @@ Valid Upto: ${validUpto}
   return (
     <div className="eway-wrapper">
       <div className="eway-container">
-
-        {/* ===== TOP BAR ===== */}
         <div className="eway-top">
           <button className="print-btn no-print" onClick={() => window.print()}>
             🖨️ Print E-Way Bill
           </button>
-
           <div className="qr-box">
             <QRCodeCanvas value={qrData} size={90} level="M" />
           </div>
         </div>
 
-        {/* ===== BILL CONTENT ===== */}
         <EWayHeader data={data} />
         <PartyDetails from={from} to={to} />
         <GoodsTable goods={goods} />
-        <TaxSummary tax={taxSummary} />
+        
+        {/* ✅ Pass both taxSummary and freight */}
+        <TaxSummary tax={taxSummary} freight={freight} />
+        
         <TransportDetails transport={transport} />
         <VehicleDetails vehicle={vehicle} />
         <EWayFooter ewayBillNo={ewayBillNo} />
-
       </div>
     </div>
   );
