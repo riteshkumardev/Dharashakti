@@ -1,17 +1,46 @@
 import Sale from "../models/Sale.js";
-import Stock from "../models/Stock.js"; // 🆕 Stock मॉडल इम्पोर्ट करना न भूलें
+import Stock from "../models/Stock.js";
 
-// ➕ Add new sale (एंड स्टॉक घटाना)
+// ✅ 1. Latest Bill Number nikalne ka naya function (Auto-Increment logic)
+export const getLatestBillNo = async (req, res) => {
+  try {
+    // Database se sabse bada ewayBillNo find karein (Numerical order mein)
+    const lastSale = await Sale.findOne().sort({ ewayBillNo: -1 });
+    
+    // Agar image ke mutabiq 168 last hai, toh next 169 hoga
+    const nextBillNo = lastSale && !isNaN(lastSale.ewayBillNo) 
+      ? Number(lastSale.ewayBillNo) + 1 
+      : 169; 
+
+    res.json({ success: true, nextBillNo });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ➕ Add new sale (Bill No aur Stock update ke saath)
 export const addSale = async (req, res) => {
   try {
+    // 1. Sale record create karein
     const sale = await Sale.create(req.body);
 
-    // 🔄 स्टॉक ऑटो-अपडेट: सेल होने पर स्टॉक कम करें (-)
-    await Stock.findOneAndUpdate(
-      { productName: req.body.productName },
-      { $inc: { totalQuantity: -Number(req.body.quantity) } }, // Quantity को घटाएं
-      { upsert: true, new: true } // अगर प्रोडक्ट नहीं है तो नया बना देगा
-    );
+    // 2. 🔄 स्टॉक ऑटो-अपडेट: Multiple items hone par loop chalayein ya single item handle karein
+    // Agar body mein products array hai toh loop chalega, warna single productName
+    if (req.body.goods && Array.isArray(req.body.goods)) {
+      for (const item of req.body.goods) {
+        await Stock.findOneAndUpdate(
+          { productName: item.product },
+          { $inc: { totalQuantity: -Number(item.quantity) } },
+          { upsert: true }
+        );
+      }
+    } else {
+      await Stock.findOneAndUpdate(
+        { productName: req.body.productName },
+        { $inc: { totalQuantity: -Number(req.body.quantity) } },
+        { upsert: true }
+      );
+    }
 
     res.status(201).json({ success: true, data: sale });
   } catch (error) {
@@ -19,26 +48,26 @@ export const addSale = async (req, res) => {
   }
 };
 
-// 📄 Get all sales
+// 📄 Get all sales (Image_ab30e5 ke table ke liye)
 export const getSales = async (req, res) => {
   try {
-    const sales = await Sale.find().sort({ createdAt: -1 });
+    // Latest bills ko sabse upar dikhane ke liye sort karein
+    const sales = await Sale.find().sort({ ewayBillNo: -1 });
     res.json({ success: true, count: sales.length, data: sales });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// 🛠️ Update sale (पुराने और नए स्टॉक को बैलेंस करना)
+// 🛠️ Update sale (Stock Balance Fix)
 export const updateSale = async (req, res) => {
   try {
-    // 1. पुरानी सेल का डेटा निकालें ताकि स्टॉक बैलेंस किया जा सके
     const oldSale = await Sale.findById(req.params.id);
     if (!oldSale) return res.status(404).json({ success: false, message: "Sale not found" });
 
     const updatedSale = await Sale.findByIdAndUpdate(req.params.id, req.body, { new: true });
 
-    // 2. स्टॉक एडजस्टमेंट: पुराने वजन को वापस जोड़ें और नए को घटाएं
+    // स्टॉक एडजस्टमेंट logic
     const qtyDiff = Number(oldSale.quantity) - Number(req.body.quantity);
     
     await Stock.findOneAndUpdate(
@@ -53,16 +82,15 @@ export const updateSale = async (req, res) => {
   }
 };
 
-// ❌ Delete sale (स्टॉक वापस बढ़ाना)
+// ❌ Delete sale (Stock wapas badhana)
 export const deleteSale = async (req, res) => {
   try {
     const sale = await Sale.findById(req.params.id);
     if (!sale) return res.status(404).json({ success: false, message: "Sale not found" });
 
-    // 🔄 स्टॉक वापस बढ़ाएं (+): क्योंकि बिक्री कैंसिल हो गई है
     await Stock.findOneAndUpdate(
-      { productName: sale.productName },
-      { $inc: { totalQuantity: Number(sale.quantity) } }
+      { productName: sale.productName || sale.goods[0]?.product },
+      { $inc: { totalQuantity: Number(sale.quantity || sale.goods[0]?.quantity) } }
     );
 
     await Sale.findByIdAndDelete(req.params.id);
