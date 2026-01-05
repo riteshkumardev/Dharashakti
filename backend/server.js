@@ -16,6 +16,7 @@ import attendanceRoutes from "./routes/attendance.routes.js";
 import expenseRoutes from "./routes/expense.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
 import purchaseRoutes from "./routes/purchase.routes.js";
+import supplierRoutes from "./routes/supplier.routes.js";
 
 
 
@@ -47,7 +48,7 @@ app.use("/api/attendance", attendanceRoutes);
 
 app.use("/api/purchases", purchaseRoutes); // ✅ ONLY PURCHASE DATA
 app.use("/api/stocks", stockRoutes);       // ✅ ONLY STOCK DATA
-
+app.use("/api/suppliers", supplierRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/salary-payments", salaryRoutes);
 
