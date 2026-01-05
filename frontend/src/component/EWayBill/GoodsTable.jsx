@@ -9,7 +9,7 @@ const GoodsTable = ({ goods = [] }) => (
         <th style={{ border: "1px solid #000", padding: "8px", textAlign: "center" }}>Quantity</th>
         <th style={{ border: "1px solid #000", padding: "8px", textAlign: "center" }}>Rate</th>
         <th style={{ border: "1px solid #000", padding: "8px", textAlign: "center" }}>Total Amt</th>
-        <th style={{ border: "1px solid #000", padding: "8px", textAlign: "center" }}>Tax Rate</th>
+     
       </tr>
     </thead>
     <tbody>
@@ -21,7 +21,7 @@ const GoodsTable = ({ goods = [] }) => (
             <td style={{ border: "1px solid #000", padding: "8px", textAlign: "center" }}>{g.quantity}</td>
             <td style={{ border: "1px solid #000", padding: "8px", textAlign: "center" }}>{g.rate}</td>
             <td style={{ border: "1px solid #000", padding: "8px", textAlign: "center" }}>{Number(g.taxableAmount).toFixed(2)}</td>
-            <td style={{ border: "1px solid #000", padding: "8px", textAlign: "center" }}>{g.taxRate}%</td>
+        
           </tr>
         ))
       ) : (

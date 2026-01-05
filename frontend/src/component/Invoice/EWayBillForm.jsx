@@ -7,6 +7,7 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
   const [drivers, setDrivers] = useState([]);
   const [showSupplierList, setShowSupplierList] = useState(false);
   const [showDriverList, setShowDriverList] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const HSN_MASTER = {
     "Corn Grit": "11031300",
@@ -14,6 +15,25 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     "Cattle Feed": "23099010",
     "Corn Flour": "11022000"
   };
+
+  useEffect(() => {
+    const fetchLatestBill = async () => {
+      try {
+        const res = await axios.get("http://localhost:5000/api/sales/latest-bill-no");
+        const nextBillNo = res.data.success ? Number(res.data.nextBillNo) : 169;
+        
+        setData(prev => ({ 
+          ...prev, 
+          ewayBillNo: nextBillNo,
+          date: new Date().toISOString().split('T')[0] 
+        }));
+      } catch (error) {
+        console.error("Error fetching bill no:", error);
+        setData(prev => ({ ...prev, ewayBillNo: 169 })); 
+      }
+    };
+    fetchLatestBill();
+  }, [setData]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -32,23 +52,40 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     fetchData();
   }, []);
 
-  // ✅ Auto-set Date to Today if empty
-  useEffect(() => {
-    if (!data.date) {
-      const today = new Date().toISOString().split('T')[0];
-      setData(prev => ({ ...prev, date: today }));
+  const handleFinalSubmit = async () => {
+    if (!data.to.name || data.goods[0].quantity <= 0) {
+      alert("Please fill Customer and Goods details!");
+      return;
     }
-  }, []);
+
+    setLoading(true);
+    try {
+      const res = await axios.post("http://localhost:5000/api/sales", {
+        ...data,
+        customerName: data.to.name,
+        vehicleNo: data.vehicle.vehicleNo,
+        totalAmount: data.taxSummary.total
+      });
+
+      if (res.data.success) {
+        onPreview(); 
+      }
+    } catch (error) {
+      console.error("Submit failed:", error);
+      alert("Error saving bill: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddItem = () => {
     const newItem = { hsn: "", product: "", quantity: 0, rate: 0, taxRate: 5, taxableAmount: 0 };
-    const updatedGoods = [...data.goods, newItem];
-    calculateTotal(updatedGoods, null);
+    setData({ ...data, goods: [...data.goods, newItem] });
   };
 
   const handleRemoveItem = (index) => {
     const updatedGoods = data.goods.filter((_, i) => i !== index);
-    calculateTotal(updatedGoods, null);
+    calculateTotal(updatedGoods, data.freight);
   };
 
   const handleSelectSupplier = (s) => {
@@ -69,28 +106,31 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     } else {
       updatedGoods[index][field] = value;
     }
-
     const qty = Number(updatedGoods[index].quantity) || 0;
     const rate = Number(updatedGoods[index].rate) || 0;
     updatedGoods[index].taxableAmount = qty * rate;
     
-    // Auto-calculate freight based on NEW total quantity
     const totalQty = updatedGoods.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
     calculateTotal(updatedGoods, totalQty * 0.80);
   };
 
+// ... (baaki ka poora code same rahega)
+
   const calculateTotal = (updatedGoods, freightVal) => {
     let totalTaxable = 0;
     let totalIgst = 0;
-    
+    let totalQty = 0; // Total quantity track karne ke liye
+
     updatedGoods.forEach(item => {
       const taxable = Number(item.taxableAmount) || 0;
       totalTaxable += taxable;
       totalIgst += (taxable * (Number(item.taxRate) || 0)) / 100;
+      totalQty += Number(item.quantity) || 0; // Saare products ki Qty ko jodein
     });
 
-    // Agar freightVal pass nahi kiya (null hai), toh purana freight hi use karein
-    const fAmount = freightVal !== null ? Number(freightVal) : Number(data.freight) || 0;
+    // ✨ Logic: Total Qty * 0.80
+    // Agar manually input nahi kiya hai, toh auto calculate karein
+    const fAmount = freightVal !== null ? Number(freightVal) : totalQty * 0.80;
 
     setData({
       ...data,
@@ -101,106 +141,109 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
         cgst: totalIgst / 2,
         sgst: totalIgst / 2,
         igst: totalIgst,
-        total: totalTaxable + totalIgst + fAmount 
+        // ✅ Fixed Logic: Total Amount mein se Freight ko Minus (-) karein
+        total: (totalTaxable + totalIgst) - fAmount 
       }
     });
   };
 
+// ... (baaki ka return logic same rahega)
   return (
     <div className="eway-form-page no-print">
       <div className="eway-form-card">
         <h2>📄 E-Way Bill Form</h2>
 
-        {/* --- Transport & Driver --- */}
-        <h3>Transport & Driver Details</h3>
-        <div className="eway-form-grid" style={{ position: 'relative' }}>
+        {/* --- Header: Bill No & Date --- */}
+        <div className="eway-form-grid" style={{ background: '#eef2f7', padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
           <div className="form-group">
-            <label>Bill Date</label>
-            <input 
-              type="date" 
-              // ✅ Date shifted to main data.date for better printing
-              value={data.date || ""} 
-              onChange={(e) => setData({ ...data, date: e.target.value })} 
-            />
+            <label>Bill Number (Auto)</label>
+            <input readOnly style={{ fontWeight: 'bold', background: '#ddd' }} value={data.ewayBillNo || ""} />
+          </div>
+          <div className="form-group">
+            <label>Date</label>
+            <input type="date" value={data.date || ""} onChange={(e) => setData({ ...data, date: e.target.value })} />
           </div>
           <div className="form-group">
             <label>Vehicle No</label>
-            <input placeholder="Vehicle No" value={data.vehicle.vehicleNo} onChange={e => setData({ ...data, vehicle: { ...data.vehicle, vehicleNo: e.target.value } })} />
+            <input placeholder="BR11..." value={data.vehicle.vehicleNo} onChange={e => setData({ ...data, vehicle: { ...data.vehicle, vehicleNo: e.target.value } })} />
           </div>
-          <div className="form-group">
+        </div>
+
+        {/* --- Customer & Driver --- */}
+        <div className="eway-form-grid">
+          <div style={{ position: 'relative' }}>
+            <label>Customer Search</label>
+            <input 
+              placeholder="Search Buyer..." 
+              value={data.to.name} 
+              onFocus={() => setShowSupplierList(true)} 
+              onChange={e => setData({ ...data, to: { ...data.to, name: e.target.value } })} 
+            />
+            {showSupplierList && (
+              <div className="search-dropdown">
+                {suppliers.filter(s => s.name.toLowerCase().includes(data.to.name.toLowerCase())).map(s => (
+                  <div key={s._id} className="dropdown-item" onClick={() => handleSelectSupplier(s)}>{s.name}</div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={{ position: 'relative' }}>
             <label>Driver Search</label>
             <input placeholder="Search Driver..." value={data.vehicle.driverName || ""} onFocus={() => setShowDriverList(true)} onChange={e => setData({...data, vehicle: {...data.vehicle, driverName: e.target.value}})} />
             {showDriverList && (
               <div className="search-dropdown">
                 {drivers.filter(d => d.name.toLowerCase().includes((data.vehicle.driverName || "").toLowerCase())).map(d => (
-                  <div key={d._id} className="dropdown-item" onClick={() => handleSelectDriver(d)}>{d.name} <small>({d.phone})</small></div>
+                  <div key={d._id} className="dropdown-item" onClick={() => handleSelectDriver(d)}>{d.name}</div>
                 ))}
               </div>
             )}
           </div>
+          {/* ✅ Naya Field: Driver Mobile Number */}
           <div className="form-group">
             <label>Driver Mobile</label>
-            <input placeholder="Driver Phone" value={data.vehicle.driverPhone || ""} onChange={e => setData({...data, vehicle: {...data.vehicle, driverPhone: e.target.value}})} />
+            <input 
+              placeholder="Driver Phone" 
+              value={data.vehicle.driverPhone || ""} 
+              onChange={e => setData({ ...data, vehicle: { ...data.vehicle, driverPhone: e.target.value } })} 
+            />
           </div>
         </div>
 
-        {/* --- Supplier Section --- */}
-        <h3>To Party (Supplier)</h3>
-        <div className="eway-form-grid" style={{ position: 'relative' }}>
-          <input placeholder="Search Buyer..." value={data.to.name} onFocus={() => setShowSupplierList(true)} onChange={e => setData({ ...data, to: { ...data.to, name: e.target.value } })} />
-          {showSupplierList && (
-            <div className="search-dropdown">
-              {suppliers.filter(s => s.name.toLowerCase().includes(data.to.name.toLowerCase())).map(s => (
-                <div key={s._id} className="dropdown-item" onClick={() => handleSelectSupplier(s)}>{s.name}</div>
-              ))}
-            </div>
-          )}
-          <input placeholder="Buyer GSTIN" value={data.to.gst} readOnly />
-          <input placeholder="Buyer Address" value={data.to.address} readOnly />
-        </div>
-
-        {/* --- Goods Section --- */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
-          <h3>Goods Details</h3>
-          <button onClick={handleAddItem} className="add-item-btn">+ Add Item</button>
-        </div>
+        <button onClick={handleAddItem} className="add-item-btn" style={{ margin: '15px 0' }}>+ Add Item</button>
 
         {data.goods.map((item, index) => (
-          <div className="eway-form-grid" key={index} style={{ marginBottom: '10px', borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>
+          <div className="eway-form-grid" key={index} style={{ borderBottom: '1px solid #ccc', paddingBottom: '10px' }}>
             <select value={item.product} onChange={e => updateGoods(index, "product", e.target.value)}>
-              <option value="">Select Product</option>
+              <option value="">Product</option>
               <option value="Corn Grit">Corn Grit</option>
               <option value="Rice Grit">Rice Grit</option>
               <option value="Cattle Feed">Cattle Feed</option>
             </select>
-            <input placeholder="HSN" value={item.hsn} readOnly />
             <input placeholder="Qty" type="number" value={item.quantity} onChange={e => updateGoods(index, "quantity", e.target.value)} />
             <input placeholder="Rate" type="number" value={item.rate} onChange={e => updateGoods(index, "rate", e.target.value)} />
             <input placeholder="Tax %" type="number" value={item.taxRate} onChange={e => updateGoods(index, "taxRate", e.target.value)} />
-            {data.goods.length > 1 && (
-              <button onClick={() => handleRemoveItem(index)} className="del-btn">Delete</button>
-            )}
+            <button onClick={() => handleRemoveItem(index)} className="del-btn">✖</button>
           </div>
         ))}
 
-        {/* --- Totals --- */}
-        <div className="eway-form-grid" style={{marginTop: '20px', background: '#f9f9f9', padding: '15px', borderRadius: '8px'}}>
+        <div className="eway-form-grid" style={{ marginTop: '20px' }}>
           <div>
-            <label>Freight Charges (Auto: Qty * 0.80)</label>
-            <input 
-              type="number" 
-              value={data.freight || ""} 
-              onChange={(e) => calculateTotal(data.goods, e.target.value)} 
-            />
+            <label>Freight (Auto: 0.80/kg)</label>
+            <input type="number" value={data.freight || ""} onChange={(e) => calculateTotal(data.goods, e.target.value)} />
           </div>
           <div className="read-only-box">
-             <strong>Grand Total: ₹{data.taxSummary.total.toLocaleString()}</strong>
+             <strong>Grand Total: ₹{Number(data.taxSummary.total).toLocaleString()}</strong>
           </div>
         </div>
 
-        <div style={{textAlign: 'center', marginTop: '20px'}}>
-          <button onClick={onPreview} className="preview-btn">👁️ Preview & Print Bill</button>
-        </div>
+        <button 
+          onClick={handleFinalSubmit} 
+          disabled={loading}
+          className="preview-btn" 
+          style={{ width: '100%', marginTop: '20px', background: loading ? '#ccc' : '#007bff' }}
+        >
+          {loading ? "Saving..." : "👁️ Save & Preview Bill"}
+        </button>
       </div>
     </div>
   );

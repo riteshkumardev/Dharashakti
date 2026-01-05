@@ -9,7 +9,7 @@ const EWayFooter = ({ ewayBillNo }) => (
     fontSize: "14px"
   }}>
     <p style={{ margin: 0, color: "#555" }}>This is a computer generated E-Way Bill</p>
-    <b style={{ fontSize: "16px", letterSpacing: "1px" }}>{ewayBillNo}</b>
+    
   </div>
 );
 

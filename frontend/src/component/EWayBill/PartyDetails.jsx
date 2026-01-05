@@ -15,7 +15,7 @@ const PartyDetails = ({ from, to }) => (
         </td>
         <td style={{ border: "1px solid #000", padding: "10px", verticalAlign: "top" }}>
           <b>{to.name}</b><br />
-          GSTIN: {to.gst}<br />
+          GSTIN: {to.gst}<br />,{to.phone}
           {to.address}
         </td>
       </tr>
