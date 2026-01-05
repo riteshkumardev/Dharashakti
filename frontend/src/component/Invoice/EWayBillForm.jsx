@@ -2,29 +2,60 @@ import React from "react";
 import "./ewayForm.css";
 
 const EWayBillForm = ({ data, setData, onPreview }) => {
-  const updateGoods = (field, value) => {
+  
+  // Naya item add karne ka function
+  const addNewItem = () => {
+    const newItem = {
+      hsn: "",
+      product: "",
+      quantity: 0,
+      rate: 0,
+      taxRate: 5, // default tax
+      taxableAmount: 0
+    };
+    setData({ ...data, goods: [...data.goods, newItem] });
+  };
+
+  // Item delete karne ka function
+  const removeItem = (index) => {
+    const updatedGoods = data.goods.filter((_, i) => i !== index);
+    calculateTotal(updatedGoods);
+  };
+
+  // Kisi specific item ko update karne ka function
+  const updateGoods = (index, field, value) => {
     const updatedGoods = [...data.goods];
-    updatedGoods[0] = { ...updatedGoods[0], [field]: value };
+    updatedGoods[index] = { ...updatedGoods[index], [field]: value };
 
-    // Auto Calculation
-    const qty = Number(updatedGoods[0].quantity) || 0;
-    const rate = Number(updatedGoods[0].rate) || 0;
-    const taxRate = Number(updatedGoods[0].taxRate) || 0;
+    // Individual item ki taxable calculation
+    const qty = Number(updatedGoods[index].quantity) || 0;
+    const rate = Number(updatedGoods[index].rate) || 0;
+    updatedGoods[index].taxableAmount = qty * rate;
 
-    const taxable = qty * rate;
-    const igst = (taxable * taxRate) / 100;
-    
-    updatedGoods[0].taxableAmount = taxable;
+    calculateTotal(updatedGoods);
+  };
+
+  // Poore form ka total calculation
+  const calculateTotal = (updatedGoods) => {
+    let totalTaxable = 0;
+    let totalIgst = 0;
+
+    updatedGoods.forEach(item => {
+      const taxable = Number(item.taxableAmount) || 0;
+      const taxRate = Number(item.taxRate) || 0;
+      totalTaxable += taxable;
+      totalIgst += (taxable * taxRate) / 100;
+    });
 
     setData({
       ...data,
       goods: updatedGoods,
       taxSummary: {
-        taxable: taxable,
+        taxable: totalTaxable,
         cgst: 0,
         sgst: 0,
-        igst: igst,
-        total: taxable + igst
+        igst: totalIgst,
+        total: totalTaxable + totalIgst
       }
     });
   };
@@ -47,26 +78,41 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
           <input placeholder="Buyer Address" value={data.to.address} onChange={e => setData({ ...data, to: { ...data.to, address: e.target.value } })} />
         </div>
 
-        <h3>Goods Details</h3>
-        <div className="eway-form-grid">
-          <input placeholder="HSN Code" value={data.goods[0].hsn} onChange={e => updateGoods("hsn", e.target.value)} />
-          <select value={data.goods[0].product} onChange={e => updateGoods("product", e.target.value)}>
-            <option value="">Select Product</option>
-            <option value="Corn Grit">Corn Grit</option>
-            <option value="Rice Grit">Rice Grit</option>
-            <option value="Cattle Feed">Cattle Feed</option>
-            <option value="Corn Flour">Corn Flour</option>
-          </select>
-          <input placeholder="Quantity (KG)" type="number" value={data.goods[0].quantity} onChange={e => updateGoods("quantity", e.target.value)} />
-          <input placeholder="Rate (per KG)" type="number" value={data.goods[0].rate} onChange={e => updateGoods("rate", e.target.value)} />
-          <input placeholder="Tax Rate (%)" type="number" value={data.goods[0].taxRate} onChange={e => updateGoods("taxRate", e.target.value)} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>Goods Details</h3>
+          <button onClick={addNewItem} style={{ background: '#28a745', color: 'white', border: 'none', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer' }}>
+            + Add Item
+          </button>
         </div>
+
+        {/* Dynamic Items Mapping */}
+        {data.goods.map((item, index) => (
+          <div className="eway-form-grid" key={index} style={{ marginBottom: '10px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+            <input placeholder="HSN" value={item.hsn} onChange={e => updateGoods(index, "hsn", e.target.value)} />
+            <select value={item.product} onChange={e => updateGoods(index, "product", e.target.value)}>
+              <option value="">Select Product</option>
+              <option value="Corn Grit">Corn Grit</option>
+              <option value="Rice Grit">Rice Grit</option>
+              <option value="Cattle Feed">Cattle Feed</option>
+              <option value="Corn Flour">Corn Flour</option>
+            </select>
+            <input placeholder="Qty (KG)" type="number" value={item.quantity} onChange={e => updateGoods(index, "quantity", e.target.value)} />
+            <input placeholder="Rate" type="number" value={item.rate} onChange={e => updateGoods(index, "rate", e.target.value)} />
+            <input placeholder="Tax %" type="number" value={item.taxRate} onChange={e => updateGoods(index, "taxRate", e.target.value)} />
+            
+            {data.goods.length > 1 && (
+              <button onClick={() => removeItem(index)} style={{ background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                Delete
+              </button>
+            )}
+          </div>
+        ))}
 
         <h3>Tax Summary (Auto)</h3>
         <div className="eway-form-grid">
-          <div className="read-only-box">Taxable: {data.taxSummary.taxable}</div>
-          <div className="read-only-box">IGST: {data.taxSummary.igst}</div>
-          <div className="read-only-box">Total: {data.taxSummary.total}</div>
+          <div className="read-only-box">Taxable: ₹{data.taxSummary.taxable.toFixed(2)}</div>
+          <div className="read-only-box">IGST: ₹{data.taxSummary.igst.toFixed(2)}</div>
+          <div className="read-only-box">Total: ₹{data.taxSummary.total.toFixed(2)}</div>
         </div>
 
         <div className="eway-action-bar" style={{textAlign: 'center', marginTop: '20px'}}>

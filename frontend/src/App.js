@@ -24,6 +24,7 @@ import ScreenLock from "./component/Core_Component/ScreenLock/ScreenLocl";
 import Reports_Printing from "./component/Reports_Printing/Reports_Printing";
 
 import InvoicePage from "./component/Invoice/InvoicePage";
+import SupplierManager from "./component/Supplier/SupplierManager";
 
 
 function App() {
@@ -174,6 +175,7 @@ const sampleEwayData = {
             <Route path="/stock-add" element={<ProtectedRoute managerAllowed><StockAddForm role={user?.role} /></ProtectedRoute>} />
             <Route path="/employee-table" element={<ProtectedRoute managerAllowed><EmployeeTable role={user?.role} /></ProtectedRoute>} />
             <Route path="/Reports_Printing" element={<ProtectedRoute managerAllowed><Reports_Printing role={user?.role} /></ProtectedRoute>} />
+            <Route path="/suppliers" element={<ProtectedRoute managerAllowed><SupplierManager role={user?.role} /></ProtectedRoute>} />
 
             {/* ADMIN ONLY */}
             <Route path="/master-panel" element={<ProtectedRoute adminOnly><MasterPanel user={user} /></ProtectedRoute>} />
