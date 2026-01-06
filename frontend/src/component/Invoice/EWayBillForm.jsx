@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "./ewayForm.css";
 
+// ✅ Dynamic API Base URL Setup
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 const EWayBillForm = ({ data, setData, onPreview }) => {
   const [suppliers, setSuppliers] = useState([]);
   const [drivers, setDrivers] = useState([]);
@@ -15,10 +18,11 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     "Corn Flour": "11022000"
   };
 
+  // ✅ Latest Bill Fetch (Dynamic URL)
   useEffect(() => {
     const fetchLatestBill = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/sales/latest-bill-no");
+        const res = await axios.get(`${API_BASE_URL}/api/sales/latest-bill-no`);
         const nextBillNo = res.data.success ? Number(res.data.nextBillNo) : 169;
         
         setData(prev => ({ 
@@ -34,11 +38,12 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     fetchLatestBill();
   }, [setData]);
 
+  // ✅ Customer & Driver Data Fetch (Dynamic URL)
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const supRes = await axios.get("http://localhost:5000/api/suppliers/list");
-        const empRes = await axios.get("http://localhost:5000/api/employees"); 
+        const supRes = await axios.get(`${API_BASE_URL}/api/suppliers/list`);
+        const empRes = await axios.get(`${API_BASE_URL}/api/employees`); 
         if (supRes.data.success) setSuppliers(supRes.data.data);
         if (empRes.data.success) {
           const onlyDrivers = empRes.data.data.filter(emp => 
@@ -78,7 +83,8 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
         remarks: data.remarks || ""
       };
 
-      const res = await axios.post("http://localhost:5000/api/sales", payload);
+      // ✅ Dynamic Submit URL
+      const res = await axios.post(`${API_BASE_URL}/api/sales`, payload);
 
       if (res.data.success) {
         alert("Bill Saved Successfully!");
@@ -190,7 +196,6 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
         <div className="eway-form-grid">
           <div className="form-group">
             <label>Select Customer</label>
-            {/* ✅ Customer Input ko Select Box mein badal diya */}
             <select 
               value={data.to.name} 
               onChange={handleSelectSupplier}
