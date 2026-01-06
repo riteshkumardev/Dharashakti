@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const saleSchema = new mongoose.Schema(
   {
     // Bill details
-    ewayBillNo: { type: Number, required: true, unique: true }, // Image ke mutabiq 168, 169...
+    billNo: { type: Number, required: true, unique: true }, // Image ke mutabiq 168, 169...
     date: { type: String, required: true },
     
     // Customer/Supplier details

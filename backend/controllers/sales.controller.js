@@ -4,12 +4,12 @@ import Stock from "../models/Stock.js";
 // ✅ 1. Latest Bill Number nikalne ka naya function (Auto-Increment logic)
 export const getLatestBillNo = async (req, res) => {
   try {
-    // Database se sabse bada ewayBillNo find karein (Numerical order mein)
-    const lastSale = await Sale.findOne().sort({ ewayBillNo: -1 });
+    // Database se sabse bada billNo find karein (Numerical order mein)
+    const lastSale = await Sale.findOne().sort({ billNo: -1 });
     
     // Agar image ke mutabiq 168 last hai, toh next 169 hoga
-    const nextBillNo = lastSale && !isNaN(lastSale.ewayBillNo) 
-      ? Number(lastSale.ewayBillNo) + 1 
+    const nextBillNo = lastSale && !isNaN(lastSale.billNo) 
+      ? Number(lastSale.billNo) + 1 
       : 169; 
 
     res.json({ success: true, nextBillNo });
@@ -52,7 +52,7 @@ export const addSale = async (req, res) => {
 export const getSales = async (req, res) => {
   try {
     // Latest bills ko sabse upar dikhane ke liye sort karein
-    const sales = await Sale.find().sort({ ewayBillNo: -1 });
+    const sales = await Sale.find().sort({ billNo: -1 });
     res.json({ success: true, count: sales.length, data: sales });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -82,20 +82,26 @@ export const updateSale = async (req, res) => {
   }
 };
 
-// ❌ Delete sale (Stock wapas badhana)
+// ✅ Delete Sale (Stock adjustment for multiple items)
 export const deleteSale = async (req, res) => {
   try {
     const sale = await Sale.findById(req.params.id);
     if (!sale) return res.status(404).json({ success: false, message: "Sale not found" });
 
-    await Stock.findOneAndUpdate(
-      { productName: sale.productName || sale.goods[0]?.product },
-      { $inc: { totalQuantity: Number(sale.quantity || sale.goods[0]?.quantity) } }
-    );
+    // 🔄 Loop chalakar har product ka stock wapas badhayein
+    if (sale.goods && sale.goods.length > 0) {
+      for (const item of sale.goods) {
+        await Stock.findOneAndUpdate(
+          { productName: item.product },
+          { $inc: { totalQuantity: Number(item.quantity) } }
+        );
+      }
+    }
 
     await Sale.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: "Sale deleted and Stock adjusted" });
   } catch (error) {
+    // ⚠️ Agar yahan error 500 aa raha hai, toh check karein ki req.params.id sahi bhej raha hai frontend
     res.status(500).json({ success: false, message: error.message });
   }
 };
