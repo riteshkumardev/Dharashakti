@@ -5,7 +5,6 @@ import "./ewayForm.css";
 const EWayBillForm = ({ data, setData, onPreview }) => {
   const [suppliers, setSuppliers] = useState([]);
   const [drivers, setDrivers] = useState([]);
-  const [showSupplierList, setShowSupplierList] = useState(false);
   const [showDriverList, setShowDriverList] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -16,7 +15,6 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     "Corn Flour": "11022000"
   };
 
-  // ✅ Manual bill number ke liye initial fetch (sirf suggestion ke liye)
   useEffect(() => {
     const fetchLatestBill = async () => {
       try {
@@ -25,12 +23,12 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
         
         setData(prev => ({ 
           ...prev, 
-          billNo: nextBillNo, // Default value fir bhi suggest karega
+          billNo: nextBillNo,
           date: new Date().toISOString().split('T')[0] 
         }));
       } catch (error) {
         console.error("Error fetching bill no:", error);
-        setData(prev => ({ ...prev, billNo: "" })); // Error par khali rakhega
+        setData(prev => ({ ...prev, billNo: "" }));
       }
     };
     fetchLatestBill();
@@ -62,7 +60,7 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     setLoading(true);
     try {
       const payload = {
-        billNo: Number(data.billNo), // Manual bhara hua number yahan se jayega
+        billNo: Number(data.billNo),
         date: data.date,
         customerName: data.to.name,
         customerGSTIN: data.to.gst,
@@ -95,7 +93,7 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
   };
 
   const handleAddItem = () => {
-    const newItem = { hsn: "", product: "", quantity: 0, rate: 0, taxRate: 5, taxableAmount: 0 };
+    const newItem = { hsn: "", product: "", quantity: 0, rate: 0, taxRate: 0, taxableAmount: 0 };
     setData({ ...data, goods: [...data.goods, newItem] });
   };
 
@@ -104,9 +102,14 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     calculateTotal(updatedGoods, data.freight);
   };
 
-  const handleSelectSupplier = (s) => {
-    setData({ ...data, to: { name: s.name, gst: s.gstin, address: s.address, phone: s.phone } });
-    setShowSupplierList(false);
+  const handleSelectSupplier = (e) => {
+    const selectedName = e.target.value;
+    const s = suppliers.find(item => item.name === selectedName);
+    if (s) {
+      setData({ ...data, to: { name: s.name, gst: s.gstin, address: s.address, phone: s.phone } });
+    } else {
+      setData({ ...data, to: { name: "", gst: "", address: "", phone: "" } });
+    }
   };
 
   const handleSelectDriver = (d) => {
@@ -166,7 +169,6 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
         <div className="eway-form-grid" style={{ background: '#eef2f7', padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
           <div className="form-group">
             <label>Bill Number (Manual Edit)</label>
-            {/* ✅ readOnly hata diya hai taaki aap likh sakein */}
             <input 
               type="number"
               style={{ fontWeight: 'bold' }} 
@@ -186,17 +188,21 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
         </div>
 
         <div className="eway-form-grid">
-          <div style={{ position: 'relative' }}>
-            <label>Customer Search</label>
-            <input placeholder="Search Buyer..." value={data.to.name} onFocus={() => setShowSupplierList(true)} onChange={e => setData({ ...data, to: { ...data.to, name: e.target.value } })} />
-            {showSupplierList && (
-              <div className="search-dropdown">
-                {suppliers.filter(s => s.name.toLowerCase().includes(data.to.name.toLowerCase())).map(s => (
-                  <div key={s._id} className="dropdown-item" onClick={() => handleSelectSupplier(s)}>{s.name}</div>
-                ))}
-              </div>
-            )}
+          <div className="form-group">
+            <label>Select Customer</label>
+            {/* ✅ Customer Input ko Select Box mein badal diya */}
+            <select 
+              value={data.to.name} 
+              onChange={handleSelectSupplier}
+              className="customer-select"
+            >
+              <option value="">-- Choose Customer --</option>
+              {suppliers.map(s => (
+                <option key={s._id} value={s.name}>{s.name}</option>
+              ))}
+            </select>
           </div>
+          
           <div style={{ position: 'relative' }}>
             <label>Driver Search</label>
             <input placeholder="Search Driver..." value={data.vehicle.driverName || ""} onFocus={() => setShowDriverList(true)} onChange={e => setData({...data, vehicle: {...data.vehicle, driverName: e.target.value}})} />
