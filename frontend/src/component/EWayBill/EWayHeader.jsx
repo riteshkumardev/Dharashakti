@@ -14,9 +14,12 @@ const EWayHeader = ({ data }) => {
       <h2 style={{ textAlign: "center", margin: "5px 0", color: "#2c3e50" }}>
         DHARA SHAKTI AGRO PRODUCTS
       </h2>
+      <p style={{ textAlign: "center", margin: "5px 0", color: "#2c3e50" }}>
+        MANUFACTURER OF CORN GRITS & FLOUR, RICE GRITS & FLOUR, ANIMAL FEED</p>
+         
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
         <div>
-          <strong>Bill No:</strong> {data.ewayBillNo} <br />
+          <strong>Bill No:</strong> {data.billNo} <br />
           <strong>Date:</strong> {data.date || "N/A"}
         </div>
         <div style={{ textAlign: "right" }}>

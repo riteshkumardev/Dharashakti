@@ -31,10 +31,7 @@ const TaxSummary = ({ tax = {}, freight = 0 }) => {
         
 
           {/* Freight / Transport Charges [cite: 7] */}
-          <tr>
-            <td style={labelStyle}>Freight / Transport Charges</td>
-            <td style={cellStyle}>{Number(freight).toFixed(2)}</td>
-          </tr>
+        
 
           {/* CGST Calculation  */}
           <tr>
@@ -52,6 +49,11 @@ const TaxSummary = ({ tax = {}, freight = 0 }) => {
           <tr>
             <td style={labelStyle}>IGST</td>
             <td style={cellStyle}>{igst.toFixed(2)}</td>
+          </tr>
+            <tr>
+            <td style={labelStyle}>Freight / Transport Charges</td>
+            <td style={cellStyle}>-
+              {Number(freight).toFixed(2)}</td>
           </tr>
 
           {/* Grand Total  */}

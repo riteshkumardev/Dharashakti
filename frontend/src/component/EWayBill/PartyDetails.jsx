@@ -12,11 +12,13 @@ const PartyDetails = ({ from, to }) => (
           <b>{from.name}</b><br />
           GSTIN: {from.gst}<br />
           {from.address}
+          <br />
+          {" 7325055939, 8102720905"}
         </td>
         <td style={{ border: "1px solid #000", padding: "10px", verticalAlign: "top" }}>
           <b>{to.name}</b><br />
-          GSTIN: {to.gst}<br />,{to.phone}
-          {to.address}
+          GSTIN: {to.gst}<br />,
+          {to.address} <br /> {to.phone}
         </td>
       </tr>
     </tbody>

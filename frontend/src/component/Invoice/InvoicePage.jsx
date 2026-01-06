@@ -4,14 +4,15 @@ import EWayBillContainer from "../EWayBill/EWayBillContainer";
 
 const InvoicePage = () => {
   const [ewayData, setEwayData] = useState({
-    ewayBillNo: "871615409896",
+    billNo: "871615409896",
     generatedDate: new Date().toLocaleDateString(),
     validUpto: "",
     date: "",
     from: {
       name: "M/S DHARA SHAKTI AGRO PRODUCTS",
       gst: "10DZTPM1457E1ZE",
-      address: "Sripur Gahar, Samastipur, BIHAR - 848117"
+      address: "Sri Pur Gahar, Khanpur, Samastipur, Bihar-848117",
+      Mob:" 7325055939, 8102720905"
     },
     to: { name: "", gst: "", address: "" },
     goods: [

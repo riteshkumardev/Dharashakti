@@ -16,6 +16,7 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     "Corn Flour": "11022000"
   };
 
+  // ✅ Manual bill number ke liye initial fetch (sirf suggestion ke liye)
   useEffect(() => {
     const fetchLatestBill = async () => {
       try {
@@ -24,12 +25,12 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
         
         setData(prev => ({ 
           ...prev, 
-          ewayBillNo: nextBillNo,
+          billNo: nextBillNo, // Default value fir bhi suggest karega
           date: new Date().toISOString().split('T')[0] 
         }));
       } catch (error) {
         console.error("Error fetching bill no:", error);
-        setData(prev => ({ ...prev, ewayBillNo: 169 })); 
+        setData(prev => ({ ...prev, billNo: "" })); // Error par khali rakhega
       }
     };
     fetchLatestBill();
@@ -53,26 +54,41 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
   }, []);
 
   const handleFinalSubmit = async () => {
-    if (!data.to.name || data.goods[0].quantity <= 0) {
-      alert("Please fill Customer and Goods details!");
+    if (!data.billNo || !data.to.name || !data.goods || data.goods[0].quantity <= 0) {
+      alert("Please fill Bill Number, Customer and Goods details!");
       return;
     }
 
     setLoading(true);
     try {
-      const res = await axios.post("http://localhost:5000/api/sales", {
-        ...data,
+      const payload = {
+        billNo: Number(data.billNo), // Manual bhara hua number yahan se jayega
+        date: data.date,
         customerName: data.to.name,
+        customerGSTIN: data.to.gst,
+        customerAddress: data.to.address,
         vehicleNo: data.vehicle.vehicleNo,
-        totalAmount: data.taxSummary.total
-      });
+        driverName: data.vehicle.driverName,
+        driverPhone: data.vehicle.driverPhone,
+        goods: data.goods,
+        freight: Number(data.freight),
+        taxableValue: Number(data.taxSummary.taxable),
+        cgst: Number(data.taxSummary.cgst),
+        sgst: Number(data.taxSummary.sgst),
+        igst: Number(data.taxSummary.igst),
+        totalAmount: Number(data.taxSummary.total),
+        remarks: data.remarks || ""
+      };
+
+      const res = await axios.post("http://localhost:5000/api/sales", payload);
 
       if (res.data.success) {
+        alert("Bill Saved Successfully!");
         onPreview(); 
       }
     } catch (error) {
-      console.error("Submit failed:", error);
-      alert("Error saving bill: " + error.message);
+      console.error("Submit failed:", error.response?.data || error.message);
+      alert("Error saving bill: " + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
@@ -89,7 +105,7 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
   };
 
   const handleSelectSupplier = (s) => {
-    setData({ ...data, to: { name: s.name, gst: s.gstin, address: s.address } });
+    setData({ ...data, to: { name: s.name, gst: s.gstin, address: s.address, phone: s.phone } });
     setShowSupplierList(false);
   };
 
@@ -114,22 +130,18 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     calculateTotal(updatedGoods, totalQty * 0.80);
   };
 
-// ... (baaki ka poora code same rahega)
-
   const calculateTotal = (updatedGoods, freightVal) => {
     let totalTaxable = 0;
     let totalIgst = 0;
-    let totalQty = 0; // Total quantity track karne ke liye
+    let totalQty = 0;
 
     updatedGoods.forEach(item => {
       const taxable = Number(item.taxableAmount) || 0;
       totalTaxable += taxable;
       totalIgst += (taxable * (Number(item.taxRate) || 0)) / 100;
-      totalQty += Number(item.quantity) || 0; // Saare products ki Qty ko jodein
+      totalQty += Number(item.quantity) || 0;
     });
 
-    // ✨ Logic: Total Qty * 0.80
-    // Agar manually input nahi kiya hai, toh auto calculate karein
     const fAmount = freightVal !== null ? Number(freightVal) : totalQty * 0.80;
 
     setData({
@@ -141,23 +153,27 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
         cgst: totalIgst / 2,
         sgst: totalIgst / 2,
         igst: totalIgst,
-        // ✅ Fixed Logic: Total Amount mein se Freight ko Minus (-) karein
         total: (totalTaxable + totalIgst) - fAmount 
       }
     });
   };
 
-// ... (baaki ka return logic same rahega)
   return (
     <div className="eway-form-page no-print">
       <div className="eway-form-card">
         <h2>📄 E-Way Bill Form</h2>
 
-        {/* --- Header: Bill No & Date --- */}
         <div className="eway-form-grid" style={{ background: '#eef2f7', padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
           <div className="form-group">
-            <label>Bill Number (Auto)</label>
-            <input readOnly style={{ fontWeight: 'bold', background: '#ddd' }} value={data.ewayBillNo || ""} />
+            <label>Bill Number (Manual Edit)</label>
+            {/* ✅ readOnly hata diya hai taaki aap likh sakein */}
+            <input 
+              type="number"
+              style={{ fontWeight: 'bold' }} 
+              value={data.billNo || ""} 
+              onChange={(e) => setData({ ...data, billNo: e.target.value })} 
+              placeholder="Enter Bill No"
+            />
           </div>
           <div className="form-group">
             <label>Date</label>
@@ -169,16 +185,10 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
           </div>
         </div>
 
-        {/* --- Customer & Driver --- */}
         <div className="eway-form-grid">
           <div style={{ position: 'relative' }}>
             <label>Customer Search</label>
-            <input 
-              placeholder="Search Buyer..." 
-              value={data.to.name} 
-              onFocus={() => setShowSupplierList(true)} 
-              onChange={e => setData({ ...data, to: { ...data.to, name: e.target.value } })} 
-            />
+            <input placeholder="Search Buyer..." value={data.to.name} onFocus={() => setShowSupplierList(true)} onChange={e => setData({ ...data, to: { ...data.to, name: e.target.value } })} />
             {showSupplierList && (
               <div className="search-dropdown">
                 {suppliers.filter(s => s.name.toLowerCase().includes(data.to.name.toLowerCase())).map(s => (
@@ -198,14 +208,9 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
               </div>
             )}
           </div>
-          {/* ✅ Naya Field: Driver Mobile Number */}
           <div className="form-group">
             <label>Driver Mobile</label>
-            <input 
-              placeholder="Driver Phone" 
-              value={data.vehicle.driverPhone || ""} 
-              onChange={e => setData({ ...data, vehicle: { ...data.vehicle, driverPhone: e.target.value } })} 
-            />
+            <input placeholder="Driver Phone" value={data.vehicle.driverPhone || ""} onChange={e => setData({ ...data, vehicle: { ...data.vehicle, driverPhone: e.target.value } })} />
           </div>
         </div>
 
@@ -236,12 +241,7 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
           </div>
         </div>
 
-        <button 
-          onClick={handleFinalSubmit} 
-          disabled={loading}
-          className="preview-btn" 
-          style={{ width: '100%', marginTop: '20px', background: loading ? '#ccc' : '#007bff' }}
-        >
+        <button onClick={handleFinalSubmit} disabled={loading} className="preview-btn" style={{ width: '100%', marginTop: '20px', background: loading ? '#ccc' : '#007bff' }}>
           {loading ? "Saving..." : "👁️ Save & Preview Bill"}
         </button>
       </div>
