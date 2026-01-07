@@ -183,3 +183,40 @@ th {
   position: relative;
   z-index: 1;
 }
+/* --- Print Specific Fixes --- */
+@media print {
+  /* Browser ki default margins hatane ke liye */
+  @page {
+    size: A4;
+    margin: 0mm !important; 
+  }
+
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /* Invoice wrapper ko poora page cover karne ke liye */
+  .invoice-wrapper {
+    width: 210mm !important; /* A4 standard width */
+    height: 297mm !important; /* A4 standard height */
+    margin: 0 !important;
+    padding: 1mm !important; /* Content ke liye thoda sa padding */
+    border: none !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Screen par dekhne ke liye wrapper */
+.invoice-wrapper {
+  width: 210mm;
+  min-height: 290mm;
+  margin: 20px auto;
+  padding: 10mm;
+  background: #fff;
+  box-sizing: border-box;
+}

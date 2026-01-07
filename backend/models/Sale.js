@@ -2,41 +2,54 @@ import mongoose from "mongoose";
 
 const saleSchema = new mongoose.Schema(
   {
-    // Bill details
-    billNo: { type: Number, required: true, unique: true }, // Image ke mutabiq 168, 169...
-    date: { type: String, required: true },
+    // --- Bill Details ---
+    // ✅ unique aur required hata diya gaya hai
+    billNo: { type: Number }, 
+    date: { type: String },
     
-    // Customer/Supplier details
-    customerName: { type: String, required: true },
+    // --- Customer Details ---
+    // ✅ required hata diya gaya hai
+    customerName: { type: String }, 
     customerGSTIN: { type: String },
     customerAddress: { type: String },
 
-    // Driver & Vehicle details
-    vehicleNo: { type: String, required: true },
+    // --- Buyer's Order Details ---
+    buyerOrderNo: { type: String, default: "-" },
+    buyerOrderDate: { type: String, default: "-" },
+
+    // --- Dispatch Details ---
+    dispatchDocNo: { type: String, default: "-" },
+    dispatchDate: { type: String, default: "-" },
+    dispatchedThrough: { type: String, default: "-" }, 
+    destination: { type: String, default: "-" },
+
+    // --- Driver & Vehicle Details ---
+    // ✅ required hata diya gaya hai
+    vehicleNo: { type: String }, 
     driverName: { type: String },
     driverPhone: { type: String },
 
-    // Multiple Goods (Array of items)
+    // --- Goods Table ---
     goods: [
       {
-        product: { type: String, required: true },
+        product: { type: String },
         hsn: { type: String, default: "11031300" },
-        quantity: { type: Number, required: true },
-        rate: { type: Number, required: true },
-        taxRate: { type: Number, default: 5 },
-        taxableAmount: { type: Number, required: true },
+        quantity: { type: Number },
+        rate: { type: Number },
+        taxRate: { type: Number, default: 0 },
+        taxableAmount: { type: Number },
       },
     ],
 
-    // Freight and Taxes
-    freight: { type: Number, default: 0 }, // Transport Charges
-    taxableValue: { type: Number, default: 0 }, // Total Taxable Amount
+    // --- Calculations ---
+    freight: { type: Number, default: 0 },
+    taxableValue: { type: Number, default: 0 },
     cgst: { type: Number, default: 0 },
     sgst: { type: Number, default: 0 },
     igst: { type: Number, default: 0 },
 
-    // Final Calculations
-    totalAmount: { type: Number, required: true }, // Grand Total
+    // --- Final Amounts ---
+    totalAmount: { type: Number }, 
     amountReceived: { type: Number, default: 0 },
     paymentDue: { type: Number, default: 0 },
     
@@ -45,9 +58,8 @@ const saleSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Pre-save hook to calculate payment due if not provided
 saleSchema.pre("save", function (next) {
-  this.paymentDue = this.totalAmount - this.amountReceived;
+  this.paymentDue = (this.totalAmount || 0) - (this.amountReceived || 0);
   next();
 });
 

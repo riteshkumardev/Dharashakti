@@ -79,25 +79,33 @@ const SalesTable = ({ role }) => {
     editId
   ]);
 
-  const getProcessedList = () => {
-    let list = salesList.filter((s) => {
-      const matchesSearch =
-        s.customerName?.toLowerCase().includes(search.toLowerCase()) ||
-        s.billNo?.toLowerCase().includes(search.toLowerCase()) ||
-        s.vehicleNo?.toLowerCase().includes(search.toLowerCase());
-      const matchesProduct = selectedProduct === "All" || s.productName === selectedProduct;
-      return matchesSearch && matchesProduct;
-    });
+const getProcessedList = () => {
+  let list = salesList.filter((s) => {
+    // billNo ko String() mein convert karein taaki toLowerCase() kaam kare
+    const billStr = String(s.billNo || ""); 
+    const customerStr = String(s.customerName || "");
+    const vehicleStr = String(s.vehicleNo || "");
 
-    list.sort((a, b) => {
-      if (sortBy === "dateNewest") return new Date(b.date) - new Date(a.date);
-      if (sortBy === "dateOldest") return new Date(a.date) - new Date(b.date);
-      if (sortBy === "billAsc") return String(a.billNo).localeCompare(String(a.billNo), undefined, { numeric: true });
-      if (sortBy === "billDesc") return String(b.billNo).localeCompare(String(b.billNo), undefined, { numeric: true });
-      return 0;
-    });
-    return list;
-  };
+    const matchesSearch =
+      customerStr.toLowerCase().includes(search.toLowerCase()) ||
+      billStr.toLowerCase().includes(search.toLowerCase()) ||
+      vehicleStr.toLowerCase().includes(search.toLowerCase());
+
+    const matchesProduct = selectedProduct === "All" || s.productName === selectedProduct;
+    return matchesSearch && matchesProduct;
+  });
+
+  // Sorting Logic Fix (LocaleCompare mein a.billNo aur b.billNo hona chahiye)
+  list.sort((a, b) => {
+    if (sortBy === "dateNewest") return new Date(b.date) - new Date(a.date);
+    if (sortBy === "dateOldest") return new Date(a.date) - new Date(b.date);
+    if (sortBy === "billAsc") return String(a.billNo).localeCompare(String(b.billNo), undefined, { numeric: true });
+    if (sortBy === "billDesc") return String(b.billNo).localeCompare(String(a.billNo), undefined, { numeric: true });
+    return 0;
+  });
+  
+  return list;
+};
 
   const processedList = getProcessedList();
   const indexOfLastRow = currentPage * rowsPerPage;

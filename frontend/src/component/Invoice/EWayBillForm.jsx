@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "./ewayForm.css";
 
-// ✅ Dynamic API Base URL Setup
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
 const EWayBillForm = ({ data, setData, onPreview }) => {
@@ -18,7 +17,6 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     "Corn Flour": "11022000"
   };
 
-  // ✅ Latest Bill Fetch (Dynamic URL)
   useEffect(() => {
     const fetchLatestBill = async () => {
       try {
@@ -38,7 +36,6 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     fetchLatestBill();
   }, [setData]);
 
-  // ✅ Customer & Driver Data Fetch (Dynamic URL)
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -65,25 +62,16 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     setLoading(true);
     try {
       const payload = {
+        ...data,
         billNo: Number(data.billNo),
-        date: data.date,
-        customerName: data.to.name,
-        customerGSTIN: data.to.gst,
-        customerAddress: data.to.address,
-        vehicleNo: data.vehicle.vehicleNo,
-        driverName: data.vehicle.driverName,
-        driverPhone: data.vehicle.driverPhone,
-        goods: data.goods,
         freight: Number(data.freight),
         taxableValue: Number(data.taxSummary.taxable),
         cgst: Number(data.taxSummary.cgst),
         sgst: Number(data.taxSummary.sgst),
         igst: Number(data.taxSummary.igst),
         totalAmount: Number(data.taxSummary.total),
-        remarks: data.remarks || ""
       };
 
-      // ✅ Dynamic Submit URL
       const res = await axios.post(`${API_BASE_URL}/api/sales`, payload);
 
       if (res.data.success) {
@@ -172,16 +160,11 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
       <div className="eway-form-card">
         <h2>📄 E-Way Bill Form</h2>
 
+        {/* --- SECTION 1: Basic Bill Details --- */}
         <div className="eway-form-grid" style={{ background: '#eef2f7', padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
           <div className="form-group">
             <label>Bill Number (Manual Edit)</label>
-            <input 
-              type="number"
-              style={{ fontWeight: 'bold' }} 
-              value={data.billNo || ""} 
-              onChange={(e) => setData({ ...data, billNo: e.target.value })} 
-              placeholder="Enter Bill No"
-            />
+            <input type="number" style={{ fontWeight: 'bold' }} value={data.billNo || ""} onChange={(e) => setData({ ...data, billNo: e.target.value })} placeholder="Enter Bill No" />
           </div>
           <div className="form-group">
             <label>Date</label>
@@ -189,31 +172,63 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
           </div>
           <div className="form-group">
             <label>Vehicle No</label>
-            <input placeholder="BR11..." value={data.vehicle.vehicleNo} onChange={e => setData({ ...data, vehicle: { ...data.vehicle, vehicleNo: e.target.value } })} />
+            <input placeholder="BR11..." value={data.vehicle?.vehicleNo || ""} onChange={e => setData({ ...data, vehicle: { ...data.vehicle, vehicleNo: e.target.value } })} />
           </div>
         </div>
 
+        {/* --- SECTION 2: Customer & Dispatch --- */}
         <div className="eway-form-grid">
           <div className="form-group">
             <label>Select Customer</label>
-            <select 
-              value={data.to.name} 
-              onChange={handleSelectSupplier}
-              className="customer-select"
-            >
+            <select value={data.to?.name || ""} onChange={handleSelectSupplier} className="customer-select">
               <option value="">-- Choose Customer --</option>
-              {suppliers.map(s => (
-                <option key={s._id} value={s.name}>{s.name}</option>
-              ))}
+              {suppliers.map(s => <option key={s._id} value={s.name}>{s.name}</option>)}
             </select>
           </div>
-          
+          <div className="form-group">
+            <label>Buyer's Order No</label>
+            <input type="text" value={data.buyerOrderNo || ""} onChange={e => setData({...data, buyerOrderNo: e.target.value})} placeholder="Order No" />
+          </div>
+          <div className="form-group">
+            <label>Buyer's Order Date</label>
+            <input type="date" value={data.buyerOrderDate || ""} onChange={e => setData({...data, buyerOrderDate: e.target.value})} />
+          </div>
+        </div>
+
+        {/* --- SECTION 3: Dispatch Details --- */}
+        <div className="eway-form-grid">
+          <div className="form-group">
+            <label>Dispatch Document No</label>
+            <input type="text" value={data.dispatchDocNo || ""} onChange={e => setData({...data, dispatchDocNo: e.target.value})} placeholder="Doc No / Container No" />
+          </div>
+          <div className="form-group">
+            <label>Dispatch Date</label>
+            <input type="date" value={data.dispatchDate || ""} onChange={e => setData({...data, dispatchDate: e.target.value})} />
+          </div>
+          <div className="form-group">
+            <label>Dispatched Through</label>
+            <select value={data.dispatchedThrough || ""} onChange={e => setData({...data, dispatchedThrough: e.target.value})}>
+              <option value="">-- Select Mode --</option>
+              <option value="Truck">Truck</option>
+              <option value="Container">Container</option>
+              <option value="Tractor">Tractor</option>
+              <option value="Self">Self</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Destination</label>
+            <input type="text" value={data.destination || ""} onChange={e => setData({...data, destination: e.target.value})} placeholder="Place of Delivery" />
+          </div>
+        </div>
+
+        {/* --- SECTION 4: Driver Details --- */}
+        <div className="eway-form-grid">
           <div style={{ position: 'relative' }}>
             <label>Driver Search</label>
-            <input placeholder="Search Driver..." value={data.vehicle.driverName || ""} onFocus={() => setShowDriverList(true)} onChange={e => setData({...data, vehicle: {...data.vehicle, driverName: e.target.value}})} />
+            <input placeholder="Search Driver..." value={data.vehicle?.driverName || ""} onFocus={() => setShowDriverList(true)} onChange={e => setData({...data, vehicle: {...data.vehicle, driverName: e.target.value}})} />
             {showDriverList && (
               <div className="search-dropdown">
-                {drivers.filter(d => d.name.toLowerCase().includes((data.vehicle.driverName || "").toLowerCase())).map(d => (
+                {drivers.filter(d => d.name.toLowerCase().includes((data.vehicle?.driverName || "").toLowerCase())).map(d => (
                   <div key={d._id} className="dropdown-item" onClick={() => handleSelectDriver(d)}>{d.name}</div>
                 ))}
               </div>
@@ -221,19 +236,18 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
           </div>
           <div className="form-group">
             <label>Driver Mobile</label>
-            <input placeholder="Driver Phone" value={data.vehicle.driverPhone || ""} onChange={e => setData({ ...data, vehicle: { ...data.vehicle, driverPhone: e.target.value } })} />
+            <input placeholder="Driver Phone" value={data.vehicle?.driverPhone || ""} onChange={e => setData({ ...data, vehicle: { ...data.vehicle, driverPhone: e.target.value } })} />
           </div>
         </div>
 
         <button onClick={handleAddItem} className="add-item-btn" style={{ margin: '15px 0' }}>+ Add Item</button>
 
+        {/* --- SECTION 5: Goods Table --- */}
         {data.goods.map((item, index) => (
           <div className="eway-form-grid" key={index} style={{ borderBottom: '1px solid #ccc', paddingBottom: '10px' }}>
             <select value={item.product} onChange={e => updateGoods(index, "product", e.target.value)}>
               <option value="">Product</option>
-              <option value="Corn Grit">Corn Grit</option>
-              <option value="Rice Grit">Rice Grit</option>
-              <option value="Cattle Feed">Cattle Feed</option>
+              {Object.keys(HSN_MASTER).map(prod => <option key={prod} value={prod}>{prod}</option>)}
             </select>
             <input placeholder="Qty" type="number" value={item.quantity} onChange={e => updateGoods(index, "quantity", e.target.value)} />
             <input placeholder="Rate" type="number" value={item.rate} onChange={e => updateGoods(index, "rate", e.target.value)} />
@@ -242,6 +256,7 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
           </div>
         ))}
 
+        {/* --- SECTION 6: Totals --- */}
         <div className="eway-form-grid" style={{ marginTop: '20px' }}>
           <div>
             <label>Freight (Auto: 0.80/kg)</label>
