@@ -4,19 +4,46 @@ import {
   getSales,
   deleteSale,
   updateSale,
-  getLatestBillNo // 🆕 Naya controller function import karein
+  getLatestBillNo,
+  migrateSalesData 
 } from "../controllers/sales.controller.js";
 
 const router = express.Router();
 
-// ✅ 1. Latest Bill Number fetch karne ka route (Sabse upar rakhein)
-// Frontend par: axios.get("/api/sales/latest-bill-no")
+/**
+ * @route   GET /api/sales/latest-bill-no
+ * @desc    Naya Bill Number generate karne ke liye
+ */
 router.get("/latest-bill-no", getLatestBillNo);
 
-// ✅ 2. Baaki standard routes
-router.post("/", addSale);           // Naya bill save karne ke liye
-router.get("/", getSales);            // Sales table (Image_ab30e5) dikhane ke liye
-router.put("/:id", updateSale);      // Bill edit karne ke liye
-router.delete("/:id", deleteSale);   // Bill delete aur stock wapas badhane ke liye
+/**
+ * @route   GET /api/sales/fix-database-data
+ * @desc    Purane records ko naye professional schema mein migrate karne ke liye
+ */
+router.get("/fix-database-data", migrateSalesData);
+
+/**
+ * @route   POST /api/sales
+ * @desc    Nayi sale save karna aur stock adjust karna
+ */
+router.post("/", addSale);
+
+/**
+ * @route   GET /api/sales
+ * @desc    Saari sales list fetch karna
+ */
+router.get("/", getSales);
+
+/**
+ * @route   PUT /api/sales/:id
+ * @desc    Existing sale update karna aur stock re-calculate karna
+ */
+router.put("/:id", updateSale);
+
+/**
+ * @route   DELETE /api/sales/:id
+ * @desc    Sale delete karna aur stock wapas add karna
+ */
+router.delete("/:id", deleteSale);
 
 export default router;

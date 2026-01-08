@@ -1,45 +1,58 @@
 import Sale from "../models/Sale.js";
 import Stock from "../models/Stock.js";
 
-// ✅ 1. Latest Bill Number nikalne ka naya function (Auto-Increment logic)
+/* =========================================
+   🔒 Helper: Number Conversion
+   ========================================= */
+const toSafeNumber = (val) => {
+  const n = Number(val);
+  return Number.isFinite(n) ? n : 0;
+};
+
+/* =========================================
+   ✅ NEW: Get Latest Bill Number
+   ========================================= */
 export const getLatestBillNo = async (req, res) => {
   try {
-    // Database se sabse bada billNo find karein (Numerical order mein)
     const lastSale = await Sale.findOne().sort({ billNo: -1 });
-    
-    // Agar image ke mutabiq 168 last hai, toh next 169 hoga
-    const nextBillNo = lastSale && !isNaN(lastSale.billNo) 
-      ? Number(lastSale.billNo) + 1 
-      : 169; 
-
+    const nextBillNo = lastSale && lastSale.billNo ? Number(lastSale.billNo) + 1 : 1;
     res.json({ success: true, nextBillNo });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ➕ Add new sale (Bill No aur Stock update ke saath)
+/* =========================================
+   1️⃣ CREATE: Add Sale + Stock Deduction
+   ========================================= */
 export const addSale = async (req, res) => {
   try {
-    // 1. Sale record create karein
-    const sale = await Sale.create(req.body);
+    const payload = req.body;
 
-    // 2. 🔄 स्टॉक ऑटो-अपडेट: Multiple items hone par loop chalayein ya single item handle karein
-    // Agar body mein products array hai toh loop chalega, warna single productName
-    if (req.body.goods && Array.isArray(req.body.goods)) {
-      for (const item of req.body.goods) {
+    // Mapping Frontend fields to Backend Schema
+    const sanitizedData = {
+      ...payload,
+      freight: toSafeNumber(payload.travelingCost),
+      buyerOrderDate: payload.orderDate || "-",
+      dispatchDate: payload.deliveryNoteDate || "-",
+      totalAmount: toSafeNumber(payload.totalPrice),
+    };
+
+    const sale = await Sale.create(sanitizedData);
+
+    // Stock Adjustment
+    const items = (sale.goods && sale.goods.length > 0) 
+      ? sale.goods 
+      : [{ product: sale.productName, quantity: sale.quantity }];
+
+    for (const item of items) {
+      if (item.product && item.quantity > 0) {
         await Stock.findOneAndUpdate(
           { productName: item.product },
           { $inc: { totalQuantity: -Number(item.quantity) } },
           { upsert: true }
         );
       }
-    } else {
-      await Stock.findOneAndUpdate(
-        { productName: req.body.productName },
-        { $inc: { totalQuantity: -Number(req.body.quantity) } },
-        { upsert: true }
-      );
     }
 
     res.status(201).json({ success: true, data: sale });
@@ -48,33 +61,64 @@ export const addSale = async (req, res) => {
   }
 };
 
-// 📄 Get all sales (Image_ab30e5 ke table ke liye)
+/* =========================================
+   2️⃣ READ: Get All Sales
+   ========================================= */
 export const getSales = async (req, res) => {
   try {
-    // Latest bills ko sabse upar dikhane ke liye sort karein
-    const sales = await Sale.find().sort({ billNo: -1 });
+    const sales = await Sale.find().sort({ createdAt: -1 });
     res.json({ success: true, count: sales.length, data: sales });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// 🛠️ Update sale (Stock Balance Fix)
+/* =========================================
+   3️⃣ UPDATE: Update Sale + Stock Re-adjustment
+   ========================================= */
 export const updateSale = async (req, res) => {
   try {
-    const oldSale = await Sale.findById(req.params.id);
-    if (!oldSale) return res.status(404).json({ success: false, message: "Sale not found" });
+    const { id } = req.params;
+    const oldSale = await Sale.findById(id);
 
-    const updatedSale = await Sale.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!oldSale) {
+      return res.status(404).json({ success: false, message: "Sale record nahi mila" });
+    }
 
-    // स्टॉक एडजस्टमेंट logic
-    const qtyDiff = Number(oldSale.quantity) - Number(req.body.quantity);
-    
-    await Stock.findOneAndUpdate(
-      { productName: req.body.productName },
-      { $inc: { totalQuantity: qtyDiff } }, 
-      { upsert: true }
-    );
+    // Step A: Revert Old Stock
+    const oldItems = (Array.isArray(oldSale.goods) && oldSale.goods.length > 0) 
+      ? oldSale.goods 
+      : [{ product: oldSale.productName, quantity: oldSale.quantity }];
+
+    for (const item of oldItems) {
+      const pName = item.product || item.productName;
+      if (pName) {
+        await Stock.findOneAndUpdate(
+          { productName: pName },
+          { $inc: { totalQuantity: toSafeNumber(item.quantity) } }
+        );
+      }
+    }
+
+    // Step B: Save New Data
+    const updatedSale = await Sale.findByIdAndUpdate(id, req.body, { new: true });
+
+    // Step C: Deduct New Stock
+    const newItems = (Array.isArray(req.body.goods) && req.body.goods.length > 0) 
+      ? req.body.goods 
+      : [{ product: req.body.productName, quantity: req.body.quantity }];
+
+    for (const item of newItems) {
+      const pName = item.product || item.productName;
+      const q = toSafeNumber(item.quantity);
+      if (pName && q !== 0) {
+        await Stock.findOneAndUpdate(
+          { productName: pName },
+          { $inc: { totalQuantity: -q } },
+          { upsert: true }
+        );
+      }
+    }
 
     res.json({ success: true, data: updatedSale });
   } catch (error) {
@@ -82,26 +126,61 @@ export const updateSale = async (req, res) => {
   }
 };
 
-// ✅ Delete Sale (Stock adjustment for multiple items)
+/* =========================================
+   4️⃣ DELETE: Delete Sale + Restore Stock
+   ========================================= */
 export const deleteSale = async (req, res) => {
   try {
     const sale = await Sale.findById(req.params.id);
-    if (!sale) return res.status(404).json({ success: false, message: "Sale not found" });
+    if (!sale) return res.status(404).json({ success: false, message: "Sale nahi mili" });
 
-    // 🔄 Loop chalakar har product ka stock wapas badhayein
-    if (sale.goods && sale.goods.length > 0) {
-      for (const item of sale.goods) {
+    // Restore Stock
+    const itemsToReturn = (Array.isArray(sale.goods) && sale.goods.length > 0) 
+      ? sale.goods 
+      : [{ product: sale.productName, quantity: sale.quantity }];
+
+    for (const item of itemsToReturn) {
+      const pName = item.product || item.productName;
+      if (pName) {
         await Stock.findOneAndUpdate(
-          { productName: item.product },
-          { $inc: { totalQuantity: Number(item.quantity) } }
+          { productName: pName },
+          { $inc: { totalQuantity: toSafeNumber(item.quantity) } }
         );
       }
     }
 
     await Sale.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: "Sale deleted and Stock adjusted" });
+    res.json({ success: true, message: "Sale deleted aur stock restore ho gaya" });
   } catch (error) {
-    // ⚠️ Agar yahan error 500 aa raha hai, toh check karein ki req.params.id sahi bhej raha hai frontend
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/* =========================================
+   🧹 NEW: One-Time Data Migration
+   ========================================= */
+export const migrateSalesData = async (req, res) => {
+  try {
+    const sales = await Sale.find({});
+    let updateCount = 0;
+
+    for (const sale of sales) {
+      const updateData = {};
+      let needsUpdate = false;
+
+      if (sale.totalPrice !== undefined && sale.totalAmount === 0) {
+        updateData.totalAmount = sale.totalPrice;
+        needsUpdate = true;
+      }
+
+      if (needsUpdate) {
+        await Sale.findByIdAndUpdate(sale._id, { $set: updateData });
+        updateCount++;
+      }
+    }
+
+    res.json({ success: true, message: `${updateCount} records fixed successfully` });
+  } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };

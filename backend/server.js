@@ -1,4 +1,4 @@
-import express from "express";
+import express from "express"; // ✅ Sabse pehle express import karein
 import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
@@ -18,26 +18,23 @@ import analyticsRoutes from "./routes/analytics.routes.js";
 import purchaseRoutes from "./routes/purchase.routes.js";
 import supplierRoutes from "./routes/supplier.routes.js";
 
-
-
+// Database Connection
 dotenv.config();
-
-// Database connection call
 connectDB();
 
-const app = express();
+const app = express(); // ✅ Ab yahan express initialize ho jayega bina error ke
 
-// Middlewares
-// CORS ko origin * ke saath allow kiya hai taaki frontend connect ho sake
+// ✅ 1. Robust CORS Configuration
 app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  origin: true, 
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   credentials: true
 }));
+
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
-// API Routes
+// ✅ 2. API Routes Mapping
 app.use("/api/sales", salesRoutes);
 app.use("/api/employees", employeesRoutes);
 app.use("/api/auth", authRoutes);
@@ -46,27 +43,31 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/activity-logs", logRoutes);
 app.use("/api/attendance", attendanceRoutes);
 
-app.use("/api/purchases", purchaseRoutes); // ✅ ONLY PURCHASE DATA
-app.use("/api/stocks", stockRoutes);       // ✅ ONLY STOCK DATA
-app.use("/api/suppliers", supplierRoutes);
+// Professional Inventory Flow Routes
+app.use("/api/purchases", purchaseRoutes); 
+app.use("/api/stocks", stockRoutes);      
+app.use("/api/suppliers", supplierRoutes); 
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/salary-payments", salaryRoutes);
 
-   
-
-// Test Route
-app.get("/", (req, res) => {
-  res.send("Backend running successfully on Vercel");
+// ✅ 3. Global Error Handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ success: false, message: "Internal Server Error" });
 });
 
-// Vercel ke liye serverless function fix: 
-// app.listen sirf tab chalega jab hum local mein run karenge (npm run dev)
+// ✅ 4. Root Route for Health Check
+app.get("/", (req, res) => {
+  res.status(200).json({ status: "Daharasakti Backend is Live", timestamp: new Date() });
+});
+
+// Port configuration
+const PORT = process.env.PORT || 5000;
 if (process.env.NODE_ENV !== 'production') {
-  const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🚀 Server running locally on port ${PORT}`);
   });
 }
 
-// Ye line Vercel ke liye sabse zaroori hai
+// Vercel ke liye export
 export default app;
