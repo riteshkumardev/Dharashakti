@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from "react";
 import "./Sales.css";
-import axios from "axios"; 
+import axios from "axios";
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
+
+/* =========================
+   🔒 Helper (NaN Safe)
+   ========================= */
+const toSafeNumber = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
 const SalesTable = ({ role }) => {
   const isAuthorized = role === "Admin" || role === "Accountant";
@@ -29,6 +37,9 @@ const SalesTable = ({ role }) => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
+  /* =========================
+     📡 Fetch Sales
+     ========================= */
   const fetchSales = async () => {
     try {
       setLoading(true);
@@ -36,7 +47,7 @@ const SalesTable = ({ role }) => {
       if (res.data.success) {
         setSalesList(res.data.data);
       }
-    } catch (err) {
+    } catch {
       showMsg("Server se data nahi mil raha.", "error");
     } finally {
       setLoading(false);
@@ -47,65 +58,71 @@ const SalesTable = ({ role }) => {
     fetchSales();
   }, [API_URL]);
 
-  // 2️⃣ Auto Calculation in Edit Mode (Travel और CD % लॉजिक)
+  /* =========================
+     🧮 Auto Calculation (FIXED)
+     Backend ke formula ke match me
+     total = (qty*rate) + freight - discount
+     ========================= */
   useEffect(() => {
-    if (editId) {
-      const qty = Number(editData.quantity) || 0;
-      const rate = Number(editData.rate) || 0;
-      const travel = Number(editData.travelingCost) || 0;
-      const cdPercent = Number(editData.cashDiscount) || 0;
+    if (!editId) return;
 
-      // 1. बेस प्राइस (Qty * Rate)
-      const basePrice = qty * rate;
-      // 2. प्रतिशत डिस्काउंट राशि
-      const discountAmount = (basePrice * cdPercent) / 100;
-      // 3. फाइनल टोटल
-      const total = basePrice - travel - discountAmount; 
-      // 4. ड्यू बैलेंस
-      const due = total - (Number(editData.amountReceived) || 0);
+    const qty = toSafeNumber(editData.quantity);
+    const rate = toSafeNumber(editData.rate);
+    const freight = toSafeNumber(editData.freight);
+    const cdPercent = toSafeNumber(editData.cashDiscount);
+    const received = toSafeNumber(editData.amountReceived);
 
-      setEditData((prev) => ({ 
-        ...prev, 
-        totalPrice: total, 
-        paymentDue: due 
-      }));
-    }
+    const base = qty * rate;
+    const discount = (base * cdPercent) / 100;
+    const total = base + freight - discount;
+    const due = total - received;
+
+    setEditData((prev) => ({
+      ...prev,
+      totalAmount: total,
+      paymentDue: due,
+    }));
   }, [
-    editData.quantity, 
-    editData.rate, 
-    editData.travelingCost, 
-    editData.cashDiscount, 
-    editData.amountReceived, 
-    editId
+    editId,
+    editData.quantity,
+    editData.rate,
+    editData.freight,
+    editData.cashDiscount,
+    editData.amountReceived,
   ]);
 
-const getProcessedList = () => {
-  let list = salesList.filter((s) => {
-    // billNo ko String() mein convert karein taaki toLowerCase() kaam kare
-    const billStr = String(s.billNo || ""); 
-    const customerStr = String(s.customerName || "");
-    const vehicleStr = String(s.vehicleNo || "");
+  /* =========================
+     🔍 Filter + Sort
+     ========================= */
+  const getProcessedList = () => {
+    let list = salesList.filter((s) => {
+      const billStr = String(s.billNo || "");
+      const customerStr = String(s.customerName || "");
+      const vehicleStr = String(s.vehicleNo || "");
 
-    const matchesSearch =
-      customerStr.toLowerCase().includes(search.toLowerCase()) ||
-      billStr.toLowerCase().includes(search.toLowerCase()) ||
-      vehicleStr.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch =
+        customerStr.toLowerCase().includes(search.toLowerCase()) ||
+        billStr.toLowerCase().includes(search.toLowerCase()) ||
+        vehicleStr.toLowerCase().includes(search.toLowerCase());
 
-    const matchesProduct = selectedProduct === "All" || s.productName === selectedProduct;
-    return matchesSearch && matchesProduct;
-  });
+      const matchesProduct =
+        selectedProduct === "All" || s.productName === selectedProduct;
 
-  // Sorting Logic Fix (LocaleCompare mein a.billNo aur b.billNo hona chahiye)
-  list.sort((a, b) => {
-    if (sortBy === "dateNewest") return new Date(b.date) - new Date(a.date);
-    if (sortBy === "dateOldest") return new Date(a.date) - new Date(b.date);
-    if (sortBy === "billAsc") return String(a.billNo).localeCompare(String(b.billNo), undefined, { numeric: true });
-    if (sortBy === "billDesc") return String(b.billNo).localeCompare(String(a.billNo), undefined, { numeric: true });
-    return 0;
-  });
-  
-  return list;
-};
+      return matchesSearch && matchesProduct;
+    });
+
+    list.sort((a, b) => {
+      if (sortBy === "dateNewest") return new Date(b.date) - new Date(a.date);
+      if (sortBy === "dateOldest") return new Date(a.date) - new Date(b.date);
+      if (sortBy === "billAsc")
+        return String(a.billNo).localeCompare(String(b.billNo), undefined, { numeric: true });
+      if (sortBy === "billDesc")
+        return String(b.billNo).localeCompare(String(a.billNo), undefined, { numeric: true });
+      return 0;
+    });
+
+    return list;
+  };
 
   const processedList = getProcessedList();
   const indexOfLastRow = currentPage * rowsPerPage;
@@ -113,9 +130,12 @@ const getProcessedList = () => {
   const currentRows = processedList.slice(indexOfFirstRow, indexOfLastRow);
   const totalPages = Math.ceil(processedList.length / rowsPerPage);
 
+  /* =========================
+     🗑️ Delete
+     ========================= */
   const handleDelete = async (id) => {
     if (!isAuthorized) {
-      showMsg("Denied ❌: Permission required.", "error");
+      showMsg("Permission required.", "error");
       return;
     }
     if (!window.confirm("Kya aap sach me delete karna chahte hain?")) return;
@@ -124,43 +144,95 @@ const getProcessedList = () => {
       setLoading(true);
       const res = await axios.delete(`${API_URL}/api/sales/${id}`);
       if (res.data.success) {
-        showMsg("Record Deleted Successfully! 🗑️", "success");
-        fetchSales(); 
+        showMsg("Record Deleted Successfully!");
+        fetchSales();
       }
-    } catch (err) {
-      showMsg("Error ❌: Delete fail ho gaya.", "error");
+    } catch {
+      showMsg("Delete fail ho gaya.", "error");
     } finally {
       setLoading(false);
     }
   };
 
+  /* =========================
+     💾 Save (UPDATE)
+     ========================= */
   const handleSave = async () => {
     try {
       setLoading(true);
-      const res = await axios.put(`${API_URL}/api/sales/${editId}`, editData);
+
+      const payload = {
+        ...editData,
+        quantity: toSafeNumber(editData.quantity),
+        rate: toSafeNumber(editData.rate),
+        freight: toSafeNumber(editData.freight),
+        cashDiscount: toSafeNumber(editData.cashDiscount),
+        totalAmount: toSafeNumber(editData.totalAmount),
+        amountReceived: toSafeNumber(editData.amountReceived),
+        paymentDue: toSafeNumber(editData.paymentDue),
+        productName: editData.productName || "Corn Grit",
+        goods: [
+          {
+            product: editData.productName || "Corn Grit",
+            quantity: toSafeNumber(editData.quantity),
+            rate: toSafeNumber(editData.rate),
+            taxableAmount: toSafeNumber(editData.totalAmount),
+          },
+        ],
+      };
+
+      const res = await axios.put(
+        `${API_URL}/api/sales/${editId}`,
+        payload
+      );
+
       if (res.data.success) {
-        showMsg("Updated! ✅ Record update ho gaya.");
+        showMsg("Updated Successfully!");
         setEditId(null);
         fetchSales();
       }
     } catch (err) {
-      showMsg("Error ❌ Update fail ho gaya.", "error");
+      showMsg(err.response?.data?.message || "Update fail ho gaya.", "error");
     } finally {
       setLoading(false);
     }
   };
 
+  /* =========================
+     ✏️ Start Edit
+     ========================= */
   const startEdit = (sale) => {
     if (!isAuthorized) {
-      showMsg("Denied ❌ Permission Required.", "warning");
+      showMsg("Permission Required.", "warning");
       return;
     }
-    setEditId(sale._id); 
-    setEditData({ ...sale });
+
+    setEditId(sale._id);
+    setEditData({
+      ...sale,
+      billNo: sale.billNo || "",
+      vehicleNo: sale.vehicleNo || "",
+      customerName: sale.customerName || "",
+      quantity: toSafeNumber(sale.quantity),
+      rate: toSafeNumber(sale.rate),
+      freight: toSafeNumber(sale.freight || sale.travelingCost),
+      cashDiscount: toSafeNumber(sale.cashDiscount),
+      amountReceived: toSafeNumber(sale.amountReceived),
+      totalAmount: toSafeNumber(sale.totalAmount || sale.totalPrice),
+      paymentDue: toSafeNumber(sale.paymentDue),
+      remarks: sale.remarks || "",
+      productName:
+        sale.productName ||
+        sale.goods?.[0]?.product ||
+        "Corn Grit",
+    });
   };
 
   if (loading) return <Loader />;
 
+  /* =========================
+     🧾 UI
+     ========================= */
   return (
     <>
       <div className="table-container-wide">
@@ -168,14 +240,20 @@ const getProcessedList = () => {
           <div className="table-header-flex">
             <h2 className="table-title">SALES RECORDS</h2>
             <div className="table-controls-row">
-              <select className="table-select-custom" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                 <option value="dateNewest">Newest Date</option>
                 <option value="dateOldest">Oldest Date</option>
-                <option value="billAsc">Bill No (L to H)</option>
-                <option value="billDesc">Bill No (H to L)</option>
+                <option value="billAsc">Bill No (L → H)</option>
+                <option value="billDesc">Bill No (H → L)</option>
               </select>
 
-              <select className="table-select-custom" value={selectedProduct} onChange={(e) => { setSelectedProduct(e.target.value); setCurrentPage(1); }}>
+              <select
+                value={selectedProduct}
+                onChange={(e) => {
+                  setSelectedProduct(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
                 <option value="All">All Products</option>
                 <option value="Corn Grit">Corn Grit</option>
                 <option value="Cattle Feed">Cattle Feed</option>
@@ -183,7 +261,14 @@ const getProcessedList = () => {
                 <option value="Corn Flour">Corn Flour</option>
               </select>
 
-              <input className="table-search-input" placeholder="Search Customer/Vehicle..." value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} />
+              <input
+                placeholder="Search Customer/Vehicle..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
             </div>
           </div>
 
@@ -192,7 +277,7 @@ const getProcessedList = () => {
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Bill/Vehicle</th> {/* 🆕 Combined Header */}
+                  <th>Bill/Vehicle</th>
                   <th>Customer</th>
                   <th>Qty/Rate</th>
                   <th>Travel/CD%</th>
@@ -205,93 +290,23 @@ const getProcessedList = () => {
               </thead>
               <tbody>
                 {currentRows.map((sale) => (
-                  <tr key={sale._id} className={editId === sale._id ? "active-edit" : ""}>
-                    <td>
-                      {editId === sale._id ? 
-                        <input type="date" value={editData.date} onChange={(e) => setEditData({...editData, date: e.target.value})} /> 
-                        : sale.date
-                      }
-                    </td>
-                    
-                    {/* Bill No & Vehicle No */}
-                    <td>
-                      {editId === sale._id ? (
-                        <>
-                          <input placeholder="Bill No" value={editData.billNo} onChange={(e) => setEditData({...editData, billNo: e.target.value})} />
-                          <input placeholder="Vehicle No" value={editData.vehicleNo} onChange={(e) => setEditData({...editData, vehicleNo: e.target.value})} />
-                        </>
-                      ) : (
-                        <div style={{fontSize: '0.85rem'}}>
-                          <span className="bill-tag">{sale.billNo}</span><br/>
-                          <small style={{color: '#666'}}>{sale.vehicleNo || "N/A"}</small>
-                        </div>
-                      )}
+                  <tr key={sale._id}>
+                    <td>{editId === sale._id
+                      ? <input type="date" value={editData.date || ""} onChange={(e)=>setEditData({...editData,date:e.target.value})}/>
+                      : sale.date}
                     </td>
 
+                    <td>{sale.billNo}<br />{sale.vehicleNo || "N/A"}</td>
+                    <td>{sale.customerName}</td>
+                    <td>{sale.quantity} @ ₹{sale.rate}</td>
+                    <td>₹{sale.freight || 0} / {sale.cashDiscount || 0}%</td>
+                    <td>₹{sale.totalAmount || sale.totalPrice || 0}</td>
+                    <td>₹{sale.amountReceived || 0}</td>
+                    <td style={{ color: "red" }}>₹{sale.paymentDue || 0}</td>
+                    <td>{sale.remarks}</td>
                     <td>
-                      {editId === sale._id ? 
-                        <input value={editData.customerName} onChange={(e) => setEditData({...editData, customerName: e.target.value})} /> 
-                        : sale.customerName
-                      }
-                    </td>
-
-                    {/* Qty & Rate */}
-                    <td>
-                      {editId === sale._id ? (
-                        <>
-                          <input type="number" placeholder="Qty" value={editData.quantity} onChange={(e) => setEditData({...editData, quantity: e.target.value})} />
-                          <input type="number" placeholder="Rate" value={editData.rate} onChange={(e) => setEditData({...editData, rate: e.target.value})} />
-                        </>
-                      ) : (
-                        <span>{sale.quantity} @ ₹{sale.rate}</span>
-                      )}
-                    </td>
-                    
-                    {/* Travel & CD % */}
-                    <td>
-                      {editId === sale._id ? (
-                        <>
-                          <input type="number" placeholder="Travel" value={editData.travelingCost} onChange={(e) => setEditData({...editData, travelingCost: e.target.value})} />
-                          <input type="number" placeholder="CD %" value={editData.cashDiscount} onChange={(e) => setEditData({...editData, cashDiscount: e.target.value})} />
-                        </>
-                      ) : (
-                        <div style={{fontSize: '0.85rem'}}>
-                          T: ₹{sale.travelingCost || 0}<br/>
-                          CD: {sale.cashDiscount || 0}%
-                        </div>
-                      )}
-                    </td>
-
-                    <td style={{fontWeight: 'bold'}}>₹{editId === sale._id ? editData.totalPrice : sale.totalPrice}</td>
-                    
-                    <td>
-                      {editId === sale._id ? 
-                        <input type="number" value={editData.amountReceived} onChange={(e) => setEditData({...editData, amountReceived: e.target.value})} /> 
-                        : `₹${sale.amountReceived}`
-                      }
-                    </td>
-
-                    <td style={{color: 'red', fontWeight: 'bold'}}>₹{editId === sale._id ? editData.paymentDue : sale.paymentDue}</td>
-                    
-                    <td>
-                      {editId === sale._id ? 
-                        <input value={editData.remarks} onChange={(e) => setEditData({...editData, remarks: e.target.value})} /> 
-                        : <small>{sale.remarks}</small>
-                      }
-                    </td>
-                    
-                    <td>
-                      {editId === sale._id ? (
-                        <div className="btn-group-row">
-                          <button className="save-btn-ui" onClick={handleSave}>💾</button> 
-                          <button className="cancel-btn-ui" onClick={() => setEditId(null)}>✖</button>
-                        </div>
-                      ) : (
-                        <div className="btn-group-row">
-                          <button className="row-edit-btn" onClick={() => startEdit(sale)} disabled={!isAuthorized}>✏️</button> 
-                          <button className="row-delete-btn" onClick={() => handleDelete(sale._id)} disabled={!isAuthorized}>🗑️</button>
-                        </div>
-                      )}
+                      <button onClick={() => startEdit(sale)}>✏️</button>
+                      <button onClick={() => handleDelete(sale._id)}>🗑️</button>
                     </td>
                   </tr>
                 ))}
@@ -300,18 +315,18 @@ const getProcessedList = () => {
           </div>
 
           <div className="pagination-container">
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="pg-btn">◀ Prev</button>
-            <span className="pg-info">Page {currentPage} of {totalPages || 1}</span>
-            <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="pg-btn">Next ▶</button>
+            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>◀</button>
+            <span>Page {currentPage} of {totalPages || 1}</span>
+            <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>▶</button>
           </div>
         </div>
       </div>
 
-      <CustomSnackbar 
-        open={snackbar.open} 
-        message={snackbar.message} 
-        severity={snackbar.severity} 
-        onClose={() => setSnackbar({ ...snackbar, open: false })} 
+      <CustomSnackbar
+        open={snackbar.open}
+        message={snackbar.message}
+        severity={snackbar.severity}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
       />
     </>
   );

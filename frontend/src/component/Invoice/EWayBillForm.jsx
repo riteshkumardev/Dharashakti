@@ -2,7 +2,16 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "./ewayForm.css";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const API_BASE_URL =
+  process.env.REACT_APP_API_URL || "http://localhost:5000";
+
+/* =========================
+   🔒 Helper (NaN Safe)
+   ========================= */
+const toSafeNumber = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
 const EWayBillForm = ({ data, setData, onPreview }) => {
   const [suppliers, setSuppliers] = useState([]);
@@ -14,81 +23,122 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     "Corn Grit": "11031300",
     "Rice Grit": "10064000",
     "Cattle Feed": "23099010",
-    "Corn Flour": "11022000"
+    "Corn Flour": "11022000",
   };
 
+  /* =========================
+     🔢 Fetch Latest Bill No
+     ========================= */
   useEffect(() => {
     const fetchLatestBill = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/sales/latest-bill-no`);
-        const nextBillNo = res.data.success ? Number(res.data.nextBillNo) : 169;
-        
-        setData(prev => ({ 
-          ...prev, 
+        const res = await axios.get(
+          `${API_BASE_URL}/api/sales/latest-bill-no`
+        );
+        const nextBillNo =
+          res.data?.success && Number.isFinite(Number(res.data.nextBillNo))
+            ? Number(res.data.nextBillNo)
+            : 1;
+
+        setData((prev) => ({
+          ...prev,
           billNo: nextBillNo,
-          date: new Date().toISOString().split('T')[0] 
+          date: new Date().toISOString().split("T")[0],
         }));
       } catch (error) {
-        console.error("Error fetching bill no:", error);
-        setData(prev => ({ ...prev, billNo: "" }));
+        console.error("Bill no fetch failed:", error);
       }
     };
     fetchLatestBill();
   }, [setData]);
 
+  /* =========================
+     📡 Fetch Suppliers & Drivers
+     ========================= */
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const supRes = await axios.get(`${API_BASE_URL}/api/suppliers/list`);
-        const empRes = await axios.get(`${API_BASE_URL}/api/employees`); 
-        if (supRes.data.success) setSuppliers(supRes.data.data);
-        if (empRes.data.success) {
-          const onlyDrivers = empRes.data.data.filter(emp => 
-            emp.role?.toLowerCase() === 'driver' || emp.designation?.toLowerCase() === 'driver'
+        const supRes = await axios.get(
+          `${API_BASE_URL}/api/suppliers/list`
+        );
+        const empRes = await axios.get(
+          `${API_BASE_URL}/api/employees`
+        );
+
+        if (supRes.data?.success) setSuppliers(supRes.data.data);
+
+        if (empRes.data?.success) {
+          const onlyDrivers = empRes.data.data.filter(
+            (e) =>
+              e.role?.toLowerCase() === "driver" ||
+              e.designation?.toLowerCase() === "driver"
           );
           setDrivers(onlyDrivers);
         }
-      } catch (error) { console.error("Data loading failed", error); }
+      } catch (error) {
+        console.error("Data loading failed:", error);
+      }
     };
     fetchData();
   }, []);
 
-  const handleFinalSubmit = async () => {
-    if (!data.billNo || !data.to.name || !data.goods || data.goods[0].quantity <= 0) {
-      alert("Please fill Bill Number, Customer and Goods details!");
-      return;
+  /* =========================
+     🧮 Recalculate Totals
+     ========================= */
+  const calculateTotal = (goodsList, freightVal) => {
+    let taxable = 0;
+    let tax = 0;
+
+    goodsList.forEach((g) => {
+      const t = toSafeNumber(g.taxableAmount);
+      taxable += t;
+      tax += (t * toSafeNumber(g.taxRate)) / 100;
+    });
+
+    const freight = toSafeNumber(freightVal);
+
+    setData({
+      ...data,
+      goods: goodsList,
+      freight,
+      taxSummary: {
+        taxable,
+        cgst: tax / 2,
+        sgst: tax / 2,
+        igst: tax,
+        total: taxable + tax + freight,
+      },
+    });
+  };
+
+  /* =========================
+     ✍️ Update Goods
+     ========================= */
+  const updateGoods = (index, field, value) => {
+    const updatedGoods = [...data.goods];
+
+    if (field === "product") {
+      updatedGoods[index].product = value;
+      updatedGoods[index].hsn = HSN_MASTER[value] || "";
+    } else {
+      updatedGoods[index][field] = value;
     }
 
-    setLoading(true);
-    try {
-      const payload = {
-        ...data,
-        billNo: Number(data.billNo),
-        freight: Number(data.freight),
-        taxableValue: Number(data.taxSummary.taxable),
-        cgst: Number(data.taxSummary.cgst),
-        sgst: Number(data.taxSummary.sgst),
-        igst: Number(data.taxSummary.igst),
-        totalAmount: Number(data.taxSummary.total),
-      };
+    const qty = toSafeNumber(updatedGoods[index].quantity);
+    const rate = toSafeNumber(updatedGoods[index].rate);
+    updatedGoods[index].taxableAmount = qty * rate;
 
-      const res = await axios.post(`${API_BASE_URL}/api/sales`, payload);
-
-      if (res.data.success) {
-        alert("Bill Saved Successfully!");
-        onPreview(); 
-      }
-    } catch (error) {
-      console.error("Submit failed:", error.response?.data || error.message);
-      alert("Error saving bill: " + (error.response?.data?.message || error.message));
-    } finally {
-      setLoading(false);
-    }
+    calculateTotal(updatedGoods, data.freight);
   };
 
   const handleAddItem = () => {
-    const newItem = { hsn: "", product: "", quantity: 0, rate: 0, taxRate: 0, taxableAmount: 0 };
-    setData({ ...data, goods: [...data.goods, newItem] });
+    setData({
+      ...data,
+      goods: [
+        ...data.goods,
+        { hsn: "", product: "", quantity: 0, rate: 0, taxRate: 0, taxableAmount: 0 },
+      ],
+    });
   };
 
   const handleRemoveItem = (index) => {
@@ -96,180 +146,178 @@ const EWayBillForm = ({ data, setData, onPreview }) => {
     calculateTotal(updatedGoods, data.freight);
   };
 
+  /* =========================
+     👤 Select Supplier
+     ========================= */
   const handleSelectSupplier = (e) => {
-    const selectedName = e.target.value;
-    const s = suppliers.find(item => item.name === selectedName);
-    if (s) {
-      setData({ ...data, to: { name: s.name, gst: s.gstin, address: s.address, phone: s.phone } });
-    } else {
-      setData({ ...data, to: { name: "", gst: "", address: "", phone: "" } });
-    }
-  };
-
-  const handleSelectDriver = (d) => {
-    setData({ ...data, vehicle: { ...data.vehicle, driverName: d.name, driverPhone: d.phone } });
-    setShowDriverList(false);
-  };
-
-  const updateGoods = (index, field, value) => {
-    const updatedGoods = [...data.goods];
-    if (field === "product") {
-      updatedGoods[index].product = value;
-      updatedGoods[index].hsn = HSN_MASTER[value] || ""; 
-    } else {
-      updatedGoods[index][field] = value;
-    }
-    const qty = Number(updatedGoods[index].quantity) || 0;
-    const rate = Number(updatedGoods[index].rate) || 0;
-    updatedGoods[index].taxableAmount = qty * rate;
-    
-    const totalQty = updatedGoods.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-    calculateTotal(updatedGoods, totalQty * 0.80);
-  };
-
-  const calculateTotal = (updatedGoods, freightVal) => {
-    let totalTaxable = 0;
-    let totalIgst = 0;
-    let totalQty = 0;
-
-    updatedGoods.forEach(item => {
-      const taxable = Number(item.taxableAmount) || 0;
-      totalTaxable += taxable;
-      totalIgst += (taxable * (Number(item.taxRate) || 0)) / 100;
-      totalQty += Number(item.quantity) || 0;
-    });
-
-    const fAmount = freightVal !== null ? Number(freightVal) : totalQty * 0.80;
-
+    const s = suppliers.find((x) => x.name === e.target.value);
     setData({
       ...data,
-      goods: updatedGoods,
-      freight: fAmount,
-      taxSummary: {
-        taxable: totalTaxable,
-        cgst: totalIgst / 2,
-        sgst: totalIgst / 2,
-        igst: totalIgst,
-        total: (totalTaxable + totalIgst) - fAmount 
-      }
+      to: s
+        ? { name: s.name, gst: s.gstin, address: s.address, phone: s.phone }
+        : { name: "", gst: "", address: "", phone: "" },
     });
   };
 
+  /* =========================
+     💾 Final Submit
+     ========================= */
+  const handleFinalSubmit = async () => {
+    if (!data.billNo || !data.to?.name || data.goods.length === 0) {
+      alert("Please fill Bill Number, Customer & Product!");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const sanitizedGoods = data.goods.map((g) => ({
+        product: g.product,
+        hsn: g.hsn,
+        quantity: toSafeNumber(g.quantity),
+        rate: toSafeNumber(g.rate),
+        taxRate: toSafeNumber(g.taxRate),
+        taxableAmount: toSafeNumber(g.taxableAmount),
+      }));
+
+      const payload = {
+        ...data,
+        billNo: toSafeNumber(data.billNo),
+        customerName: data.to.name,
+        vehicleNo: data.vehicle?.vehicleNo || "",
+
+        productName: sanitizedGoods[0].product,
+        quantity: sanitizedGoods[0].quantity,
+        rate: sanitizedGoods[0].rate,
+
+        freight: toSafeNumber(data.freight),
+        taxableValue: toSafeNumber(data.taxSummary.taxable),
+        cgst: toSafeNumber(data.taxSummary.cgst),
+        sgst: toSafeNumber(data.taxSummary.sgst),
+        igst: toSafeNumber(data.taxSummary.igst),
+        totalAmount: toSafeNumber(data.taxSummary.total),
+        paymentDue:
+          toSafeNumber(data.taxSummary.total) -
+          toSafeNumber(data.amountReceived),
+
+        goods: sanitizedGoods,
+      };
+
+      const res = await axios.post(
+        `${API_BASE_URL}/api/sales`,
+        payload
+      );
+
+      if (res.data.success) {
+        alert("Bill Saved Successfully!");
+        onPreview();
+      }
+    } catch (error) {
+      console.error("Submit failed:", error);
+      alert("Save failed. Check quantity or product.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* =========================
+     🧾 UI
+     ========================= */
   return (
     <div className="eway-form-page no-print">
       <div className="eway-form-card">
         <h2>📄 E-Way Bill Form</h2>
 
-        {/* --- SECTION 1: Basic Bill Details --- */}
-        <div className="eway-form-grid" style={{ background: '#eef2f7', padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
-          <div className="form-group">
-            <label>Bill Number (Manual Edit)</label>
-            <input type="number" style={{ fontWeight: 'bold' }} value={data.billNo || ""} onChange={(e) => setData({ ...data, billNo: e.target.value })} placeholder="Enter Bill No" />
-          </div>
-          <div className="form-group">
-            <label>Date</label>
-            <input type="date" value={data.date || ""} onChange={(e) => setData({ ...data, date: e.target.value })} />
-          </div>
-          <div className="form-group">
-            <label>Vehicle No</label>
-            <input placeholder="BR11..." value={data.vehicle?.vehicleNo || ""} onChange={e => setData({ ...data, vehicle: { ...data.vehicle, vehicleNo: e.target.value } })} />
-          </div>
-        </div>
-
-        {/* --- SECTION 2: Customer & Dispatch --- */}
+        {/* Bill Details */}
         <div className="eway-form-grid">
-          <div className="form-group">
-            <label>Select Customer</label>
-            <select value={data.to?.name || ""} onChange={handleSelectSupplier} className="customer-select">
-              <option value="">-- Choose Customer --</option>
-              {suppliers.map(s => <option key={s._id} value={s.name}>{s.name}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Buyer's Order No</label>
-            <input type="text" value={data.buyerOrderNo || ""} onChange={e => setData({...data, buyerOrderNo: e.target.value})} placeholder="Order No" />
-          </div>
-          <div className="form-group">
-            <label>Buyer's Order Date</label>
-            <input type="date" value={data.buyerOrderDate || ""} onChange={e => setData({...data, buyerOrderDate: e.target.value})} />
-          </div>
+          <input
+            type="number"
+            value={data.billNo || ""}
+            onChange={(e) => setData({ ...data, billNo: e.target.value })}
+            placeholder="Bill No"
+          />
+          <input
+            type="date"
+            value={data.date || ""}
+            onChange={(e) => setData({ ...data, date: e.target.value })}
+          />
+          <input
+            placeholder="Vehicle No"
+            value={data.vehicle?.vehicleNo || ""}
+            onChange={(e) =>
+              setData({
+                ...data,
+                vehicle: { ...data.vehicle, vehicleNo: e.target.value },
+              })
+            }
+          />
         </div>
 
-        {/* --- SECTION 3: Dispatch Details --- */}
-        <div className="eway-form-grid">
-          <div className="form-group">
-            <label>Dispatch Document No</label>
-            <input type="text" value={data.dispatchDocNo || ""} onChange={e => setData({...data, dispatchDocNo: e.target.value})} placeholder="Doc No / Container No" />
-          </div>
-          <div className="form-group">
-            <label>Dispatch Date</label>
-            <input type="date" value={data.dispatchDate || ""} onChange={e => setData({...data, dispatchDate: e.target.value})} />
-          </div>
-          <div className="form-group">
-            <label>Dispatched Through</label>
-            <select value={data.dispatchedThrough || ""} onChange={e => setData({...data, dispatchedThrough: e.target.value})}>
-              <option value="">-- Select Mode --</option>
-              <option value="Truck">Truck</option>
-              <option value="Container">Container</option>
-              <option value="Tractor">Tractor</option>
-              <option value="Self">Self</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Destination</label>
-            <input type="text" value={data.destination || ""} onChange={e => setData({...data, destination: e.target.value})} placeholder="Place of Delivery" />
-          </div>
-        </div>
+        {/* Customer */}
+        <select value={data.to?.name || ""} onChange={handleSelectSupplier}>
+          <option value="">Select Customer</option>
+          {suppliers.map((s) => (
+            <option key={s._id} value={s.name}>
+              {s.name}
+            </option>
+          ))}
+        </select>
 
-        {/* --- SECTION 4: Driver Details --- */}
-        <div className="eway-form-grid">
-          <div style={{ position: 'relative' }}>
-            <label>Driver Search</label>
-            <input placeholder="Search Driver..." value={data.vehicle?.driverName || ""} onFocus={() => setShowDriverList(true)} onChange={e => setData({...data, vehicle: {...data.vehicle, driverName: e.target.value}})} />
-            {showDriverList && (
-              <div className="search-dropdown">
-                {drivers.filter(d => d.name.toLowerCase().includes((data.vehicle?.driverName || "").toLowerCase())).map(d => (
-                  <div key={d._id} className="dropdown-item" onClick={() => handleSelectDriver(d)}>{d.name}</div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="form-group">
-            <label>Driver Mobile</label>
-            <input placeholder="Driver Phone" value={data.vehicle?.driverPhone || ""} onChange={e => setData({ ...data, vehicle: { ...data.vehicle, driverPhone: e.target.value } })} />
-          </div>
-        </div>
-
-        <button onClick={handleAddItem} className="add-item-btn" style={{ margin: '15px 0' }}>+ Add Item</button>
-
-        {/* --- SECTION 5: Goods Table --- */}
+        {/* Goods */}
+        <button onClick={handleAddItem}>+ Add Item</button>
         {data.goods.map((item, index) => (
-          <div className="eway-form-grid" key={index} style={{ borderBottom: '1px solid #ccc', paddingBottom: '10px' }}>
-            <select value={item.product} onChange={e => updateGoods(index, "product", e.target.value)}>
-              <option value="">Product</option>
-              {Object.keys(HSN_MASTER).map(prod => <option key={prod} value={prod}>{prod}</option>)}
+          <div key={index} className="eway-form-grid">
+            <select
+              value={item.product}
+              onChange={(e) => updateGoods(index, "product", e.target.value)}
+            >
+              <option value="">Select Product</option>
+              {Object.keys(HSN_MASTER).map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
             </select>
-            <input placeholder="Qty" type="number" value={item.quantity} onChange={e => updateGoods(index, "quantity", e.target.value)} />
-            <input placeholder="Rate" type="number" value={item.rate} onChange={e => updateGoods(index, "rate", e.target.value)} />
-            <input placeholder="Tax %" type="number" value={item.taxRate} onChange={e => updateGoods(index, "taxRate", e.target.value)} />
-            <button onClick={() => handleRemoveItem(index)} className="del-btn">✖</button>
+            <input
+              type="number"
+              placeholder="Qty"
+              value={item.quantity}
+              onChange={(e) => updateGoods(index, "quantity", e.target.value)}
+            />
+            <input
+              type="number"
+              placeholder="Rate"
+              value={item.rate}
+              onChange={(e) => updateGoods(index, "rate", e.target.value)}
+            />
+            <input
+              type="number"
+              placeholder="Tax %"
+              value={item.taxRate}
+              onChange={(e) => updateGoods(index, "taxRate", e.target.value)}
+            />
+            <button onClick={() => handleRemoveItem(index)}>✖</button>
           </div>
         ))}
 
-        {/* --- SECTION 6: Totals --- */}
-        <div className="eway-form-grid" style={{ marginTop: '20px' }}>
-          <div>
-            <label>Freight (Auto: 0.80/kg)</label>
-            <input type="number" value={data.freight || ""} onChange={(e) => calculateTotal(data.goods, e.target.value)} />
-          </div>
-          <div className="read-only-box">
-             <strong>Grand Total: ₹{Number(data.taxSummary.total).toLocaleString()}</strong>
-          </div>
-        </div>
+        {/* Freight & Total */}
+        <input
+          type="number"
+          placeholder="Freight"
+          value={data.freight || ""}
+          onChange={(e) => calculateTotal(data.goods, e.target.value)}
+        />
 
-        <button onClick={handleFinalSubmit} disabled={loading} className="preview-btn" style={{ width: '100%', marginTop: '20px', background: loading ? '#ccc' : '#007bff' }}>
-          {loading ? "Saving..." : "👁️ Save & Preview Bill"}
-        </button>
+        <strong>
+          Grand Total ₹{toSafeNumber(data.taxSummary?.total).toLocaleString()}
+        </strong>
+
+        {/* <button
+          onClick={handleFinalSubmit}
+          disabled={loading}
+          className="preview-btn"
+        >
+          {loading ? "Saving..." : "💾 Save & Preview"}
+        </button> */}
       </div>
     </div>
   );
