@@ -200,3 +200,44 @@
   background: #cbd5e0;
   border-radius: 10px;
 }
+.card-3d-grouped {
+  background: #f8fafc;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  box-shadow: 4px 4px 8px #d1d9e6, -4px -4px 8px #ffffff;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.main-info {
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.bill-dropdown-3d {
+  background: #f1f5f9;
+  padding: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.inner-bill-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  border-bottom: 1px dashed #0b71df;
+}
+
+.btn-mini-3d {
+  background: #1b1fee;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  width: 30%;
+  font-size: 10px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
