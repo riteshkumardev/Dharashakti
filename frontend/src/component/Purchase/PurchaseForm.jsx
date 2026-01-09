@@ -64,16 +64,25 @@ const PurchaseForm = ({ onCancel, role }) => {
   }, [API_URL]);
 
   /* =========================================
-      🎯 Auto-Fill Supplier Logic
+      🎯 Auto-Fill Supplier Logic (Updated)
   ========================================== */
   const handleSupplierSelect = (e) => {
     const selectedName = e.target.value;
     const supplier = suppliers.find((s) => s.name === selectedName);
 
     if (supplier) {
+      // ✨ Logic for Local Customer: Ask for custom name
+      let finalName = supplier.name;
+      if (supplier.name === "Local customer") {
+        const customName = prompt("Please enter Local Customer Name for the Bill:");
+        if (customName) {
+          finalName = customName;
+        }
+      }
+
       setFormData((prev) => ({
         ...prev,
-        supplierName: supplier.name,
+        supplierName: finalName, // Yahan final name save hoga
         gstin: supplier.gstin || "N/A",
         mobile: supplier.phone || "N/A",
         address: supplier.address || "N/A",
@@ -161,12 +170,11 @@ const PurchaseForm = ({ onCancel, role }) => {
             <input type="date" name="date" value={formData.date} onChange={handleChange} disabled={loading || !isAuthorized} />
           </div>
 
-          {/* 🆕 Supplier Selection with Auto-fill */}
           <div className="input-group">
             <label>Select Supplier</label>
             <select 
               name="supplierName" 
-              value={formData.supplierName} 
+              value={formData.supplierName === "" ? "" : (suppliers.find(s => s.name === "Local customer") ? "Local customer" : formData.supplierName)} 
               onChange={handleSupplierSelect} 
               required 
               disabled={loading || !isAuthorized}
@@ -176,6 +184,11 @@ const PurchaseForm = ({ onCancel, role }) => {
                 <option key={s._id} value={s.name}>{s.name}</option>
               ))}
             </select>
+          </div>
+
+          <div className="input-group">
+            <label>Supplier Name (Saved)</label>
+            <input name="supplierName" value={formData.supplierName} readOnly className="readonly-input" style={{backgroundColor: '#e8f5e9', fontWeight: 'bold'}} />
           </div>
 
           <div className="input-group">
@@ -202,8 +215,6 @@ const PurchaseForm = ({ onCancel, role }) => {
             <label>Supplier Address</label>
             <input name="address" value={formData.address} readOnly className="readonly-input" style={{backgroundColor: '#f0f0f0'}} />
           </div>
-
-          {/* <hr className="span-2" style={{width: '100%', margin: '10px 0', border: '0.5px solid #eee'}} /> */}
 
           <div className="input-group">
             <label>Product Name</label>
