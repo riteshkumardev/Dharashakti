@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import Loader from "../Core_Component/Loader/Loader";
+
 import "./ProfitLoss.css";
+import FinancialSummary from "../Core_Component/Alert/FinancialSummary";
 
 /* =========================
-   🔒 Helper (NaN Safe)
+    🔒 Helper (NaN Safe)
    ========================= */
 const safeNum = (v) => {
   const n = Number(v);
@@ -22,7 +24,7 @@ const ProfitLoss = () => {
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   /* =========================
-     📡 Fetch ALL Required Data
+      📡 Fetch ALL Required Data
      ========================= */
   useEffect(() => {
     const fetchAll = async () => {
@@ -33,17 +35,11 @@ const ProfitLoss = () => {
         const [salesRes, purchaseRes, analyticsRes] = await Promise.all([
           axios.get(`${API_URL}/api/sales`),
           axios.get(`${API_URL}/api/purchases`),
-          axios.get(`${API_URL}/api/analytics/profit-loss`) // only for expenses
+          axios.get(`${API_URL}/api/analytics/profit-loss`) 
         ]);
 
-        if (salesRes.data?.success) {
-          setSalesList(salesRes.data.data || []);
-        }
-
-        if (purchaseRes.data?.success) {
-          setPurchaseList(purchaseRes.data.data || []);
-        }
-
+        if (salesRes.data?.success) setSalesList(salesRes.data.data || []);
+        if (purchaseRes.data?.success) setPurchaseList(purchaseRes.data.data || []);
         if (analyticsRes.data?.success) {
           setExpenses(safeNum(analyticsRes.data.totalExpenses));
         }
@@ -60,43 +56,18 @@ const ProfitLoss = () => {
   }, [API_URL]);
 
   /* =========================
-     🧮 TOTAL SALES (ALL SALES)
+      🧮 CALCULATIONS (Common for Summary & Table)
      ========================= */
   const totalSales = useMemo(() => {
-    return salesList.reduce(
-      (sum, s) =>
-        sum +
-        safeNum(
-          s.totalAmount ??
-          s.totalPrice ??
-          0
-        ),
-      0
-    );
+    return salesList.reduce((sum, s) => sum + safeNum(s.totalAmount ?? s.totalPrice ?? 0), 0);
   }, [salesList]);
 
-  /* =========================
-     🧮 TOTAL PURCHASE (ALL PURCHASES)
-     ========================= */
   const totalPurchases = useMemo(() => {
-    return purchaseList.reduce(
-      (sum, p) => sum + safeNum(p.totalAmount),
-      0
-    );
+    return purchaseList.reduce((sum, p) => sum + safeNum(p.totalAmount), 0);
   }, [purchaseList]);
 
-  /* =========================
-     🧮 PROFIT / LOSS
-     ========================= */
-  const totalOut = useMemo(
-    () => totalPurchases + expenses,
-    [totalPurchases, expenses]
-  );
-
-  const netProfit = useMemo(
-    () => totalSales - totalOut,
-    [totalSales, totalOut]
-  );
+  const totalOut = useMemo(() => totalPurchases + expenses, [totalPurchases, expenses]);
+  const netProfit = useMemo(() => totalSales - totalOut, [totalSales, totalOut]);
 
   if (loading) return <Loader />;
 
@@ -104,12 +75,13 @@ const ProfitLoss = () => {
     <div className="pl-container">
       <div className="pl-header">
         <h3>📊 Profit & Loss Statement (Live)</h3>
-        {error && (
-          <p style={{ color: "red", fontSize: "12px" }}>{error}</p>
-        )}
+        {error && <p style={{ color: "red", fontSize: "12px" }}>{error}</p>}
       </div>
 
-      <div className="pl-table-wrapper card-shadow">
+
+      {/* Detailed Table Section */}
+      <div className="pl-table-wrapper card-shadow" style={{ marginTop: "30px" }}>
+        <h4 style={{ padding: "15px", margin: 0, borderBottom: "1px solid #eee" }}>Detailed Breakdown</h4>
         <table className="pl-table">
           <thead>
             <tr>
@@ -120,7 +92,6 @@ const ProfitLoss = () => {
             </tr>
           </thead>
           <tbody>
-
             {/* SALES */}
             <tr>
               <td>Total Sales (All Invoices)</td>
@@ -159,11 +130,7 @@ const ProfitLoss = () => {
                   Formula: Sales − (Purchases + Expenses)
                 </p>
               </td>
-              <td
-                className={`text-right total-final ${
-                  netProfit >= 0 ? "pos" : "neg"
-                }`}
-              >
+              <td className={`text-right total-final ${netProfit >= 0 ? "pos" : "neg"}`}>
                 ₹{netProfit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
               </td>
               <td>
@@ -172,10 +139,16 @@ const ProfitLoss = () => {
                 </strong>
               </td>
             </tr>
-
           </tbody>
         </table>
       </div>
+      
+      {/* ✨ Financial Summary Core Component ✨ */}
+      <FinancialSummary 
+        salesList={salesList} 
+        purchaseList={purchaseList} 
+        expenses={expenses} 
+      />
     </div>
   );
 };
