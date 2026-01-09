@@ -166,7 +166,7 @@ const EWayBillContainer = ({ data }) => {
                 <td>{i + 1}</td>
                 <td className="text-left"><strong>{g.product} (NON BRANDED)</strong></td>
                 <td>{g.hsn}</td>
-                <td><strong>{g.quantity} KGS</strong></td>
+                <td><strong>{g.quantity} KGS</strong></td>  
                 <td>{g.rate}</td>
                 <td>KGS</td>
                 <td className="text-right" style={{borderRight: 'none'}}>{Number(g.taxableAmount).toFixed(2)}</td>

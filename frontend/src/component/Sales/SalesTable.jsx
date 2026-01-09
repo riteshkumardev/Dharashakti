@@ -74,7 +74,7 @@ const SalesTable = ({ role }) => {
 
     const base = qty * rate;
     const discount = (base * cdPercent) / 100;
-    const total = base + freight - discount;
+    const total = base - freight - discount;
     const due = total - received;
 
     setEditData((prev) => ({

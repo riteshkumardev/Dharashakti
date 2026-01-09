@@ -1,52 +1,115 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios"; 
+import React, { useState, useEffect, useMemo } from "react";
+import axios from "axios";
 import Loader from "../Core_Component/Loader/Loader";
 import "./ProfitLoss.css";
 
-const ProfitLoss = () => {
-  const [data, setData] = useState({ sales: 0, purchases: 0, expenses: 0 });
-  const [loading, setLoading] = useState(true);
+/* =========================
+   🔒 Helper (NaN Safe)
+   ========================= */
+const safeNum = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
-  // Live Backend URL handle karne ke liye dynamic logic
+const ProfitLoss = () => {
+  const [salesList, setSalesList] = useState([]);
+  const [purchaseList, setPurchaseList] = useState([]);
+  const [expenses, setExpenses] = useState(0);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
+  /* =========================
+     📡 Fetch ALL Required Data
+     ========================= */
   useEffect(() => {
-    const fetchAnalytics = async () => {
+    const fetchAll = async () => {
       try {
         setLoading(true);
-        // Backend se live data fetch karne ke liye API_URL ka use
-        const res = await axios.get(`${API_URL}/api/analytics/profit-loss`);
-        
-        if (res.data.success) {
-          setData({
-            sales: res.data.totalSales,
-            purchases: res.data.totalPurchases,
-            expenses: res.data.totalExpenses
-          });
+        setError(null);
+
+        const [salesRes, purchaseRes, analyticsRes] = await Promise.all([
+          axios.get(`${API_URL}/api/sales`),
+          axios.get(`${API_URL}/api/purchases`),
+          axios.get(`${API_URL}/api/analytics/profit-loss`) // only for expenses
+        ]);
+
+        if (salesRes.data?.success) {
+          setSalesList(salesRes.data.data || []);
         }
+
+        if (purchaseRes.data?.success) {
+          setPurchaseList(purchaseRes.data.data || []);
+        }
+
+        if (analyticsRes.data?.success) {
+          setExpenses(safeNum(analyticsRes.data.totalExpenses));
+        }
+
       } catch (err) {
-        console.error("Financial data fetch error:", err);
+        console.error("P&L fetch error:", err);
+        setError("Server se Profit/Loss data load nahi ho pa raha.");
       } finally {
-        // Smooth transition
-        setTimeout(() => setLoading(false), 800);
+        setTimeout(() => setLoading(false), 500);
       }
     };
 
-    fetchAnalytics();
+    fetchAll();
   }, [API_URL]);
 
-  const totalOut = data.purchases + data.expenses;
-  const netProfit = data.sales - totalOut;
+  /* =========================
+     🧮 TOTAL SALES (ALL SALES)
+     ========================= */
+  const totalSales = useMemo(() => {
+    return salesList.reduce(
+      (sum, s) =>
+        sum +
+        safeNum(
+          s.totalAmount ??
+          s.totalPrice ??
+          0
+        ),
+      0
+    );
+  }, [salesList]);
+
+  /* =========================
+     🧮 TOTAL PURCHASE (ALL PURCHASES)
+     ========================= */
+  const totalPurchases = useMemo(() => {
+    return purchaseList.reduce(
+      (sum, p) => sum + safeNum(p.totalAmount),
+      0
+    );
+  }, [purchaseList]);
+
+  /* =========================
+     🧮 PROFIT / LOSS
+     ========================= */
+  const totalOut = useMemo(
+    () => totalPurchases + expenses,
+    [totalPurchases, expenses]
+  );
+
+  const netProfit = useMemo(
+    () => totalSales - totalOut,
+    [totalSales, totalOut]
+  );
 
   if (loading) return <Loader />;
 
   return (
     <div className="pl-container">
       <div className="pl-header">
-        <h3>📊 Financial Analytics (Live MongoDB)</h3>
+        <h3>📊 Profit & Loss Statement (Live)</h3>
+        {error && (
+          <p style={{ color: "red", fontSize: "12px" }}>{error}</p>
+        )}
       </div>
 
-      <div className="pl-table-wrapper">
+      <div className="pl-table-wrapper card-shadow">
         <table className="pl-table">
           <thead>
             <tr>
@@ -57,32 +120,59 @@ const ProfitLoss = () => {
             </tr>
           </thead>
           <tbody>
+
+            {/* SALES */}
             <tr>
-              <td>Total Sales Revenue</td>
+              <td>Total Sales (All Invoices)</td>
               <td><span className="badge inc">Income</span></td>
-              <td className="text-right amount-plus">+{data.sales.toLocaleString()}</td>
-              <td>✅ Received</td>
+              <td className="text-right amount-plus">
+                + {totalSales.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </td>
+              <td>📄 Auto Calculated</td>
             </tr>
+
+            {/* PURCHASE */}
             <tr>
-              <td>Inventory Purchases</td>
-              <td><span className="badge exp">Purchase</span></td>
-              <td className="text-right amount-minus">-{data.purchases.toLocaleString()}</td>
-              <td>📦 Outgoing</td>
+              <td>Total Purchases</td>
+              <td><span className="badge pur">Purchase</span></td>
+              <td className="text-right amount-minus">
+                - {totalPurchases.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </td>
+              <td>📦 Stock In</td>
             </tr>
+
+            {/* EXPENSE */}
             <tr>
-              <td>Daily Operational Expenses</td>
+              <td>Total Expenses</td>
               <td><span className="badge exp">Expense</span></td>
-              <td className="text-right amount-minus">-{data.expenses.toLocaleString()}</td>
+              <td className="text-right amount-minus">
+                - {expenses.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </td>
               <td>💸 Paid</td>
             </tr>
 
+            {/* NET */}
             <tr className="final-row">
-              <td colSpan="2"><strong>NET SETTLEMENT (Profit/Loss)</strong></td>
-              <td className={`text-right total-final ${netProfit >= 0 ? 'pos' : 'neg'}`}>
-                ₹{netProfit.toLocaleString()}
+              <td colSpan="2">
+                <strong>NET PROFIT / LOSS</strong>
+                <p style={{ fontSize: "10px", margin: 0, color: "#666" }}>
+                  Formula: Sales − (Purchases + Expenses)
+                </p>
               </td>
-              <td><strong>{netProfit >= 0 ? "🚀 PROFIT" : "⚠️ LOSS"}</strong></td>
+              <td
+                className={`text-right total-final ${
+                  netProfit >= 0 ? "pos" : "neg"
+                }`}
+              >
+                ₹{netProfit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </td>
+              <td>
+                <strong className={netProfit >= 0 ? "text-pos" : "text-neg"}>
+                  {netProfit >= 0 ? "🚀 PROFIT" : "⚠️ LOSS"}
+                </strong>
+              </td>
             </tr>
+
           </tbody>
         </table>
       </div>
