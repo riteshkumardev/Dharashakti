@@ -17,6 +17,7 @@ import expenseRoutes from "./routes/expense.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
 import purchaseRoutes from "./routes/purchase.routes.js";
 import supplierRoutes from "./routes/supplier.routes.js";
+import aiRoutes from "./routes/ai.routes.js";
 
 // Database Connection
 dotenv.config();
@@ -42,6 +43,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/activity-logs", logRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/ai", aiRoutes);
 
 // Professional Inventory Flow Routes
 app.use("/api/purchases", purchaseRoutes); 
@@ -68,6 +70,27 @@ if (process.env.NODE_ENV !== 'production') {
     console.log(`🚀 Server running locally on port ${PORT}`);
   });
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Health check
+app.get("/", (req, res) => {
+  res.json({ status: "Backend running clean ✅" });
+});
+
+
+
+
 
 // Vercel ke liye export
 export default app;
