@@ -4,11 +4,14 @@ import "./SupplierManager.css";
 import Loader from '../Core_Component/Loader/Loader';
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
+// ✨ Setup dynamic API URL for Localhost and Vercel/Production
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 const SupplierManager = () => {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState([]);
-  const [searchTerm, setSearchTerm] = useState(""); // ✨ New Search State
+  const [searchTerm, setSearchTerm] = useState("");
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   
   const [formData, setFormData] = useState({
@@ -23,15 +26,19 @@ const SupplierManager = () => {
 
   const [editId, setEditId] = useState(null);
 
+  const showMsg = (msg, sev) => {
+    setSnackbar({ open: true, message: msg, severity: sev });
+  };
+
   const fetchSuppliers = async () => {
     setLoading(true);
     try {
-      const response = await axios.get("http://localhost:5000/api/suppliers/list");
+      const response = await axios.get(`${API_BASE_URL}/api/suppliers/list`);
       if (response.data.success) {
         setSuppliers(response.data.data);
       }
     } catch (error) {
-      showMsg("Error fetching suppliers", "error");
+      showMsg("Error fetching suppliers. Check if Backend is running.", "error");
     } finally {
       setLoading(false);
     }
@@ -41,15 +48,10 @@ const SupplierManager = () => {
     fetchSuppliers();
   }, []);
 
-  const showMsg = (msg, sev) => {
-    setSnackbar({ open: true, message: msg, severity: sev });
-  };
-
-  // ✨ Search Logic: Name, GSTIN, ya Phone mein se filter karega
   const filteredSuppliers = suppliers.filter((s) => {
     const search = searchTerm.toLowerCase();
     return (
-      s.name.toLowerCase().includes(search) ||
+      (s.name && s.name.toLowerCase().includes(search)) ||
       (s.gstin && s.gstin.toLowerCase().includes(search)) ||
       (s.phone && s.phone.includes(search))
     );
@@ -57,13 +59,21 @@ const SupplierManager = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.name.trim()) return showMsg("Supplier name is required", "error");
+
     setLoading(true);
+    // ✨ Convert previousBalance to number for safe calculation
+    const submissionData = {
+        ...formData,
+        previousBalance: Number(formData.previousBalance)
+    };
+
     try {
       if (editId) {
-        const response = await axios.put(`http://localhost:5000/api/suppliers/update/${editId}`, formData);
+        const response = await axios.put(`${API_BASE_URL}/api/suppliers/update/${editId}`, submissionData);
         if (response.data.success) showMsg("Supplier updated successfully!", "success");
       } else {
-        const response = await axios.post("http://localhost:5000/api/suppliers/add", formData);
+        await axios.post(`${API_BASE_URL}/api/suppliers/add`, submissionData);
         showMsg("Supplier saved successfully!", "success");
       }
       resetForm();
@@ -76,12 +86,12 @@ const SupplierManager = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure?")) {
+    if (window.confirm("Are you sure you want to delete this supplier?")) {
       setLoading(true);
       try {
-        await axios.delete(`http://localhost:5000/api/suppliers/delete/${id}`);
+        await axios.delete(`${API_BASE_URL}/api/suppliers/delete/${id}`);
         setSuppliers(suppliers.filter(s => s._id !== id));
-        showMsg("Deleted", "info");
+        showMsg("Supplier deleted", "info");
       } catch (error) {
         showMsg("Delete failed", "error");
       } finally {
@@ -94,10 +104,10 @@ const SupplierManager = () => {
     setEditId(s._id);
     setFormData({
       name: s.name,
-      address: s.address,
-      phone: s.phone,
-      gstin: s.gstin,
-      previousBalance: s.previousBalance,
+      address: s.address || "",
+      phone: s.phone || "",
+      gstin: s.gstin || "",
+      previousBalance: s.previousBalance || 0,
       lastBillNo: s.lastBillNo || "",
       lastBillDate: s.lastBillDate ? s.lastBillDate.substring(0, 10) : ""
     });
@@ -110,8 +120,6 @@ const SupplierManager = () => {
     setShowForm(false);
   };
 
-  if (loading && !suppliers.length) return <Loader />;
-
   return (
     <div className="supplier-container">
       <div className="supplier-header">
@@ -120,7 +128,6 @@ const SupplierManager = () => {
         </div>
         
         <div className="header-right" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-          {/* ✨ Professional Search Bar */}
           {!showForm && (
             <div className="search-wrapper">
               <input 
@@ -152,12 +159,15 @@ const SupplierManager = () => {
             <input placeholder="Opening Balance" type="number" value={formData.previousBalance} onChange={e => setFormData({...formData, previousBalance: e.target.value})} />
           </div>
           <div className="form-actions">
-            <button type="submit" className="save-btn">{editId ? "Update" : "Save"}</button>
+            <button type="submit" className="save-btn" disabled={loading}>
+                {loading ? "Processing..." : (editId ? "Update" : "Save")}
+            </button>
             <button type="button" className="cancel-btn" onClick={resetForm}>Cancel</button>
           </div>
         </form>
       ) : (
         <div className="supplier-list">
+          {loading && suppliers.length === 0 ? <Loader /> : (
           <table>
             <thead>
               <tr>
@@ -181,7 +191,9 @@ const SupplierManager = () => {
                       {s.lastBillNo || "---"}<br/>
                       <small>{s.lastBillDate ? new Date(s.lastBillDate).toLocaleDateString() : "No Date"}</small>
                     </td>
-                    <td className="total-cell">₹{s.totalOwed}</td>
+                    <td className="total-cell">
+                        ₹{Number(s.totalOwed || 0).toLocaleString('en-IN')}
+                    </td>
                     <td>
                       <button className="edit-icon" onClick={() => handleEdit(s)}>✏️</button>
                       <button className="delete-icon" onClick={() => handleDelete(s._id)}>🗑️</button>
@@ -197,6 +209,7 @@ const SupplierManager = () => {
               )}
             </tbody>
           </table>
+          )}
         </div>
       )}
 
