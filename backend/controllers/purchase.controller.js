@@ -1,14 +1,17 @@
 import Purchase from "../models/Purchase.js";
 import Stock from "../models/Stock.js";
 
-/* =========================
-   ➕ ADD PURCHASE
-========================= */
+/* =============================================
+    ➕ ADD PURCHASE (Updated with New Fields)
+============================================= */
 export const addPurchase = async (req, res) => {
   try {
     const {
       date,
       supplierName,
+      gstin,      // 🆕 New var
+      mobile,     // 🆕 New var
+      address,    // 🆕 New var
       productName,
       billNo,
       vehicleNo,
@@ -25,6 +28,9 @@ export const addPurchase = async (req, res) => {
     const purchase = await Purchase.create({
       date,
       supplierName,
+      gstin,      // 🆕 Save to DB
+      mobile,     // 🆕 Save to DB
+      address,    // 🆕 Save to DB
       productName,
       billNo,
       vehicleNo,
@@ -64,7 +70,7 @@ export const addPurchase = async (req, res) => {
 };
 
 /* =========================
-   📄 GET ALL PURCHASES
+    📄 GET ALL PURCHASES
 ========================= */
 export const getPurchases = async (req, res) => {
   try {
@@ -82,9 +88,9 @@ export const getPurchases = async (req, res) => {
   }
 };
 
-/* =========================
-   🛠 UPDATE PURCHASE
-========================= */
+/* =============================================
+    🛠 UPDATE PURCHASE (Updated with New Fields)
+============================================= */
 export const updatePurchase = async (req, res) => {
   try {
     const oldPurchase = await Purchase.findById(req.params.id);
@@ -93,40 +99,48 @@ export const updatePurchase = async (req, res) => {
 
     const {
       productName,
-      quantity = oldPurchase.quantity
+      quantity = oldPurchase.quantity,
+      gstin,      // 🆕 For update
+      mobile,     // 🆕 For update
+      address     // 🆕 For update
     } = req.body;
 
+    // Update with new numbers and new strings
     const updatedPurchase = await Purchase.findByIdAndUpdate(
       req.params.id,
       {
         ...req.body,
+        gstin,    // 🆕 Update GST
+        mobile,   // 🆕 Update Mobile
+        address,  // 🆕 Update Address
         quantity: Number(quantity),
-        rate: Number(req.body.rate),
-        travelingCost: Number(req.body.travelingCost),
-        cashDiscount: Number(req.body.cashDiscount),
-        paidAmount: Number(req.body.paidAmount),
-        totalAmount: Number(req.body.totalAmount),
-        balanceAmount: Number(req.body.balanceAmount)
+        rate: Number(req.body.rate || oldPurchase.rate),
+        travelingCost: Number(req.body.travelingCost || oldPurchase.travelingCost),
+        cashDiscount: Number(req.body.cashDiscount || oldPurchase.cashDiscount),
+        paidAmount: Number(req.body.paidAmount || oldPurchase.paidAmount),
+        totalAmount: Number(req.body.totalAmount || oldPurchase.totalAmount),
+        balanceAmount: Number(req.body.balanceAmount || oldPurchase.balanceAmount)
       },
       { new: true }
     );
 
     /* 🔁 STOCK ADJUSTMENT LOGIC */
-    // 1️⃣ old product quantity minus
+    // 1️⃣ Old product quantity roll-back (minus)
     await Stock.findOneAndUpdate(
       { productName: oldPurchase.productName },
       { $inc: { totalQuantity: -oldPurchase.quantity } }
     );
 
-    // 2️⃣ new product quantity add
+    // 2️⃣ New product quantity add
     const stock = await Stock.findOneAndUpdate(
-      { productName },
+      { productName: productName || updatedPurchase.productName },
       { $inc: { totalQuantity: updatedPurchase.quantity } },
       { upsert: true, new: true }
     );
 
     res.json({
       success: true,
+      message: "Update successful and Stock adjusted",
       purchase: updatedPurchase,
       stock
     });
@@ -140,7 +154,7 @@ export const updatePurchase = async (req, res) => {
 };
 
 /* =========================
-   ❌ DELETE PURCHASE
+    ❌ DELETE PURCHASE
 ========================= */
 export const deletePurchase = async (req, res) => {
   try {
@@ -159,7 +173,7 @@ export const deletePurchase = async (req, res) => {
 
     res.json({
       success: true,
-      message: "Purchase deleted & Stock adjusted ✅",
+      message: "Purchase deleted & Stock roll-back complete ✅",
       stock
     });
 
