@@ -1,323 +1,107 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import axios from "axios";
 import "./ewayForm.css";
 
-const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:5000";
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-/* =========================
-   🔒 Helper (NaN Safe)
-   ========================= */
 const toSafeNumber = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 };
 
 const EWayBillForm = ({ data, setData, onPreview }) => {
-  const [suppliers, setSuppliers] = useState([]);
-  const [drivers, setDrivers] = useState([]);
-  const [showDriverList, setShowDriverList] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [searchBillNo, setSearchBillNo] = useState("");
 
-  const HSN_MASTER = {
-    "Corn Grit": "11031300",
-    "Rice Grit": "10064000",
-    "Cattle Feed": "23099010",
-    "Corn Flour": "11022000",
-  };
-
-  /* =========================
-     🔢 Fetch Latest Bill No
-     ========================= */
-  useEffect(() => {
-    const fetchLatestBill = async () => {
-      try {
-        const res = await axios.get(
-          `${API_BASE_URL}/api/sales/latest-bill-no`
-        );
-        const nextBillNo =
-          res.data?.success && Number.isFinite(Number(res.data.nextBillNo))
-            ? Number(res.data.nextBillNo)
-            : 1;
-
-        setData((prev) => ({
-          ...prev,
-          billNo: nextBillNo,
-          date: new Date().toISOString().split("T")[0],
-        }));
-      } catch (error) {
-        console.error("Bill no fetch failed:", error);
-      }
-    };
-    fetchLatestBill();
-  }, [setData]);
-
-  /* =========================
-     📡 Fetch Suppliers & Drivers
-     ========================= */
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const supRes = await axios.get(
-          `${API_BASE_URL}/api/suppliers/list`
-        );
-        const empRes = await axios.get(
-          `${API_BASE_URL}/api/employees`
-        );
-
-        if (supRes.data?.success) setSuppliers(supRes.data.data);
-
-        if (empRes.data?.success) {
-          const onlyDrivers = empRes.data.data.filter(
-            (e) =>
-              e.role?.toLowerCase() === "driver" ||
-              e.designation?.toLowerCase() === "driver"
-          );
-          setDrivers(onlyDrivers);
-        }
-      } catch (error) {
-        console.error("Data loading failed:", error);
-      }
-    };
-    fetchData();
-  }, []);
-
-  /* =========================
-     🧮 Recalculate Totals
-     ========================= */
-  const calculateTotal = (goodsList, freightVal) => {
-    let taxable = 0;
-    let tax = 0;
-
-    goodsList.forEach((g) => {
-      const t = toSafeNumber(g.taxableAmount);
-      taxable += t;
-      tax += (t * toSafeNumber(g.taxRate)) / 100;
-    });
-
-    const freight = toSafeNumber(freightVal);
-
-    setData({
-      ...data,
-      goods: goodsList,
-      freight,
-      taxSummary: {
-        taxable,
-        cgst: tax / 2,
-        sgst: tax / 2,
-        igst: tax,
-        total: taxable + tax + freight,
-      },
-    });
-  };
-
-  /* =========================
-     ✍️ Update Goods
-     ========================= */
-  const updateGoods = (index, field, value) => {
-    const updatedGoods = [...data.goods];
-
-    if (field === "product") {
-      updatedGoods[index].product = value;
-      updatedGoods[index].hsn = HSN_MASTER[value] || "";
-    } else {
-      updatedGoods[index][field] = value;
-    }
-
-    const qty = toSafeNumber(updatedGoods[index].quantity);
-    const rate = toSafeNumber(updatedGoods[index].rate);
-    updatedGoods[index].taxableAmount = qty * rate;
-
-    calculateTotal(updatedGoods, data.freight);
-  };
-
-  const handleAddItem = () => {
-    setData({
-      ...data,
-      goods: [
-        ...data.goods,
-        { hsn: "", product: "", quantity: 0, rate: 0, taxRate: 0, taxableAmount: 0 },
-      ],
-    });
-  };
-
-  const handleRemoveItem = (index) => {
-    const updatedGoods = data.goods.filter((_, i) => i !== index);
-    calculateTotal(updatedGoods, data.freight);
-  };
-
-  /* =========================
-     👤 Select Supplier
-     ========================= */
-  const handleSelectSupplier = (e) => {
-    const s = suppliers.find((x) => x.name === e.target.value);
-    setData({
-      ...data,
-      to: s
-        ? { name: s.name, gst: s.gstin, address: s.address, phone: s.phone }
-        : { name: "", gst: "", address: "", phone: "" },
-    });
-  };
-
-  /* =========================
-     💾 Final Submit
-     ========================= */
-  const handleFinalSubmit = async () => {
-    if (!data.billNo || !data.to?.name || data.goods.length === 0) {
-      alert("Please fill Bill Number, Customer & Product!");
-      return;
-    }
-
+  /* =============================================
+      🔍 Fetch Data by Bill Number (Mapping JSON)
+     ============================================= */
+  const fetchBillData = async () => {
+    if (!searchBillNo) return alert("Please enter a Bill Number");
     setLoading(true);
     try {
-      const sanitizedGoods = data.goods.map((g) => ({
-        product: g.product,
-        hsn: g.hsn,
-        quantity: toSafeNumber(g.quantity),
-        rate: toSafeNumber(g.rate),
-        taxRate: toSafeNumber(g.taxRate),
-        taxableAmount: toSafeNumber(g.taxableAmount),
-      }));
+      const res = await axios.get(`${API_BASE_URL}/api/sales`);
+      if (res.data?.success) {
+        // Backend data se specific Bill khojna
+        const billData = res.data.data.find(b => b.billNo === parseInt(searchBillNo));
 
-      const payload = {
-        ...data,
-        billNo: toSafeNumber(data.billNo),
-        customerName: data.to.name,
-        vehicleNo: data.vehicle?.vehicleNo || "",
-
-        productName: sanitizedGoods[0].product,
-        quantity: sanitizedGoods[0].quantity,
-        rate: sanitizedGoods[0].rate,
-
-        freight: toSafeNumber(data.freight),
-        taxableValue: toSafeNumber(data.taxSummary.taxable),
-        cgst: toSafeNumber(data.taxSummary.cgst),
-        sgst: toSafeNumber(data.taxSummary.sgst),
-        igst: toSafeNumber(data.taxSummary.igst),
-        totalAmount: toSafeNumber(data.taxSummary.total),
-        paymentDue:
-          toSafeNumber(data.taxSummary.total) -
-          toSafeNumber(data.amountReceived),
-
-        goods: sanitizedGoods,
-      };
-
-      const res = await axios.post(
-        `${API_BASE_URL}/api/sales`,
-        payload
-      );
-
-      if (res.data.success) {
-        alert("Bill Saved Successfully!");
-        onPreview();
+        if (billData) {
+          // Backend se milne wale exact variables ko map karna
+          setData({
+            ...data,
+            billNo: billData.billNo,
+            date: billData.date,
+            customerName: billData.customerName,
+            address: billData.address,
+            gstin: billData.gstin,
+            mobile: billData.mobile,
+            vehicleNo: billData.vehicleNo,
+            deliveryNote: billData.deliveryNote,
+            paymentMode: billData.paymentMode,
+            buyerOrderNo: billData.buyerOrderNo,
+            buyerOrderDate: billData.buyerOrderDate,
+            dispatchDocNo: billData.dispatchDocNo,
+            dispatchDate: billData.dispatchDate,
+            dispatchedThrough: billData.dispatchedThrough,
+            destination: billData.destination,
+            termsOfDelivery: billData.termsOfDelivery,
+            freight: billData.freight,
+            // Goods array mapping
+            goods: billData.goods.map(g => ({
+              product: g.product,
+              hsn: g.hsn || "2309",
+              quantity: g.quantity,
+              rate: g.rate,
+              taxableAmount: g.taxableAmount
+            })),
+            taxSummary: {
+              taxable: billData.taxableValue,
+              cgst: billData.cgst,
+              sgst: billData.sgst,
+              igst: billData.igst,
+              total: billData.totalAmount
+            }
+          });
+          alert("Data fetched successfully!");
+        } else {
+          alert("Bill not found in database!");
+        }
       }
     } catch (error) {
-      console.error("Submit failed:", error);
-      alert("Save failed. Check quantity or product.");
+      console.error("Fetch error:", error);
+      alert("Error loading data from server");
     } finally {
       setLoading(false);
     }
   };
 
-  /* =========================
-     🧾 UI
-     ========================= */
   return (
     <div className="eway-form-page no-print">
       <div className="eway-form-card">
-        <h2>📄 E-Way Bill Form</h2>
+        <h2>📄 Sales Bill Selector</h2>
+        <p style={{ fontSize: "12px", color: "#666" }}>Backend se data load karne ke liye Bill No. daalein</p>
 
-        {/* Bill Details */}
-        <div className="eway-form-grid">
+        {/* --- Search Section (Ab sirf isi ka kaam hai) --- */}
+        <div style={{ background: "#f0f4f8", padding: "15px", borderRadius: "8px", marginBottom: "20px", display: "flex", gap: "10px" }}>
           <input
             type="number"
-            value={data.billNo || ""}
-            onChange={(e) => setData({ ...data, billNo: e.target.value })}
-            placeholder="Bill No"
+            placeholder="Enter Bill No (e.g. 1)"
+            value={searchBillNo}
+            onChange={(e) => setSearchBillNo(e.target.value)}
+            style={{ flex: 1, padding: "10px", border: "1px solid #ccc", borderRadius: "4px" }}
           />
-          <input
-            type="date"
-            value={data.date || ""}
-            onChange={(e) => setData({ ...data, date: e.target.value })}
-          />
-          <input
-            placeholder="Vehicle No"
-            value={data.vehicle?.vehicleNo || ""}
-            onChange={(e) =>
-              setData({
-                ...data,
-                vehicle: { ...data.vehicle, vehicleNo: e.target.value },
-              })
-            }
-          />
+          <button 
+            onClick={fetchBillData} 
+            disabled={loading} 
+            style={{ background: "#007bff", color: "white", padding: "10px 20px", border: "none", borderRadius: "4px", cursor: "pointer" }}
+          >
+            {loading ? "Loading..." : "🔍 Fetch Bill"}
+          </button>
         </div>
 
-        {/* Customer */}
-        <select value={data.to?.name || ""} onChange={handleSelectSupplier}>
-          <option value="">Select Customer</option>
-          {suppliers.map((s) => (
-            <option key={s._id} value={s.name}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-
-        {/* Goods */}
-        <button onClick={handleAddItem}>+ Add Item</button>
-        {data.goods.map((item, index) => (
-          <div key={index} className="eway-form-grid">
-            <select
-              value={item.product}
-              onChange={(e) => updateGoods(index, "product", e.target.value)}
-            >
-              <option value="">Select Product</option>
-              {Object.keys(HSN_MASTER).map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-            <input
-              type="number"
-              placeholder="Qty"
-              value={item.quantity}
-              onChange={(e) => updateGoods(index, "quantity", e.target.value)}
-            />
-            <input
-              type="number"
-              placeholder="Rate"
-              value={item.rate}
-              onChange={(e) => updateGoods(index, "rate", e.target.value)}
-            />
-            <input
-              type="number"
-              placeholder="Tax %"
-              value={item.taxRate}
-              onChange={(e) => updateGoods(index, "taxRate", e.target.value)}
-            />
-            <button onClick={() => handleRemoveItem(index)}>✖</button>
-          </div>
-        ))}
-
-        {/* Freight & Total */}
-        <input
-          type="number"
-          placeholder="Freight"
-          value={data.freight || ""}
-          onChange={(e) => calculateTotal(data.goods, e.target.value)}
-        />
-
-        <strong>
-          Grand Total ₹{toSafeNumber(data.taxSummary?.total).toLocaleString()}
-        </strong>
-
-        {/* <button
-          onClick={handleFinalSubmit}
-          disabled={loading}
-          className="preview-btn"
-        >
-          {loading ? "Saving..." : "💾 Save & Preview"}
-        </button> */}
+        {/* --- View Only Info (Confirm karne ke liye ki sahi data hai) --- */}
+     
+    
       </div>
     </div>
   );

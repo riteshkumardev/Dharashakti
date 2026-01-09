@@ -1,6 +1,8 @@
 import React from "react";
 
 const EWayBillContainer = ({ data }) => {
+  console.log(data, "data contanor");
+  
   if (!data) return null;
 
   // 1. Function: Number to Words (INR)
@@ -19,25 +21,36 @@ const EWayBillContainer = ({ data }) => {
     return str;
   };
 
-  // 2. Logic: Calculations (Bags, Round Off, Weight)
+  // 2. Logic: Calculations
   const totalWeight = data?.goods?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0;
-  const totalBags = Math.ceil(totalWeight / 50); // 1 Bag = 50kg logic
-  const subTotal = data?.goods?.reduce((sum, item) => sum + Number(item.taxableAmount || 0), 0) || 0;
-  const finalTotal = Math.round(subTotal);
-  const roundOffValue = (finalTotal - subTotal).toFixed(2);
+  const totalBags = data?.deliveryNote || Math.ceil(totalWeight / 50); 
+  const subTotal = Number(data.taxableValue || 0);
+  const freightAmt = Number(data.freight || 0); // This will be -10000 based on your JSON
+  const finalTotal = Number(data.totalAmount || 0);
+  const roundOffValue = (finalTotal - (subTotal + freightAmt)).toFixed(2);
 
-  // 3. Logic: Unique HSN Grouping for Footer Table (Rows 1, 2, 3...)
-  const uniqueHSNs = data?.goods ? [...new Set(data.goods.map(item => item.hsn))].filter(h => h) : [];
-
+  // 3. Logic: Mapping data directly from your JSON payload
   const invoiceData = {
     billNo: data?.billNo || "N/A",
     date: data?.date || "N/A",
-    vehicleNo: data?.vehicleNo || data?.vehicle?.vehicleNo || "N/A",
-    customerName: data?.customerName || data?.to?.name || "N/A",
-    customerAddress: data?.customerAddress || data?.to?.address || "N/A",
-    customerGSTIN: data?.customerGSTIN || data?.to?.gst || "N/A",
+    vehicleNo: data?.vehicleNo || "N/A",
+    customerName: data?.customerName || "N/A",
+    customerAddress: data?.address || "N/A",
+    customerGSTIN: data?.gstin || "N/A",
+    customerMobile: data?.mobile || "N/A",
+    paymentMode: data?.paymentMode || "BY BANK",
+    buyerOrderNo: data?.buyerOrderNo || "-",
+    buyerOrderDate: data?.buyerOrderDate || "-",
+    dispatchDocNo: data?.dispatchDocNo || "-",
+    dispatchDate: data?.dispatchDate || "-",
+    dispatchedThrough: data?.dispatchedThrough || "-",
+    destination: data?.destination || "-",
+    lrRrNo: data?.lrRrNo || "-",
+    termsOfDelivery: data?.termsOfDelivery || "-",
     goods: data?.goods || []
   };
+
+  const uniqueHSNs = invoiceData.goods ? [...new Set(invoiceData.goods.map(item => item.hsn))].filter(h => h) : [];
 
   return (
     <div className="invoice-wrapper">
@@ -89,6 +102,7 @@ const EWayBillContainer = ({ data }) => {
               <strong>{invoiceData.customerName}</strong><br />
               {invoiceData.customerAddress}<br />
               GSTIN/UIN : {invoiceData.customerGSTIN}<br />
+              Mobile : {invoiceData.customerMobile}<br />
               State Name : Bihar, Code : 10
             </div>
 
@@ -97,6 +111,7 @@ const EWayBillContainer = ({ data }) => {
               <strong>{invoiceData.customerName}</strong><br />
               {invoiceData.customerAddress}<br />
               GSTIN/UIN : {invoiceData.customerGSTIN}<br />
+              Mobile : {invoiceData.customerMobile}<br />
               State Name : Bihar, Code : 10
             </div>
           </div>
@@ -108,25 +123,28 @@ const EWayBillContainer = ({ data }) => {
             </div>
             <div className="info-row">
               <div className="info-col">Delivery Note<br/><strong>{totalBags} BAGS</strong></div>
-              <div className="info-col">Mode/Terms of Payment<br/><strong>BY BANK</strong></div>
+              <div className="info-col">Mode/Terms of Payment<br/><strong>{invoiceData.paymentMode}</strong></div>
             </div>
             <div className="info-row">
-              <div className="info-col">Buyer's Order No.<br/><strong>-</strong></div>
-              <div className="info-col">Dated<br/><strong>-</strong></div>
+              <div className="info-col">Buyer's Order No.<br/><strong>{invoiceData.buyerOrderNo}</strong></div>
+              <div className="info-col">Dated<br/><strong>{invoiceData.buyerOrderDate}</strong></div>
             </div>
             <div className="info-row">
-              <div className="info-col">Dispatch Doc No.<br/><strong>-</strong></div>
-              <div className="info-col">Delivery Note Date<br/><strong>-</strong></div>
+              <div className="info-col">Dispatch Doc No.<br/><strong>{invoiceData.dispatchDocNo}</strong></div>
+              <div className="info-col">Delivery Note Date<br/><strong>{invoiceData.dispatchDate}</strong></div>
             </div>
             <div className="info-row">
-              <div className="info-col">Dispatched through<br/><strong>-</strong></div>
-              <div className="info-col">Destination<br/><strong>-</strong></div>
+              <div className="info-col">Dispatched through<br/><strong>{invoiceData.dispatchedThrough}</strong></div>
+              <div className="info-col">Destination<br/><strong>{invoiceData.destination}</strong></div>
             </div>
             <div className="info-row">
-              <div className="info-col">Bill of Lading/LR-RR No.<br/><strong>dt. {invoiceData.date}</strong></div>
+              <div className="info-col">Bill of Lading/LR-RR No.<br/><strong>{invoiceData.lrRrNo}</strong></div>
               <div className="info-col">Motor Vehicle No.<br/><strong>{invoiceData.vehicleNo}</strong></div>
             </div>
-            <div className="p-5" style={{height: '110px'}}><strong>Terms of Delivery</strong></div>
+            <div className="p-5" style={{height: '110px'}}>
+              <strong>Terms of Delivery</strong><br/>
+              {invoiceData.termsOfDelivery}
+            </div>
           </div>
         </div>
 
@@ -146,29 +164,32 @@ const EWayBillContainer = ({ data }) => {
             {invoiceData.goods.map((g, i) => (
               <tr key={i}>
                 <td>{i + 1}</td>
-                <td className="text-left"><strong>{g.product || g.desc} (NON BRANDED)</strong></td>
+                <td className="text-left"><strong>{g.product} (NON BRANDED)</strong></td>
                 <td>{g.hsn}</td>
-                <td><strong>{g.quantity || g.qty} KGS</strong></td>
+                <td><strong>{g.quantity} KGS</strong></td>
                 <td>{g.rate}</td>
                 <td>KGS</td>
-                <td className="text-right" style={{borderRight: 'none'}}>{Number(g.taxableAmount || g.amt).toFixed(2)}</td>
+                <td className="text-right" style={{borderRight: 'none'}}>{Number(g.taxableAmount).toFixed(2)}</td>
               </tr>
             ))}
             <tr className="spacer-row"><td></td><td></td><td></td><td></td><td></td><td></td><td style={{borderRight: 'none'}}></td></tr>
             
-            {/* Round Off Section */}
             <tr style={{borderTop: '1px solid #000'}}>
               <td colSpan="6" className="text-right"><strong>{subTotal.toFixed(2)}</strong></td>
               <td className="text-right" style={{borderRight: 'none'}}><strong>{subTotal.toFixed(2)}</strong></td>
             </tr>
+            {/* Freight Charge Added Here */}
             <tr>
-              <td colSpan="2" className="text-left">Less:</td>
-              <td colSpan="3" className="text-right"><strong>ROUND OFF (+)</strong></td>
-              <td></td>
+              <td colSpan="3" className="text-left">Less:</td>
+              <td colSpan="3" className="text-right"><strong>FREIGHT CHARGES</strong></td>
+              <td className="text-right" style={{borderRight: 'none'}}><strong>-({Math.abs(freightAmt).toFixed(2)})</strong></td>
+            </tr>
+            <tr>
+              <td colSpan="3"></td>
+              <td colSpan="3" className="text-right"><strong>ROUND OFF</strong></td>
               <td className="text-right" style={{borderRight: 'none'}}><strong>({roundOffValue})</strong></td>
             </tr>
 
-            {/* Final Total */}
             <tr style={{borderTop: '1.5px solid #000', fontWeight: 'bold'}}>
               <td colSpan="3" className="text-right">Total</td>
               <td>{totalWeight.toLocaleString()} KGS</td>
@@ -184,7 +205,6 @@ const EWayBillContainer = ({ data }) => {
             <strong style={{textTransform: 'uppercase'}}>INR {amountInWords(finalTotal)}</strong>
           </div>
 
-          {/* HSN Table with Multiple Rows (1, 2, 3...) */}
           <table className="hsn-tax-table">
             <thead>
               <tr style={{textAlign: 'center', fontWeight: 'bold'}}>
@@ -197,15 +217,11 @@ const EWayBillContainer = ({ data }) => {
                 <tr key={idx}>
                   <td style={{textAlign: 'center'}}>{hsnCode}</td>
                   <td style={{textAlign: 'right', borderRight: 'none'}}>
-                    {data?.goods?.filter(item => item.hsn === hsnCode)
+                    {invoiceData.goods.filter(item => item.hsn === hsnCode)
                       .reduce((sum, item) => sum + Number(item.taxableAmount || 0), 0).toFixed(2)}
                   </td>
                 </tr>
               ))}
-              <tr style={{fontWeight: 'bold'}}>
-                <td style={{textAlign: 'right'}}>Total</td>
-                <td style={{textAlign: 'right', borderRight: 'none'}}>{subTotal.toFixed(2)}</td>
-              </tr>
             </tbody>
           </table>
 
@@ -214,19 +230,18 @@ const EWayBillContainer = ({ data }) => {
           <div className="bottom-split">
             <div className="decl-box">
               <strong>Declaration</strong><br />
-              We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct. We hereby certify that food/ foods mentioned in this invoice is/are warranted to be of the nature and quality which it/these purports/purported to be.
+              We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
             </div>
             <div className="bank-sig-box">
               <div className="bank-inner">
                 <strong>Company's Bank Details</strong><br />
-                A/c Holder's Name : <strong>Dhara Shakti Agro Products</strong><br />
                 Bank Name : <strong>Punjab National Bank</strong><br />
                 A/c No. : <strong>3504008700005079</strong><br />
                 IFS Code : <strong>PUNB0350400</strong>
               </div>
               <div className="auth-sig-box">
                 <span>for DHARA SHAKTI AGRO PRODUCTS</span>
-                <strong>Authorised Signatory</strong>
+                <strong style={{marginTop: 'auto'}}>Authorised Signatory</strong>
               </div>
             </div>
           </div>
