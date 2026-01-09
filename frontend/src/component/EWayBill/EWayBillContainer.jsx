@@ -230,7 +230,11 @@ const EWayBillContainer = ({ data }) => {
           <div className="bottom-split">
             <div className="decl-box">
               <strong>Declaration</strong><br />
-              We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
+
+We declare that this invoice shows the actual price of the goods described and
+that all particulars are true and correct. We hereby certify that food/ foods
+mentioned in this invoice is/are warranted to be of the nature and quality which
+it/these purports/purported to be.
             </div>
             <div className="bank-sig-box">
               <div className="bank-inner">
