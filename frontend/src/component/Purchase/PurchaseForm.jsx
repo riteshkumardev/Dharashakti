@@ -99,7 +99,7 @@ const PurchaseForm = ({ onCancel, role }) => {
     const basePrice = qty * rate;
     const discountAmount = (basePrice * cdPercent) / 100;
 
-    const total = basePrice - discountAmount + travel; 
+    const total = basePrice - discountAmount - travel; 
     const balance = total - (Number(formData.paidAmount) || 0);
 
     setFormData((prev) => ({
