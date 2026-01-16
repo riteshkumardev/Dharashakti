@@ -12,14 +12,15 @@ const EmployeeLedger = ({ role, user }) => {
   const [employees, setEmployees] = useState([]);
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [paymentHistory, setPaymentHistory] = useState([]);
-  const [attendanceStats, setAttendanceStats] = useState({ present: 0, absent: 0 });
+  const [attendanceStats, setAttendanceStats] = useState({ present: 0, absent: 0, halfDay: 0 });
   const [advanceAmount, setAdvanceAmount] = useState('');
+  const [overtimeHours, setOvertimeHours] = useState('');
+  const [incentive, setIncentive] = useState('');
   const [showCalendar, setShowCalendar] = useState(false);
   const [fullAttendanceData, setFullAttendanceData] = useState({});
   const [loading, setLoading] = useState(true); 
   const [fetchingDetail, setFetchingDetail] = useState(false);
 
-  // Live Backend URL handle karne ke liye
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   const maskID = (id) => {
@@ -31,86 +32,63 @@ const EmployeeLedger = ({ role, user }) => {
   // 1️⃣ Fetch Staff List (Boss Only)
   useEffect(() => {
     const fetchEmployees = async () => {
-      if (!isBoss) {
-        setLoading(false);
-        return;
-      }
+      if (!isBoss) { setLoading(false); return; }
       try {
         const res = await axios.get(`${API_URL}/api/employees`);
         if (res.data.success) setEmployees(res.data.data);
-      } catch (err) { 
-        console.error("Staff load failed"); 
-      } finally { 
-        setLoading(false); 
-      }
+      } catch (err) { console.error("Staff load failed"); } 
+      finally { setLoading(false); }
     };
     fetchEmployees();
   }, [isBoss, API_URL]);
 
-  // 2️⃣ Auto-View for Self (Workers/Operators)
-  useEffect(() => {
-    if (!isBoss && user) {
-      viewLedger(user);
-    }
-  }, [isBoss, user]);
-
-  // 3️⃣ Fetch Detailed Ledger for Selected Employee
+  // 2️⃣ View Detailed Ledger
   const viewLedger = async (emp) => {
     setFetchingDetail(true);
     setSelectedEmp(emp);
-    
     const empId = emp.employeeId || emp._id;
 
     try {
-      // Fetch Payment History (Advance)
       const payRes = await axios.get(`${API_URL}/api/salary-payments/${empId}`);
       if (payRes.data.success) setPaymentHistory(payRes.data.data.reverse());
 
-      // Fetch Attendance Data
       const currentMonth = new Date().toISOString().slice(0, 7); 
       const attRes = await axios.get(`${API_URL}/api/attendance/report/${empId}`);
       
       if (attRes.data.success) {
         const history = attRes.data.data; 
-        let p = 0, a = 0;
+        let p = 0, a = 0, h = 0;
         
         Object.keys(history).forEach(date => {
           if (date.startsWith(currentMonth)) {
             if (history[date] === "Present") p++;
             else if (history[date] === "Absent") a++;
+            else if (history[date] === "Half-Day") h++;
           }
         });
-        setAttendanceStats({ present: p, absent: a });
+        setAttendanceStats({ present: p, absent: a, halfDay: h });
         setFullAttendanceData(history);
       }
-    } catch (err) {
-      console.error("Ledger detail fetch error");
-    } finally {
-      setFetchingDetail(false);
-    }
+    } catch (err) { console.error("Fetch error"); } 
+    finally { setFetchingDetail(false); }
   };
 
-  const getTileClassName = ({ date, view }) => {
-    if (view === 'month') {
-      const dateStr = date.toLocaleDateString('en-CA'); 
-      if (fullAttendanceData[dateStr] === "Present") return 'cal-present';
-      if (fullAttendanceData[dateStr] === "Absent") return 'cal-absent';
-    }
-    return null;
-  };
-
-  // Financial Calculations
-  const totalAdvance = paymentHistory.reduce((sum, p) => sum + Number(p.amount), 0);
+  // 🧮 Professional Payroll Calculations
   const monthlySalary = selectedEmp ? Number(selectedEmp.salary) : 0;
-  const earnedSalary = Math.round((monthlySalary / 30) * attendanceStats.present);
-  const netPayable = earnedSalary - totalAdvance;
+  const dayRate = monthlySalary / 30;
+  const effectiveDaysWorked = attendanceStats.present + (attendanceStats.halfDay * 0.5);
+  const grossEarned = Math.round(dayRate * effectiveDaysWorked);
+  const pfDeduction = selectedEmp?.role === "Worker" ? 0 : Math.round(grossEarned * 0.12);
+  const esiDeduction = Math.round(grossEarned * 0.0075);
+  const totalAdvance = paymentHistory.reduce((sum, p) => sum + Number(p.amount), 0);
+  const otEarning = (Number(overtimeHours) || 0) * (dayRate / 8);
+  const totalEarnings = Math.round(grossEarned + otEarning + (Number(incentive) || 0));
+  const totalDeductions = Math.round(pfDeduction + esiDeduction + totalAdvance);
+  const netPayable = totalEarnings - totalDeductions;
 
-  // 4️⃣ Handle Advance Payment (Save to MongoDB)
   const handlePayment = async (e) => {
     e.preventDefault();
-    if (!isAuthorized) { alert("Permission denied!"); return; }
-    if(!advanceAmount || !selectedEmp) return;
-
+    if (!isAuthorized || !advanceAmount) return;
     try {
       const res = await axios.post(`${API_URL}/api/salary-payments`, {
         employeeId: selectedEmp.employeeId || selectedEmp._id,
@@ -118,15 +96,22 @@ const EmployeeLedger = ({ role, user }) => {
         date: new Date().toISOString().split('T')[0],
         type: 'Advance'
       });
-
       if (res.data.success) {
         setAdvanceAmount('');
-        alert("✅ Advance Added!");
-        viewLedger(selectedEmp); // UI Refresh
+        alert("✅ Payment Recorded!");
+        viewLedger(selectedEmp);
       }
-    } catch (err) { 
-      alert("Save failed: " + err.message); 
+    } catch (err) { alert("Error saving payment"); }
+  };
+
+  const getTileClassName = ({ date, view }) => {
+    if (view === 'month') {
+      const dateStr = date.toLocaleDateString('en-CA'); 
+      if (fullAttendanceData[dateStr] === "Present") return 'cal-present';
+      if (fullAttendanceData[dateStr] === "Absent") return 'cal-absent';
+      if (fullAttendanceData[dateStr] === "Half-Day") return 'cal-half';
     }
+    return null;
   };
 
   if (loading) return <Loader />;
@@ -134,9 +119,7 @@ const EmployeeLedger = ({ role, user }) => {
   return (
     <div className="table-container-wide">
       <div className="table-card-wide no-print">
-        <h2 className="table-title">
-            {isBoss ? "Staff Salary & Attendance Ledger" : "My Payroll Ledger"}
-        </h2>
+        <h2 className="table-title">Dhara Shakti Agro: Professional Payroll</h2>
         
         <div className="ledger-main-wrapper">
           {isBoss && (
@@ -146,7 +129,7 @@ const EmployeeLedger = ({ role, user }) => {
                   <div key={emp._id} className={`staff-card-item ${selectedEmp?._id === emp._id ? 'active-ledger' : ''}`} onClick={() => viewLedger(emp)}>
                     <div className="staff-info-mini">
                         <strong>{emp.name}</strong>
-                        <div className="masked-id-text">ID: {maskID(emp.employeeId)}</div>
+                        <div className="designation-text">{emp.designation || emp.role} | ID: {maskID(emp.employeeId)}</div>
                     </div>
                   </div>
                 ))}
@@ -155,61 +138,57 @@ const EmployeeLedger = ({ role, user }) => {
           )}
 
           {selectedEmp && (
-            <div className={`ledger-detail-view ${!isBoss ? 'full-width-ledger' : ''}`}>
-              {fetchingDetail ? (
-                <div className="detail-fetch-loader"><Loader /><p>Fetching Secure Data...</p></div>
-              ) : (
-                <>
-                  <div className="attendance-summary-bar">
-                    <div className="summary-item">Month: <b>{new Date().toLocaleString('default', { month: 'long' })}</b></div>
-                    <div className="summary-item green">Present: <b>{attendanceStats.present} Days</b></div>
-                    <div className="summary-item red">Absent: <b>{attendanceStats.absent} Days</b></div>
-                    <button className="view-btn-small" onClick={() => setShowCalendar(true)}>👁️ History</button>
-                    <button className="view-btn-small" style={{background: '#2e7d32', color: 'white'}} onClick={() => window.print()}>🖨️ Print Ledger</button>
-                  </div>
+            <div className="ledger-detail-view full-width-ledger">
+              <div className="attendance-summary-bar">
+                <div className="summary-item">Days: <b>{effectiveDaysWorked}</b></div>
+                <div className="summary-item green">P: <b>{attendanceStats.present}</b></div>
+                <div className="summary-item yellow">H/D: <b>{attendanceStats.halfDay}</b></div>
+                <div className="summary-item red">A: <b>{attendanceStats.absent}</b></div>
+                <button className="view-btn-small" onClick={() => setShowCalendar(true)}>🗓️ History</button>
+                <button className="view-btn-small print-btn" onClick={() => window.print()}>🖨️ Payslip</button>
+              </div>
 
-                  <div className="ledger-stats-row">
-                    <div className="stat-pill total-salary">Salary <b>₹{monthlySalary}</b></div>
-                    <div className="stat-pill balance-due">Earned <b>₹{earnedSalary}</b></div>
-                    <div className="stat-pill total-advance">Advance <b>₹{totalAdvance}</b></div>
-                    <div className="stat-pill final-pay">Payable <b>₹{netPayable}</b></div>
-                  </div>
-
-                  {isAuthorized && (
-                    <div className="advance-entry-box">
-                       <form onSubmit={handlePayment} className="advance-form-grid">
-                          <input type="number" placeholder="Enter Amount" value={advanceAmount} onChange={(e)=>setAdvanceAmount(e.target.value)} required />
-                          <button type="submit" className="save-btn-new">SAVE</button>
-                       </form>
+              <div className="pro-payroll-grid">
+                <div className="pro-card earnings-card">
+                  <h4 className="card-header-text">💰 Earning Components</h4>
+                  <div className="pay-row"><span>Base Salary:</span> <b>₹{monthlySalary.toLocaleString()}</b></div>
+                  <div className="pay-row"><span>Gross Earned:</span> <b className="text-green">₹{grossEarned.toLocaleString()}</b></div>
+                  <div className="pay-input-group">
+                    <div className="pro-input-field">
+                      <label>Incentive/Bonus</label>
+                      <input type="number" value={incentive} onChange={(e)=>setIncentive(e.target.value)} placeholder="₹" />
                     </div>
-                  )}
-
-                  <div className="ledger-table-container">
-                    <table className="modern-sales-table">
-                      <thead><tr><th>Date</th><th>Type</th><th>Amount</th></tr></thead>
-                      <tbody>
-                        {paymentHistory.length > 0 ? (
-                          paymentHistory.map(pay => (
-                            <tr key={pay._id}>
-                                <td>{pay.date}</td>
-                                <td>{pay.type}</td>
-                                <td className="amount-text-red">₹{pay.amount}</td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr><td colSpan="3" className="no-data-msg">No payment history found.</td></tr>
-                        )}
-                      </tbody>
-                    </table>
+                    <div className="pro-input-field">
+                      <label>Overtime (Hrs)</label>
+                      <input type="number" value={overtimeHours} onChange={(e)=>setOvertimeHours(e.target.value)} placeholder="Hrs" />
+                    </div>
                   </div>
-                </>
+                </div>
+
+                <div className="pro-card deductions-card">
+                  <h4 className="card-header-text">📉 Statutory Deductions</h4>
+                  <div className="pay-row"><span>PF (12%):</span> <b className="text-red">- ₹{pfDeduction.toLocaleString()}</b></div>
+                  <div className="pay-row"><span>ESI (0.75%):</span> <b className="text-red">- ₹{esiDeduction.toLocaleString()}</b></div>
+                  <div className="pay-row highlight"><span>Total Advance:</span> <b className="text-red">- ₹{totalAdvance.toLocaleString()}</b></div>
+                  
+                  <div className="net-payable-box">
+                    <div className="net-label">NET TAKE-HOME</div>
+                    <div className="net-amount">₹{netPayable.toLocaleString()}</div>
+                  </div>
+                </div>
+              </div>
+
+              {isAuthorized && (
+                <form onSubmit={handlePayment} className="pro-action-bar">
+                  <input type="number" placeholder="Enter Advance Amount..." value={advanceAmount} onChange={(e)=>setAdvanceAmount(e.target.value)} />
+                  <button type="submit">RECORD DISBURSEMENT</button>
+                </form>
               )}
             </div>
           )}
         </div>
       </div>
 
-      {/* CALENDAR MODAL */}
       {showCalendar && (
         <div className="cal-modal-overlay">
           <div className="cal-modal-content">
@@ -221,6 +200,7 @@ const EmployeeLedger = ({ role, user }) => {
               <Calendar tileClassName={getTileClassName} />
               <div className="cal-legend">
                 <div className="leg-item"><span className="leg-box green"></span> P</div>
+                <div className="leg-item"><span className="leg-box yellow"></span> H/D</div>
                 <div className="leg-item"><span className="leg-box red"></span> A</div>
               </div>
             </div>
@@ -228,40 +208,29 @@ const EmployeeLedger = ({ role, user }) => {
         </div>
       )}
 
-      {/* PRINT SECTION */}
       {selectedEmp && (
-        <div className="printable-invoice A4 only-print">
-            <div className="invoice-header">
-                <div className="company-info-center">
-                    <h1>DHARA SHAKTI AGRO PRODUCTS</h1>
-                    <p className="manufacture-line">STAFF EARNING & ATTENDANCE LEDGER</p>
-                    <p>Calculation: (Base Salary / 30 Days)</p>
-                </div>
+        <div className="payslip-print-view only-print">
+            <div className="payslip-header">
+                <h1>DHARA SHAKTI AGRO PRODUCTS</h1>
+                <h3>Salary Slip - {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
             </div>
-            <table className="modern-report-table">
-                <thead>
-                    <tr>
-                        <th>Staff Name</th>
-                        <th>Monthly Salary</th>
-                        <th>Days Worked</th>
-                        <th>Earned Amount</th>
-                        <th>Advance Paid</th>
-                        <th>Net Payable</th>
-                    </tr>
-                </thead>
+            <div className="payslip-meta">
+                <p><b>Name:</b> {selectedEmp.name} | <b>Designation:</b> {selectedEmp.designation}</p>
+                <p><b>Aadhar:</b> {selectedEmp.aadhar} | <b>Account:</b> {selectedEmp.accountNo || 'N/A'}</p>
+            </div>
+            <table className="payslip-table">
+                <thead><tr><th>Earnings</th><th>Amount</th><th>Deductions</th><th>Amount</th></tr></thead>
                 <tbody>
-                    <tr>
-                        <td><strong>{selectedEmp.name}</strong></td>
-                        <td>₹{monthlySalary.toLocaleString()}</td>
-                        <td>{attendanceStats.present} Days</td>
-                        <td>₹{earnedSalary.toLocaleString()}</td>
-                        <td style={{color: 'red'}}>- ₹{totalAdvance.toLocaleString()}</td>
-                        <td style={{fontWeight: 'bold', color: 'green', backgroundColor: '#f9f9f9'}}>
-                            ₹{netPayable.toLocaleString()}
-                        </td>
-                    </tr>
+                    <tr><td>Basic Salary</td><td>₹{grossEarned}</td><td>PF (Provident Fund)</td><td>₹{pfDeduction}</td></tr>
+                    <tr><td>Incentives</td><td>₹{incentive || 0}</td><td>ESI</td><td>₹{esiDeduction}</td></tr>
+                    <tr><td>OT Pay ({overtimeHours || 0} Hrs)</td><td>₹{Math.round(otEarning)}</td><td>Advances Taken</td><td>₹{totalAdvance}</td></tr>
+                    <tr className="payslip-total-row"><td><b>Total Earnings</b></td><td><b>₹{totalEarnings}</b></td><td><b>Total Deductions</b></td><td><b>₹{totalDeductions}</b></td></tr>
                 </tbody>
             </table>
+            <div className="net-salary-box">
+                NET PAYABLE: ₹{netPayable.toLocaleString()}
+                <p><small>(In words: Rupee {netPayable} Only)</small></p>
+            </div>
         </div>
       )}
     </div>
