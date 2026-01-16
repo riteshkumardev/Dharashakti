@@ -38,28 +38,28 @@ const StockManagement = ({ role }) => {
     fetchStocks();
   }, [API_URL]);
 
-  // ✨ PRODUCTION & CONVERSION LOGIC (1 KG = 11 Pieces for Bags)
+  // ✨ PRODUCTION LOGIC: Corn & Rice Summary
   const getInventorySummary = () => {
     const getQty = (name) => stocks.find(s => s.productName === name)?.totalQuantity || 0;
 
-    // Corn logic: Grit + Grit 3mm + Feed + Flour
+    // 🌽 Corn logic: Grit + Grit 3mm + Feed + Flour
     const totalCornDerived = getQty("Corn Grit") + getQty("Corn Grit (3mm)") + getQty("Cattle Feed") + getQty("Corn Flour");
     
-    // Rice logic: Grit + Flour
-    const totalRiceDerived = getQty("Rice Grit") + getQty("Rice Flour");
+    // 🌾 Rice logic: Rice Grit + Rice Flour = Rice Broken
+    const totalRiceBroken = getQty("Rice Grit") + getQty("Rice Flour");
 
-    // ✨ Packing Bag Logic: Convert 401 KG to Pieces (401 * 11 = 4411)
+    // 🛍️ Packing Bag Logic: Convert KG to Pieces (401 KG * 11 = 4411 Pcs)
     const bagWeightKg = getQty("Packing Bag");
     const actualBagsAvailable = Math.floor(bagWeightKg * 11);
 
-    // Estimated bags required based on Total Finished Goods Weight / 50 KG per bag
-    const totalFinishedWeight = stocks.reduce((sum, s) => 
+    // Estimated pieces required: Total Weight in Stock / 50 KG
+    const totalProductionWeight = stocks.reduce((sum, s) => 
       !s.productName.includes("Bag") && !s.productName.includes("Corn") && !s.productName.includes("Rice") 
       ? sum + (Number(s.totalQuantity) || 0) : sum, 0
     );
-    const estimatedBagsRequired = Math.ceil(totalFinishedWeight / 50);
+    const estimatedBagsRequired = Math.ceil(totalProductionWeight / 50);
 
-    return { totalCornDerived, totalRiceDerived, actualBagsAvailable, estimatedBagsRequired };
+    return { totalCornDerived, totalRiceBroken, actualBagsAvailable, estimatedBagsRequired };
   };
 
   const summary = getInventorySummary();
@@ -108,20 +108,20 @@ const StockManagement = ({ role }) => {
   return (
     <div className="table-container-wide professional-stock-page">
       
-      {/* 🚀 Dashboard Summary Cards */}
+      {/* 📊 Dashboard Summary Cards */}
       <div className="stock-summary-row">
         <div className="summary-card total">
-          <span className="card-label">Corn Derived Total</span>
+          <span className="card-label">Total Corn Consumed</span>
           <span className="card-value">{summary.totalCornDerived.toLocaleString()} KG</span>
           <small>Grit + Feed + Flour</small>
         </div>
         <div className="summary-card low">
-          <span className="card-label">Rice Derived Total</span>
-          <span className="card-value">{summary.totalRiceDerived.toLocaleString()} KG</span>
-          <small>Grit + Flour</small>
+          <span className="card-label">Total Rice Broken</span>
+          <span className="card-value">{summary.totalRiceBroken.toLocaleString()} KG</span>
+          <small>Rice Grit + Rice Flour</small>
         </div>
         <div className="summary-card out">
-          <span className="card-label">Bags Availability</span>
+          <span className="card-label">Bags Inventory</span>
           <span className="card-value">{summary.actualBagsAvailable.toLocaleString()} Pcs</span>
           <small>Need approx {summary.estimatedBagsRequired} Pcs</small>
         </div>
@@ -131,7 +131,7 @@ const StockManagement = ({ role }) => {
         <div className="table-header-row professional-header">
           <div className="title-group">
             <h2 className="table-title">Inventory Control Panel</h2>
-            <p className="subtitle">Automatic Conversion: 1 KG Packing Bag = 11 Pieces</p>
+            <p className="subtitle">Real-time tracking for Rice Broken & Corn processing</p>
           </div>
           <div className="search-wrapper modern-search">
             <span className="search-icon">🔍</span>
@@ -149,11 +149,11 @@ const StockManagement = ({ role }) => {
             <thead>
               <tr>
                 <th>#</th>
-                <th>Product Information</th>
-                <th>Quantity</th>
-                <th>Last Update</th>
-                <th>Internal Remarks</th>
-                <th>Health Status</th>
+                <th>Product Name</th>
+                <th>Inventory Count</th>
+                <th>Last Interaction</th>
+                <th>Remarks</th>
+                <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -177,6 +177,7 @@ const StockManagement = ({ role }) => {
                       {isEditing ? 
                         <input type="number" value={editData.totalQuantity} onChange={(e) => setEditData({...editData, totalQuantity: e.target.value})} className="edit-input-field small-input" /> 
                         : <span className={isOut ? "negative-val" : ""}>
+                            {/* ✨ If Packing Bag, show Pcs (KG * 11) else KG */}
                             {isBag ? (qty * 11).toLocaleString() : qty.toLocaleString()} {isBag ? "Pcs" : "KG"}
                           </span>
                       }
@@ -191,7 +192,7 @@ const StockManagement = ({ role }) => {
                     <td>
                       <div className={`status-pill-pro ${isOut ? 'pill-danger' : qty < 500 ? 'pill-warning' : 'pill-success'}`}>
                         <span className="dot"></span>
-                        {isOut ? 'Out of Stock' : qty < 500 ? 'Low Stock' : 'Healthy'}
+                        {isOut ? 'Critical Out' : qty < 500 ? 'Low Stock' : 'Healthy'}
                       </div>
                     </td>
                     <td className="action-btns-cell">

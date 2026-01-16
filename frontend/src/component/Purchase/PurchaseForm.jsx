@@ -40,7 +40,7 @@ const PurchaseForm = ({ onCancel, role }) => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  const productList = ["Corn", "Corn Greet", "Cattle Feed", "Aatarice", "Rice Greet", "Packing Bag"];
+  const productList = ["Corn", "Corn Greet", "Cattle Feed", "Aatarice", "Rice Greet", "Packing Bag","Rice Broken"];
 
   /* =========================================
       📡 Fetch Suppliers List on Load
