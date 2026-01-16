@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios'; 
 import Calendar from 'react-calendar'; 
 import 'react-calendar/dist/Calendar.css'; 
@@ -22,6 +22,9 @@ const EmployeeLedger = ({ role, user }) => {
   const [loading, setLoading] = useState(true); 
   const [fetchingDetail, setFetchingDetail] = useState(false);
 
+  // 🗓️ MAIN ANCHOR: Current Month set as default (YYYY-MM)
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
   const maskID = (id) => {
@@ -29,6 +32,32 @@ const EmployeeLedger = ({ role, user }) => {
     const strID = id.toString();
     return strID.length > 4 ? "XXXX" + strID.slice(-4) : strID;
   };
+
+  // 📅 Dropdown logic update: January 2026 ko list mein force add kiya gaya hai
+  const availableMonths = useMemo(() => {
+    const now = new Date();
+    const currentStr = now.toISOString().slice(0, 7); // "2026-01"
+
+    if (!selectedEmp?.joiningDate) return [currentStr];
+    
+    const start = new Date(selectedEmp.joiningDate);
+    const end = new Date();
+    const months = [];
+    
+    if (isNaN(start.getTime())) return [currentStr];
+
+    // Loop through months from joining till today
+    let tempDate = new Date(start.getFullYear(), start.getMonth(), 1);
+    while (tempDate <= end) {
+      months.push(tempDate.toISOString().slice(0, 7));
+      tempDate.setMonth(tempDate.getMonth() + 1);
+    }
+
+    // Ensure January 2026 is always there even if joining is recent
+    if (!months.includes(currentStr)) months.push(currentStr);
+
+    return months.reverse(); 
+  }, [selectedEmp]);
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -42,20 +71,25 @@ const EmployeeLedger = ({ role, user }) => {
     fetchEmployees();
   }, [isBoss, API_URL]);
 
-  const viewLedger = async (emp) => {
+  const viewLedger = async (emp, month = selectedMonth) => {
     setFetchingDetail(true);
     setSelectedEmp(emp);
     const empId = emp.employeeId || emp._id;
     try {
       const payRes = await axios.get(`${API_URL}/api/salary-payments/${empId}`);
-      if (payRes.data.success) setPaymentHistory(payRes.data.data.reverse());
-      const currentMonth = new Date().toISOString().slice(0, 7); 
+      if (payRes.data.success) {
+        // Strict Month Filtering for Payments
+        const filteredPay = payRes.data.data.filter(p => p.date.startsWith(month));
+        setPaymentHistory(filteredPay.reverse());
+      }
+
       const attRes = await axios.get(`${API_URL}/api/attendance/report/${empId}`);
       if (attRes.data.success) {
         const history = attRes.data.data; 
         let p = 0, a = 0, h = 0;
         Object.keys(history).forEach(date => {
-          if (date.startsWith(currentMonth)) {
+          // Strict Month Filtering for Attendance
+          if (date.startsWith(month)) {
             if (history[date] === "Present") p++;
             else if (history[date] === "Absent") a++;
             else if (history[date] === "Half-Day") h++;
@@ -68,43 +102,31 @@ const EmployeeLedger = ({ role, user }) => {
     finally { setFetchingDetail(false); }
   };
 
-  // 🧮 CALCULATIONS WRAPPED IN OBJECTS (Fixes ESLint Errors)
+  useEffect(() => {
+    if (selectedEmp) {
+      viewLedger(selectedEmp, selectedMonth);
+    }
+  }, [selectedMonth]);
+
   const monthlySalary = selectedEmp ? Number(selectedEmp.salary) : 0;
   const dayRate = monthlySalary / 30;
   
   const stats = {
     effectiveDaysWorked: attendanceStats.present + (attendanceStats.halfDay * 0.5),
-    present: attendanceStats.present,
-    absent: attendanceStats.absent,
+    present: attendanceStats.present, 
+    absent: attendanceStats.absent, 
     halfDay: attendanceStats.halfDay
   };
 
   const grossEarned = Math.round(dayRate * stats.effectiveDaysWorked);
-  const pfDeduction = selectedEmp?.role === "Worker" ? 0 : Math.round(grossEarned * 0);
-  const esiDeduction = Math.round(grossEarned * 0);
   const totalAdvance = paymentHistory.reduce((sum, p) => sum + Number(p.amount), 0);
   const otEarning = (Number(overtimeHours) || 0) * (dayRate / 8);
-  // const grossEarned = Math.round(dayRate * stats.effectiveDaysWorked);
-  // const pfDeduction = selectedEmp?.role === "Worker" ? 0 : Math.round(grossEarned * 0.12);
-  // const esiDeduction = Math.round(grossEarned * 0.0075);
-  // const totalAdvance = paymentHistory.reduce((sum, p) => sum + Number(p.amount), 0);
-  // const otEarning = (Number(overtimeHours) || 0) * (dayRate / 8);
-  
   const totalEarnings = Math.round(grossEarned + otEarning + (Number(incentive) || 0));
-  const totalDeductions = Math.round(pfDeduction + esiDeduction + totalAdvance);
-  const netPayable = totalEarnings - totalDeductions;
+  const netPayable = totalEarnings - totalAdvance;
 
   const payroll = {
-    grossEarned,
-    pfDeduction,
-    esiDeduction,
-    totalAdvance,
-    otEarning,
-    totalEarnings,
-    totalDeductions,
-    netPayable,
-    incentive,
-    overtimeHours
+    grossEarned, totalAdvance, otEarning, totalEarnings,
+    netPayable, incentive, overtimeHours, pfDeduction: 0, esiDeduction: 0, totalDeductions: totalAdvance
   };
 
   const handlePayment = async (e) => {
@@ -120,7 +142,7 @@ const EmployeeLedger = ({ role, user }) => {
       if (res.data.success) {
         setAdvanceAmount('');
         alert("✅ Payment Recorded!");
-        viewLedger(selectedEmp);
+        viewLedger(selectedEmp, selectedMonth);
       }
     } catch (err) { alert("Error saving payment"); }
   };
@@ -160,6 +182,25 @@ const EmployeeLedger = ({ role, user }) => {
 
           {selectedEmp && (
             <div className="ledger-detail-view full-width-ledger">
+              
+              <div className="month-selector-pro" style={{
+                  display: 'flex', alignItems: 'center', gap: '15px', 
+                  background: '#f8fafc', padding: '12px 20px', borderRadius: '12px', border: '1px solid #e2e8f0'
+              }}>
+                <label style={{fontWeight: '800', color: '#1e293b', fontSize: '13px'}}>SALARY PERIOD:</label>
+                <select 
+                  value={selectedMonth} 
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  style={{padding: '6px 15px', borderRadius: '8px', border: '2px solid #4d47f3', fontWeight: '700', cursor: 'pointer', color: '#000'}}
+                >
+                  {availableMonths.map(m => (
+                    <option key={m} value={m}>
+                      {new Date(m + "-01").toLocaleString('default', { month: 'long', year: 'numeric' })}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="attendance-summary-bar">
                 <div className="summary-item">Days: <b>{stats.effectiveDaysWorked}</b></div>
                 <div className="summary-item green">P: <b>{stats.present}</b></div>
@@ -171,7 +212,7 @@ const EmployeeLedger = ({ role, user }) => {
 
               <div className="pro-payroll-grid">
                 <div className="pro-card earnings-card">
-                  <h4 className="card-header-text">💰 Earning Components</h4>
+                  <h4 className="card-header-text">💰 Earnings ({new Date(selectedMonth + "-01").toLocaleString('default', { month: 'short' })})</h4>
                   <div className="pay-row"><span>Base Salary:</span> <b>₹{monthlySalary.toLocaleString()}</b></div>
                   <div className="pay-row"><span>Gross Earned:</span> <b className="text-green">₹{grossEarned.toLocaleString()}</b></div>
                   <div className="pay-input-group">
@@ -187,11 +228,8 @@ const EmployeeLedger = ({ role, user }) => {
                 </div>
 
                 <div className="pro-card deductions-card">
-                  <h4 className="card-header-text">📉 Statutory Deductions</h4>
-                  <div className="pay-row"><span>PF (12%):</span> <b className="text-red">- ₹{pfDeduction.toLocaleString()}</b></div>
-                  <div className="pay-row"><span>ESI (0.75%):</span> <b className="text-red">- ₹{esiDeduction.toLocaleString()}</b></div>
-                  <div className="pay-row highlight"><span>Total Advance:</span> <b className="text-red">- ₹{totalAdvance.toLocaleString()}</b></div>
-                  
+                  <h4 className="card-header-text">📉 Deductions</h4>
+                  <div className="pay-row highlight"><span>Advances Taken:</span> <b className="text-red">- ₹{totalAdvance.toLocaleString()}</b></div>
                   <div className="net-payable-box">
                     <div className="net-label">NET TAKE-HOME</div>
                     <div className="net-amount">₹{netPayable.toLocaleString()}</div>
@@ -218,7 +256,10 @@ const EmployeeLedger = ({ role, user }) => {
               <button className="cal-close-btn" onClick={() => setShowCalendar(false)}>&times;</button>
             </div>
             <div className="cal-body">
-              <Calendar tileClassName={getTileClassName} />
+              <Calendar 
+                activeStartDate={new Date(selectedMonth + "-01")}
+                tileClassName={getTileClassName} 
+              />
               <div className="cal-legend">
                 <div className="leg-item"><span className="leg-box green"></span> P</div>
                 <div className="leg-item"><span className="leg-box yellow"></span> H/D</div>
@@ -234,6 +275,7 @@ const EmployeeLedger = ({ role, user }) => {
           selectedEmp={selectedEmp}
           stats={stats}
           payroll={payroll}
+          currentMonth={selectedMonth}
         />
       )}
     </div>

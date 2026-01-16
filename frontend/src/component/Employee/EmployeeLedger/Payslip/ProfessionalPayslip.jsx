@@ -1,13 +1,22 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react'; // QR Code ke liye
 import './ProfessionalPayslip.css';
-const ProfessionalPayslip = ({ selectedEmp, stats, payroll }) => {
+
+const ProfessionalPayslip = ({ selectedEmp, stats, payroll, currentMonth }) => {
   if (!selectedEmp) return null;
+
+  // ✅ Fix: Date string ko valid banane ke liye "-01" add kiya gaya hai
+  const dateObject = new Date(currentMonth + "-01");
+  
+  const formattedMonth = dateObject.toLocaleString('default', { 
+    month: 'long', 
+    year: 'numeric' 
+  });
 
   // QR Code Data: Scanning this shows key info
   const qrData = `
     Staff: ${selectedEmp.name}
-    Month: ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
+    Month: ${formattedMonth}
     Net Pay: ₹${payroll.netPayable.toLocaleString()}
     Status: Verified by Dhara Shakti Agro
   `.trim();
@@ -19,7 +28,8 @@ const ProfessionalPayslip = ({ selectedEmp, stats, payroll }) => {
         <div className="company-branding">
           <h1>DHARA SHAKTI AGRO PRODUCTS</h1>
           <p className="address-line">Sri Pur Gahar,Khanpur,samastipur, Bihar 848117 | +91 9088247314</p>
-          <h2 className="payslip-title">PAY ADVICE - {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
+          {/* ✅ Fixed Header Month */}
+          <h2 className="payslip-title">PAY ADVICE - {formattedMonth}</h2>
         </div>
         <div className="qr-box">
           <QRCodeSVG value={qrData} size={80} level="H" />
