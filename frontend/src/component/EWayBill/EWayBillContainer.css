@@ -1,0 +1,33 @@
+@media print {
+  /* 1. Poori body ko hide karein */
+  body {
+    visibility: hidden !important;
+    background: white !important;
+  }
+
+  /* 2. Sirf Bill aur uske children ko dikhayein */
+  #printableInvoice, #printableInvoice * {
+    visibility: visible !important;
+  }
+
+  /* 3. Bill ko page ke bilkul top-left corner mein laayein */
+  #printableInvoice {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    margin: 0 !important;
+    padding: 5mm !important; /* Thoda gap print ke liye */
+    display: block !important;
+  }
+
+  /* 4. Kisi bhi parent container ka restriction hatayein */
+  html, body, #root, [class*="container"], [class*="layout"], [class*="wrapper"] {
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+    position: static !important; /* Taaki absolute positioning sahi kaam kare */
+  }
+
+  .no-print { display: none !important; }
+}

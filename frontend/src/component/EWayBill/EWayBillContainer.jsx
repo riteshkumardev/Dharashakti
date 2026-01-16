@@ -25,11 +25,10 @@ const EWayBillContainer = ({ data }) => {
   const totalWeight = data?.goods?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0;
   const totalBags = data?.deliveryNote || Math.ceil(totalWeight / 50); 
   const subTotal = Number(data.taxableValue || 0);
-  const freightAmt = Number(data.freight || 0); // This will be -10000 based on your JSON
+  const freightAmt = Number(data.freight || 0);
   const finalTotal = Number(data.totalAmount || 0);
   const roundOffValue = (finalTotal - (subTotal + freightAmt)).toFixed(2);
 
-  // 3. Logic: Mapping data directly from your JSON payload
   const invoiceData = {
     billNo: data?.billNo || "N/A",
     date: data?.date || "N/A",
@@ -52,9 +51,40 @@ const EWayBillContainer = ({ data }) => {
 
   const uniqueHSNs = invoiceData.goods ? [...new Set(invoiceData.goods.map(item => item.hsn))].filter(h => h) : [];
 
+  // 🔥 FINAL PRINT FIX: Isolated New Tab Printing
+  const handlePrint = () => {
+    const printContent = document.getElementById('printableInvoice').innerHTML;
+    const styleContent = document.getElementById('invoiceStyles').innerHTML;
+    const printWindow = window.open('', '_blank');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Bill No: ${invoiceData.billNo}</title>
+          <style>${styleContent}</style>
+          <style>
+            @page { size: A4; margin: 0mm; }
+            body { margin-top: 5mm; padding: 0; background: #fff; }
+            .invoice-wrapper { width: 100%; border: none; box-shadow: none; padding: 0; }
+          </style>
+        </head>
+        <body>
+          <div class="invoice-wrapper">${printContent}</div>
+          <script>
+            window.onload = function() {
+              window.print();
+              window.close();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
-    <div className="invoice-wrapper">
-      <style>
+    <div className="invoice-container-main">
+      <style id="invoiceStyles">
         {`
           .invoice-wrapper { width: 210mm; min-height: 290mm; padding: 5mm; margin: auto; background: #fff; font-family: 'Arial Narrow', Arial, sans-serif; font-size: 11px; color: #000; line-height: 1.3; }
           .main-border { border: 1.5px solid #000; }
@@ -81,177 +111,181 @@ const EWayBillContainer = ({ data }) => {
           .bank-sig-box { width: 50%; display: flex; flex-direction: column; }
           .bank-inner { padding: 5px; font-size: 10px; border-bottom: 1px solid #000; flex-grow: 1; }
           .auth-sig-box { padding: 5px; text-align: right; height: 80px; display: flex; flex-direction: column; justify-content: space-between; }
-          @media print { .no-print { display: none; } }
         `}
       </style>
 
-      <div className="main-border">
-        <div className="title-center">BILL OF SUPPLY (ORIGINAL FOR RECIPIENT)</div>
+      {/* Wrapping content in printableInvoice ID for extraction */}
+      <div id="printableInvoice" className="invoice-wrapper">
+        <div className="main-border">
+          <div className="title-center">BILL OF SUPPLY (ORIGINAL FOR RECIPIENT)</div>
 
-        <div className="flex-container">
-          <div className="left-section">
-            <div className="p-5 border-b">
-              <strong style={{fontSize: '13px'}}>DHARA SHAKTI AGRO PRODUCTS</strong><br />
-              Sri Pur Gahar, Khanpur, Samastipur, Bihar-848117<br />
-              GSTIN/UIN: 10DZTPM1457E1ZE | FSSAI: 2042331000141<br />
-              E-Mail: dharashaktiagroproducts@gmail.com
+          <div className="flex-container">
+            <div className="left-section">
+              <div className="p-5 border-b">
+                <strong style={{fontSize: '13px'}}>DHARA SHAKTI AGRO PRODUCTS</strong><br />
+                Sri Pur Gahar, Khanpur, Samastipur, Bihar-848117<br />
+                GSTIN/UIN: 10DZTPM1457E1ZE | FSSAI: 2042331000141<br />
+                E-Mail: dharashaktiagroproducts@gmail.com
+              </div>
+
+              <div className="p-5 border-b" style={{minHeight: '90px'}}>
+                <span>Consignee (Ship to)</span><br />
+                <strong>{invoiceData.customerName}</strong><br />
+                {invoiceData.customerAddress}<br />
+                GSTIN/UIN : {invoiceData.customerGSTIN}<br />
+                Mobile : {invoiceData.customerMobile}<br />
+                State Name : Bihar, Code : 10
+              </div>
+
+              <div className="p-5" style={{minHeight: '90px'}}>
+                <span>Buyer (Bill to)</span><br />
+                <strong>{invoiceData.customerName}</strong><br />
+                {invoiceData.customerAddress}<br />
+                GSTIN/UIN : {invoiceData.customerGSTIN}<br />
+                Mobile : {invoiceData.customerMobile}<br />
+                State Name : Bihar, Code : 10
+              </div>
             </div>
 
-            <div className="p-5 border-b" style={{minHeight: '90px'}}>
-              <span>Consignee (Ship to)</span><br />
-              <strong>{invoiceData.customerName}</strong><br />
-              {invoiceData.customerAddress}<br />
-              GSTIN/UIN : {invoiceData.customerGSTIN}<br />
-              Mobile : {invoiceData.customerMobile}<br />
-              State Name : Bihar, Code : 10
-            </div>
-
-            <div className="p-5" style={{minHeight: '90px'}}>
-              <span>Buyer (Bill to)</span><br />
-              <strong>{invoiceData.customerName}</strong><br />
-              {invoiceData.customerAddress}<br />
-              GSTIN/UIN : {invoiceData.customerGSTIN}<br />
-              Mobile : {invoiceData.customerMobile}<br />
-              State Name : Bihar, Code : 10
+            <div className="right-section">
+              <div className="info-row">
+                <div className="info-col">Invoice No.<br/><strong>{invoiceData.billNo}</strong></div>
+                <div className="info-col">Dated<br/><strong>{invoiceData.date}</strong></div>
+              </div>
+              <div className="info-row">
+                <div className="info-col">Delivery Note<br/><strong>{totalBags} BAGS</strong></div>
+                <div className="info-col">Mode/Terms of Payment<br/><strong>{invoiceData.paymentMode}</strong></div>
+              </div>
+              <div className="info-row">
+                <div className="info-col">Buyer's Order No.<br/><strong>{invoiceData.buyerOrderNo}</strong></div>
+                <div className="info-col">Dated<br/><strong>{invoiceData.buyerOrderDate}</strong></div>
+              </div>
+              <div className="info-row">
+                <div className="info-col">Dispatch Doc No.<br/><strong>{invoiceData.dispatchDocNo}</strong></div>
+                <div className="info-col">Delivery Note Date<br/><strong>{invoiceData.dispatchDate}</strong></div>
+              </div>
+              <div className="info-row">
+                <div className="info-col">Dispatched through<br/><strong>{invoiceData.dispatchedThrough}</strong></div>
+                <div className="info-col">Destination<br/><strong>{invoiceData.destination}</strong></div>
+              </div>
+              <div className="info-row">
+                <div className="info-col">Bill of Lading/LR-RR No.<br/><strong>{invoiceData.lrRrNo}</strong></div>
+                <div className="info-col">Motor Vehicle No.<br/><strong>{invoiceData.vehicleNo}</strong></div>
+              </div>
+              <div className="p-5" style={{height: '60px'}}>
+                <strong>Terms of Delivery</strong><br/>
+                {invoiceData.termsOfDelivery}
+              </div>
             </div>
           </div>
 
-          <div className="right-section">
-            <div className="info-row">
-              <div className="info-col">Invoice No.<br/><strong>{invoiceData.billNo}</strong></div>
-              <div className="info-col">Dated<br/><strong>{invoiceData.date}</strong></div>
-            </div>
-            <div className="info-row">
-              <div className="info-col">Delivery Note<br/><strong>{totalBags} BAGS</strong></div>
-              <div className="info-col">Mode/Terms of Payment<br/><strong>{invoiceData.paymentMode}</strong></div>
-            </div>
-            <div className="info-row">
-              <div className="info-col">Buyer's Order No.<br/><strong>{invoiceData.buyerOrderNo}</strong></div>
-              <div className="info-col">Dated<br/><strong>{invoiceData.buyerOrderDate}</strong></div>
-            </div>
-            <div className="info-row">
-              <div className="info-col">Dispatch Doc No.<br/><strong>{invoiceData.dispatchDocNo}</strong></div>
-              <div className="info-col">Delivery Note Date<br/><strong>{invoiceData.dispatchDate}</strong></div>
-            </div>
-            <div className="info-row">
-              <div className="info-col">Dispatched through<br/><strong>{invoiceData.dispatchedThrough}</strong></div>
-              <div className="info-col">Destination<br/><strong>{invoiceData.destination}</strong></div>
-            </div>
-            <div className="info-row">
-              <div className="info-col">Bill of Lading/LR-RR No.<br/><strong>{invoiceData.lrRrNo}</strong></div>
-              <div className="info-col">Motor Vehicle No.<br/><strong>{invoiceData.vehicleNo}</strong></div>
-            </div>
-            <div className="p-5" style={{height: '110px'}}>
-              <strong>Terms of Delivery</strong><br/>
-              {invoiceData.termsOfDelivery}
-            </div>
-          </div>
-        </div>
-
-        <table className="items-table">
-          <thead>
-            <tr>
-              <th style={{width: '30px'}}>Sl No.</th>
-              <th style={{width: '350px'}}>Description of Goods</th>
-              <th>HSN/SAC</th>
-              <th>Quantity</th>
-              <th>Rate</th>
-              <th>per</th>
-              <th style={{borderRight: 'none'}}>Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoiceData.goods.map((g, i) => (
-              <tr key={i}>
-                <td>{i + 1}</td>
-                <td className="text-left"><strong>{g.product} (NON BRANDED)</strong></td>
-                <td>{g.hsn}</td>
-                <td><strong>{g.quantity} KGS</strong></td>  
-                <td>{g.rate}</td>
-                <td>KGS</td>
-                <td className="text-right" style={{borderRight: 'none'}}>{Number(g.taxableAmount).toFixed(2)}</td>
-              </tr>
-            ))}
-            <tr className="spacer-row"><td></td><td></td><td></td><td></td><td></td><td></td><td style={{borderRight: 'none'}}></td></tr>
-            
-            <tr style={{borderTop: '1px solid #000'}}>
-              <td colSpan="6" className="text-right"><strong>{subTotal.toFixed(2)}</strong></td>
-              <td className="text-right" style={{borderRight: 'none'}}><strong>{subTotal.toFixed(2)}</strong></td>
-            </tr>
-            {/* Freight Charge Added Here */}
-            <tr>
-              <td colSpan="3" className="text-left">Less:</td>
-              <td colSpan="3" className="text-right"><strong>FREIGHT CHARGES</strong></td>
-              <td className="text-right" style={{borderRight: 'none'}}><strong>-({Math.abs(freightAmt).toFixed(2)})</strong></td>
-            </tr>
-            <tr>
-              <td colSpan="3"></td>
-              <td colSpan="3" className="text-right"><strong>ROUND OFF</strong></td>
-              <td className="text-right" style={{borderRight: 'none'}}><strong>({roundOffValue})</strong></td>
-            </tr>
-
-            <tr style={{borderTop: '1.5px solid #000', fontWeight: 'bold'}}>
-              <td colSpan="3" className="text-right">Total</td>
-              <td>{totalWeight.toLocaleString()} KGS</td>
-              <td colSpan="2"></td>
-              <td className="text-right" style={{borderRight: 'none'}}>₹ {finalTotal.toFixed(2)}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div className="footer-section">
-          <div className="p-5">
-            Amount Chargeable (in words)<br />
-            <strong style={{textTransform: 'uppercase'}}>INR {amountInWords(finalTotal)}</strong>
-          </div>
-
-          <table className="hsn-tax-table">
+          <table className="items-table">
             <thead>
-              <tr style={{textAlign: 'center', fontWeight: 'bold'}}>
-                <td style={{width: '70%'}}>HSN/SAC</td>
-                <td style={{borderRight: 'none'}}>Taxable Value</td>
+              <tr>
+                <th style={{width: '30px'}}>Sl No.</th>
+                <th style={{width: '350px'}}>Description of Goods</th>
+                <th>HSN/SAC</th>
+                <th>Quantity</th>
+                <th>Rate</th>
+                <th>per</th>
+                <th style={{borderRight: 'none'}}>Amount</th>
               </tr>
             </thead>
             <tbody>
-              {uniqueHSNs.map((hsnCode, idx) => (
-                <tr key={idx}>
-                  <td style={{textAlign: 'center'}}>{hsnCode}</td>
-                  <td style={{textAlign: 'right', borderRight: 'none'}}>
-                    {invoiceData.goods.filter(item => item.hsn === hsnCode)
-                      .reduce((sum, item) => sum + Number(item.taxableAmount || 0), 0).toFixed(2)}
-                  </td>
+              {invoiceData.goods.map((g, i) => (
+                <tr key={i}>
+                  <td>{i + 1}</td>
+                  <td className="text-left"><strong>{g.product}</strong></td>
+                  <td>{g.hsn}</td>
+                  <td><strong>{g.quantity} KGS</strong></td>  
+                  <td>{g.rate}</td>
+                  <td>KGS</td>
+                  <td className="text-right" style={{borderRight: 'none'}}>{Number(g.taxableAmount).toFixed(2)}</td>
                 </tr>
               ))}
+              <tr className="spacer-row"><td></td><td></td><td></td><td></td><td></td><td></td><td style={{borderRight: 'none'}}></td></tr>
+              
+              <tr style={{borderTop: '1px solid #000'}}>
+                <td colSpan="6" className="text-right"><strong>{subTotal.toFixed(2)}</strong></td>
+                <td className="text-right" style={{borderRight: 'none'}}><strong>{subTotal.toFixed(2)}</strong></td>
+              </tr>
+              <tr>
+                <td colSpan="3" className="text-left">Less:</td>
+                <td colSpan="3" className="text-right"><strong>FREIGHT CHARGES</strong></td>
+                <td className="text-right" style={{borderRight: 'none'}}><strong>-({Math.abs(freightAmt).toFixed(2)})</strong></td>
+              </tr>
+              <tr>
+                <td colSpan="3"></td>
+                <td colSpan="3" className="text-right"><strong>ROUND OFF</strong></td>
+                <td className="text-right" style={{borderRight: 'none'}}><strong>({roundOffValue})</strong></td>
+              </tr>
+
+              <tr style={{borderTop: '1.5px solid #000', fontWeight: 'bold'}}>
+                <td colSpan="3" className="text-right">Total</td>
+                <td>{totalWeight.toLocaleString()} KGS</td>
+                <td colSpan="2"></td>
+                <td className="text-right" style={{borderRight: 'none'}}>₹ {finalTotal.toFixed(2)}</td>
+              </tr>
             </tbody>
           </table>
 
-          <div className="p-5">Tax Amount (in words) : <strong>NIL</strong></div>
-
-          <div className="bottom-split">
-            <div className="decl-box">
-              <strong>Declaration</strong><br />
-
-We declare that this invoice shows the actual price of the goods described and
-that all particulars are true and correct. We hereby certify that food/ foods
-mentioned in this invoice is/are warranted to be of the nature and quality which
-it/these purports/purported to be.
+          <div className="footer-section">
+            <div className="p-5">
+              Amount Chargeable (in words)<br />
+              <strong style={{textTransform: 'uppercase'}}>INR {amountInWords(finalTotal)}</strong>
             </div>
-            <div className="bank-sig-box">
-              <div className="bank-inner">
-                <strong>Company's Bank Details</strong><br />
-                Bank Name : <strong>Punjab National Bank</strong><br />
-                A/c No. : <strong>3504008700005079</strong><br />
-                IFS Code : <strong>PUNB0350400</strong>
+
+            <table className="hsn-tax-table">
+              <thead>
+                <tr style={{textAlign: 'center', fontWeight: 'bold'}}>
+                  <td style={{width: '70%'}}>HSN/SAC</td>
+                  <td style={{borderRight: 'none'}}>Taxable Value</td>
+                </tr>
+              </thead>
+              <tbody>
+                {uniqueHSNs.map((hsnCode, idx) => (
+                  <tr key={idx}>
+                    <td style={{textAlign: 'center'}}>{hsnCode}</td>
+                    <td style={{textAlign: 'right', borderRight: 'none'}}>
+                      {invoiceData.goods.filter(item => item.hsn === hsnCode)
+                        .reduce((sum, item) => sum + Number(item.taxableAmount || 0), 0).toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="p-5">Tax Amount (in words) : <strong>NIL</strong></div>
+
+            <div className="bottom-split">
+              <div className="decl-box">
+          We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct. We hereby certify that food/ foods mentioned in this invoice is/are warranted to be of the nature and quality which it/these purports/purported to be.
               </div>
-              <div className="auth-sig-box">
-                <span>for DHARA SHAKTI AGRO PRODUCTS</span>
-                <strong style={{marginTop: 'auto'}}>Authorised Signatory</strong>
+              <div className="bank-sig-box">
+                <div className="bank-inner">
+                  <strong>Company's Bank Details</strong><br />
+                  Bank Name : <strong>Punjab National Bank</strong><br />
+                  A/c No. : <strong>3504008700005079</strong><br />
+                  IFS Code : <strong>PUNB0350400</strong>
+                </div>
+                <div className="auth-sig-box">
+                  <span>for DHARA SHAKTI AGRO PRODUCTS</span>
+                  <strong style={{marginTop: 'auto'}}>Authorised Signatory</strong>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-      <button className="no-print" onClick={() => window.print()} style={{marginTop: '10px', padding: '10px 20px', cursor: 'pointer', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px'}}>Print Bill</button>
+      
+      {/* Updated Print Button */}
+      <button 
+        className="no-print" 
+        onClick={handlePrint} 
+        style={{marginTop: '10px', padding: '10px 20px', cursor: 'pointer', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px'}}
+      >
+        Print Bill Now
+      </button>
     </div>
   );
 };
