@@ -407,7 +407,7 @@ const SalesTable = ({ role }) => {
         severity={snackbar.severity}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
       />
-    </>
+    </> 
   );
 };
 
