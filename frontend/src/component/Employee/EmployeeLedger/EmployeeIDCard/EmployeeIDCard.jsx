@@ -5,6 +5,15 @@ import './EmployeeIDCard.css';
 const EmployeeIDCard = ({ selectedEmp }) => {
   if (!selectedEmp) return null;
 
+  // Live Backend URL
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
+  // 📸 FIXED: Photo URL Handling
+  const getPhotoURL = (photoPath) => {
+    if (!photoPath) return "https://i.imgur.com/6VBx3io.png";
+    return photoPath.startsWith('http') ? photoPath : `${API_URL}${photoPath}`;
+  };
+
   const qrData = `ID: ${selectedEmp.employeeId} | Name: ${selectedEmp.name} | Blood: ${selectedEmp.bloodGroup || 'N/A'}`;
 
   // 🖨️ Handle Print
@@ -14,7 +23,7 @@ const EmployeeIDCard = ({ selectedEmp }) => {
 
   return (
     <div className="id-card-generator-container">
-      {/* 1️⃣ Print Button (Sirf Screen par dikhega) */}
+      {/* 1️⃣ Print Button (Screen only) */}
       <div className="no-print print-btn-wrapper" style={{ textAlign: 'center', marginBottom: '20px' }}>
         <button className="view-btn-small id-print-btn" onClick={handlePrint} style={{ background: '#4d47f3', padding: '10px 20px', color: 'white', borderRadius: '8px', cursor: 'pointer', border: 'none' }}>
           🖨️ Print Employee ID Card
@@ -31,9 +40,11 @@ const EmployeeIDCard = ({ selectedEmp }) => {
           </div>
           
           <div className="photo-container">
+            {/* 📸 Photo with API_URL prefixing */}
             <img 
-              src={selectedEmp.profilePic || "https://via.placeholder.com/100"} 
+              src={getPhotoURL(selectedEmp.photo || selectedEmp.profilePic)} 
               alt="Profile" 
+              onError={(e) => { e.target.src = "https://i.imgur.com/6VBx3io.png"; }}
             />
           </div>
 

@@ -15,18 +15,21 @@ const MasterPanel = ({ user }) => {
   const [actionLoading, setActionLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
-  // Live Backend URL handled dynamically
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
+  // 📸 Helper: Fix Photo URL for Backend paths
+  const getPhotoURL = (photoPath) => {
+    if (!photoPath) return null;
+    return photoPath.startsWith('http') ? photoPath : `${API_URL}${photoPath}`;
+  };
 
   const showMsg = (msg, type = "success") => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  // --- 🛠️ Fetch Users and Logs from MongoDB ---
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Backend routes using Live API URL
       const usersRes = await axios.get(`${API_URL}/api/employees`);
       const logsRes = await axios.get(`${API_URL}/api/activity-logs`);
 
@@ -44,21 +47,17 @@ const MasterPanel = ({ user }) => {
     fetchData();
   }, [API_URL]);
 
-  // --- 🔑 Password Reset Logic (Live MongoDB) ---
   const handlePasswordReset = async (employeeId, targetName) => {
     const newPass = window.prompt(`Enter new password for ${targetName}:`);
-    
     if (!newPass) return;
     if (newPass.length < 4) return showMsg("Password too short (Min 4 chars)", "error");
 
     setActionLoading(true);
     try {
-      // API call to live backend
       await axios.put(`${API_URL}/api/profile/password`, {
         employeeId: employeeId,
         password: newPass
       });
-
       showMsg(`Password for ${targetName} updated!`, "success");
       fetchData(); 
     } catch (err) {
@@ -68,17 +67,14 @@ const MasterPanel = ({ user }) => {
     }
   };
 
-  // --- 🛡️ Role & Access Toggle Logic (Live MongoDB) ---
   const handleSystemUpdate = async (employeeId, targetName, field, value) => {
     setActionLoading(true);
     try {
-      // Dynamic update route to live backend
       await axios.put(`${API_URL}/api/employees/${employeeId}`, {
         [field]: value,
         adminAction: true, 
         adminName: user?.name
       });
-
       showMsg(`System Updated: ${field.toUpperCase()} set to ${value}`, "success");
       fetchData(); 
     } catch (err) {
@@ -129,13 +125,25 @@ const MasterPanel = ({ user }) => {
             <div key={userItem._id} className={`user-control-card ${userItem.isBlocked ? 'is-blocked' : ''}`}>
               <div className="card-header">
                 <div className="user-profile-img">
-                   {userItem.photo ? <img src={userItem.photo} alt="p" /> : (userItem.name?.charAt(0) || "?")}
+                   {/* 📸 Photo Fix applied here */}
+                   {userItem.photo ? (
+                     <img 
+                       src={getPhotoURL(userItem.photo)} 
+                       alt="p" 
+                       onError={(e) => { e.target.src = "https://i.imgur.com/6VBx3io.png"; }}
+                     />
+                   ) : (
+                     <div className="avatar-letter">{userItem.name?.charAt(0) || "?"}</div>
+                   )}
                 </div>
                 <div className="user-basic-info">
                    <h3>{userItem.name}</h3>
                    <span>Emp ID: {userItem.employeeId}</span>
                 </div>
-                <div className={`role-pill ${userItem.role?.toLowerCase()}`}>{userItem.role || 'Worker'}</div>
+                {/* Dynamic Role Badges */}
+                <div className={`role-pill ${userItem.role?.toLowerCase() || 'worker'}`}>
+                  {userItem.role || 'Worker'}
+                </div>
               </div>
 
               <div className="control-body">
@@ -148,6 +156,8 @@ const MasterPanel = ({ user }) => {
                   >
                     <option value="Admin">Admin</option>
                     <option value="Manager">Manager</option>
+                    <option value="Accountant">Accountant</option>
+                    <option value="Staff">Staff</option>
                     <option value="Worker">Worker</option>
                   </select>
                 </div>
@@ -161,7 +171,7 @@ const MasterPanel = ({ user }) => {
                     </button>
 
                     <button 
-                      className="access-toggle-btn ${userItem.isBlocked ? 'btn-enable' : 'btn-disable'}"
+                      className={`access-toggle-btn ${userItem.isBlocked ? 'btn-enable' : 'btn-disable'}`}
                       onClick={() => handleSystemUpdate(userItem.employeeId, userItem.name, 'isBlocked', !userItem.isBlocked)}
                       disabled={actionLoading}
                     >

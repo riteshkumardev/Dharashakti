@@ -5,7 +5,7 @@ import 'react-calendar/dist/Calendar.css';
 import './EmployeeLedger.css';
 import Loader from "../../Core_Component/Loader/Loader";
 import ProfessionalPayslip from './Payslip/ProfessionalPayslip';
-import EmployeeIDCard from './EmployeeIDCard/EmployeeIDCard'; // 🆕 ID Card Import
+import EmployeeIDCard from './EmployeeIDCard/EmployeeIDCard';
 
 const EmployeeLedger = ({ role, user }) => {
   const isAuthorized = role === "Admin" || role === "Accountant";
@@ -19,10 +19,8 @@ const EmployeeLedger = ({ role, user }) => {
   const [overtimeHours, setOvertimeHours] = useState('');
   const [incentive, setIncentive] = useState('');
   const [showCalendar, setShowCalendar] = useState(false);
-  
-  // 🆕 Visibility States
   const [showPayslip, setShowPayslip] = useState(false);
-  const [showIDCard, setShowIDCard] = useState(false); // ID Card toggle
+  const [showIDCard, setShowIDCard] = useState(false);
 
   const [fullAttendanceData, setFullAttendanceData] = useState({});
   const [loading, setLoading] = useState(true); 
@@ -31,6 +29,12 @@ const EmployeeLedger = ({ role, user }) => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
+  // 📸 Helper function to fix Photo URL mismatch
+  const getPhotoURL = (photoPath) => {
+    if (!photoPath) return "https://i.imgur.com/6VBx3io.png";
+    return photoPath.startsWith('http') ? photoPath : `${API_URL}${photoPath}`;
+  };
 
   const maskID = (id) => {
     if (!id) return "---";
@@ -70,8 +74,8 @@ const EmployeeLedger = ({ role, user }) => {
   const viewLedger = async (emp, month = selectedMonth) => {
     setFetchingDetail(true);
     setSelectedEmp(emp);
-    setShowPayslip(false); // Reset view on switch
-    setShowIDCard(false);  // Reset view on switch
+    setShowPayslip(false); 
+    setShowIDCard(false); 
     
     const empId = emp.employeeId || emp._id;
     try {
@@ -179,6 +183,22 @@ const EmployeeLedger = ({ role, user }) => {
           {selectedEmp && (
             <div className="ledger-detail-view full-width-ledger">
               
+              {/* 📸 EMPLOYEE HEADER WITH PHOTO */}
+              <div className="emp-ledger-profile-header" style={{display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px', background: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0'}}>
+                <div className="ledger-profile-circle" style={{width: '70px', height: '70px', borderRadius: '50%', overflow: 'hidden', border: '3px solid #4d47f3'}}>
+                  <img 
+                    src={getPhotoURL(selectedEmp.photo)} 
+                    alt="Profile" 
+                    style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                    onError={(e) => { e.target.src = "https://i.imgur.com/6VBx3io.png"; }}
+                  />
+                </div>
+                <div>
+                  <h3 style={{margin: 0, color: '#1e293b'}}>{selectedEmp.name}</h3>
+                  <p style={{margin: 0, color: '#64748b', fontSize: '14px'}}>{selectedEmp.designation} | Emp ID: {selectedEmp.employeeId}</p>
+                </div>
+              </div>
+
               <div className="month-selector-pro" style={{
                   display: 'flex', alignItems: 'center', gap: '15px', 
                   background: '#f8fafc', padding: '12px 20px', borderRadius: '12px', border: '1px solid #e2e8f0'
@@ -206,7 +226,6 @@ const EmployeeLedger = ({ role, user }) => {
                 <div className="action-buttons-group" style={{display: 'flex', gap: '8px'}}>
                     <button className="view-btn-small" onClick={() => setShowCalendar(true)}>🗓️ History</button>
                     
-                    {/* ✅ ID Card Toggle Button */}
                     <button 
                       className="view-btn-small id-card-btn" 
                       onClick={() => { setShowIDCard(!showIDCard); setShowPayslip(false); }}
@@ -224,7 +243,6 @@ const EmployeeLedger = ({ role, user }) => {
                 </div>
               </div>
 
-              {/* ... Earnings/Deductions UI logic (Unchanged) ... */}
               <div className="pro-payroll-grid">
                 <div className="pro-card earnings-card">
                   <h4 className="card-header-text">💰 Earnings ({new Date(selectedMonth + "-01").toLocaleString('default', { month: 'short' })})</h4>
@@ -263,7 +281,6 @@ const EmployeeLedger = ({ role, user }) => {
         </div>
       </div>
 
-      {/* MODALS & OVERLAYS */}
       {showCalendar && (
         <div className="cal-modal-overlay">
           <div className="cal-modal-content">
@@ -278,7 +295,6 @@ const EmployeeLedger = ({ role, user }) => {
         </div>
       )}
 
-      {/* ✅ Dynamic Components: Payslip & ID Card */}
       {selectedEmp && showPayslip && (
         <ProfessionalPayslip selectedEmp={selectedEmp} stats={stats} payroll={payroll} currentMonth={selectedMonth} />
       )}
