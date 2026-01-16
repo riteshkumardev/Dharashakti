@@ -18,7 +18,7 @@ const ProfessionalPayslip = ({ selectedEmp, stats, payroll }) => {
       <div className="payslip-header-modern">
         <div className="company-branding">
           <h1>DHARA SHAKTI AGRO PRODUCTS</h1>
-          <p className="address-line">Industrial Area, Patna, Bihar | +91 9123456789</p>
+          <p className="address-line">Sri Pur Gahar,Khanpur,samastipur, Bihar 848117 | +91 9088247314</p>
           <h2 className="payslip-title">PAY ADVICE - {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
         </div>
         <div className="qr-box">

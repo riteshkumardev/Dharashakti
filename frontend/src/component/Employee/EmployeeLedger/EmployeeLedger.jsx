@@ -80,10 +80,15 @@ const EmployeeLedger = ({ role, user }) => {
   };
 
   const grossEarned = Math.round(dayRate * stats.effectiveDaysWorked);
-  const pfDeduction = selectedEmp?.role === "Worker" ? 0 : Math.round(grossEarned * 0.12);
-  const esiDeduction = Math.round(grossEarned * 0.0075);
+  const pfDeduction = selectedEmp?.role === "Worker" ? 0 : Math.round(grossEarned * 0);
+  const esiDeduction = Math.round(grossEarned * 0);
   const totalAdvance = paymentHistory.reduce((sum, p) => sum + Number(p.amount), 0);
   const otEarning = (Number(overtimeHours) || 0) * (dayRate / 8);
+  // const grossEarned = Math.round(dayRate * stats.effectiveDaysWorked);
+  // const pfDeduction = selectedEmp?.role === "Worker" ? 0 : Math.round(grossEarned * 0.12);
+  // const esiDeduction = Math.round(grossEarned * 0.0075);
+  // const totalAdvance = paymentHistory.reduce((sum, p) => sum + Number(p.amount), 0);
+  // const otEarning = (Number(overtimeHours) || 0) * (dayRate / 8);
   
   const totalEarnings = Math.round(grossEarned + otEarning + (Number(incentive) || 0));
   const totalDeductions = Math.round(pfDeduction + esiDeduction + totalAdvance);
