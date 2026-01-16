@@ -1,12 +1,11 @@
 import Employee from "../models/epmloyee.js"; 
-// Note: Vercel par fs aur path ka use crash de sakta hai agar disk write try karein
 
-/* ================= IMAGE UPLOAD (Vercel Compatible) ================= */
+/* ================= IMAGE UPLOAD (Production Ready) ================= */
 export const uploadProfileImage = async (req, res) => {
   try {
     const { employeeId } = req.body;
 
-    // 1. Validation
+    // 1. Validation: File ya ID missing hone par crash rokne ke liye
     if (!req.file || !employeeId) {
       return res.status(400).json({
         success: false,
@@ -15,14 +14,15 @@ export const uploadProfileImage = async (req, res) => {
     }
 
     /**
-     * ⚠️ VERCEL WARNING: 
-     * Yahan se 'fs.unlinkSync' wala logic hata diya gaya hai kyunki 
-     * serverless functions disk storage allow nahi karte.
+     * ✅ IMPORTANT: Vercel par local disk par file save (diskStorage) 
+     * karne ki koshish hamesha crash degi.
+     * Cloudinary use karne par 'req.file.path' seedha 'https://...' URL dega.
      */
+    const imagePath = req.file.path; 
 
-    // 2. Database Update: Nayi photo ka path save karein
-    // Agar Cloudinary use kar rahe hain toh path 'req.file.path' hoga
-    const imagePath = req.file.path || `/uploads/${req.file.filename}`;
+    if (!imagePath) {
+       return res.status(500).json({ success: false, message: "Storage upload failed" });
+    }
 
     const employee = await Employee.findOneAndUpdate(
       { employeeId },
@@ -40,10 +40,10 @@ export const uploadProfileImage = async (req, res) => {
       photo: imagePath, 
     });
   } catch (err) {
-    console.error("Upload Error:", err);
+    console.error("Upload Error:", err.message);
     res.status(500).json({ 
       success: false, 
-      message: "Serverless invocation failed: Use Cloudinary for production" 
+      message: "Vercel Error: Ensure Cloudinary is configured. Local disk is read-only." 
     });
   }
 };
