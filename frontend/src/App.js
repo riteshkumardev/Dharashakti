@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+// ✅ Changed BrowserRouter to MemoryRouter to hide URL paths
+import { MemoryRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
 
 // Components
@@ -25,7 +26,6 @@ import Reports_Printing from "./component/Reports_Printing/Reports_Printing";
 
 import InvoicePage from "./component/Invoice/InvoicePage";
 import SupplierManager from "./component/Supplier/SupplierManager";
-
 
 function App() {
   // ✅ SAFE localStorage read (NO JSON crash)
@@ -60,10 +60,11 @@ function App() {
     };
   }, [user]);
 
+  // ✅ Adjusted logout for MemoryRouter (Internal navigation)
   const logoutUser = () => {
     localStorage.removeItem("user");
     setUser(null);
-    window.location.href = "/login";
+    // Note: Since URL doesn't change, we don't need window.location.href
   };
 
   // ======================================================
@@ -86,62 +87,52 @@ function App() {
 
     return children;
   };
- 
 
-const sampleEwayData = {
-  ewayBillNo: "871615409896",
-  generatedDate: "11/12/2025 03:12 PM",
-  validUpto: "13/12/2025",
-  mode: "Road",
-  distance: "242 km",
-  transactionType: "Outward - Supply",
-
-  from: {
-    gstin: "10DZTPM1457E1ZE",
-    name: "M/S DHARA SHAKTI AGRO PRODUCTS",
-    address: "Samastipur, BIHAR-848117"
-  },
-
-  to: {
-    gstin: "10CLTPS3951E1ZY",
-    name: "Kranti Food",
-    address: "Kasba, BIHAR-854330"
-  },
-
-  goods: [
-    {
-      hsn: "11031300",
-      name: "CORN GRITS",
-      qty: "16500 KGS",
-      taxableAmount: 462000,
-      taxRate: "0%"
+  const sampleEwayData = {
+    ewayBillNo: "871615409896",
+    generatedDate: "11/12/2025 03:12 PM",
+    validUpto: "13/12/2025",
+    mode: "Road",
+    distance: "242 km",
+    transactionType: "Outward - Supply",
+    from: {
+      gstin: "10DZTPM1457E1ZE",
+      name: "M/S DHARA SHAKTI AGRO PRODUCTS",
+      address: "Samastipur, BIHAR-848117"
+    },
+    to: {
+      gstin: "10CLTPS3951E1ZY",
+      name: "Kranti Food",
+      address: "Kasba, BIHAR-854330"
+    },
+    goods: [
+      {
+        hsn: "11031300",
+        name: "CORN GRITS",
+        qty: "16500 KGS",
+        taxableAmount: 462000,
+        taxRate: "0%"
+      }
+    ],
+    taxSummary: {
+      taxable: 462000,
+      cgst: 0,
+      sgst: 0,
+      igst: 0,
+      total: 462000
+    },
+    transport: {
+      docNo: "162",
+      docDate: "11/12/2025"
+    },
+    vehicle: {
+      vehicleNo: "BR01GE0166",
+      enteredFrom: "Samastipur"
     }
-  ],
-
-  taxSummary: {
-    taxable: 462000,
-    cgst: 0,
-    sgst: 0,
-    igst: 0,
-    total: 462000
-  },
-
-  transport: {
-    docNo: "162",
-    docDate: "11/12/2025"
-  },
-
-  vehicle: {
-    vehicleNo: "BR01GE0166",
-    enteredFrom: "Samastipur"
-  }
-};
-
-
+  };
 
   return (
     <Router>
-      {/* <EmployeeAdd/> */}
       <div className="app-container">
         {/* Screen Lock Overlay */}
         {isLocked && user && <ScreenLock user={user} setIsLocked={setIsLocked} />}
@@ -161,8 +152,7 @@ const sampleEwayData = {
             <Route path="/profile" element={<ProtectedRoute><Profile user={user} setUser={setUser} /></ProtectedRoute>} />
             <Route path="/attendance" element={<ProtectedRoute><Attendance role={user?.role} user={user} /></ProtectedRoute>} />
             <Route path="/staff-ledger" element={<ProtectedRoute><EmployeeLedger role={user?.role} user={user} /></ProtectedRoute>} />
-            <Route path="/invoice" element={<ProtectedRoute><InvoicePage  role={user?.role} user={user}/></ProtectedRoute>} />
-            
+            <Route path="/invoice" element={<ProtectedRoute><InvoicePage role={user?.role} user={user}/></ProtectedRoute>} />
 
             {/* MANAGEMENT */}
             <Route path="/profit-loss" element={<ProtectedRoute managerAllowed><ProfitLoss role={user?.role} /></ProtectedRoute>} />

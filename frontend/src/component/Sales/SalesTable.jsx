@@ -5,7 +5,7 @@ import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
 /* =========================
-   🔒 Helper (NaN Safe)
+    🔒 Helper (NaN Safe)
    ========================= */
 const toSafeNumber = (v) => {
   const n = Number(v);
@@ -38,7 +38,7 @@ const SalesTable = ({ role }) => {
   };
 
   /* =========================
-     📡 Fetch Sales
+      📡 Fetch Sales
      ========================= */
   const fetchSales = async () => {
     try {
@@ -59,9 +59,7 @@ const SalesTable = ({ role }) => {
   }, [API_URL]);
 
   /* =========================
-     🧮 Auto Calculation (FIXED)
-     Backend ke formula ke match me
-     total = (qty*rate) + freight - discount
+      🧮 Auto Calculation (FIXED)
      ========================= */
   useEffect(() => {
     if (!editId) return;
@@ -92,7 +90,7 @@ const SalesTable = ({ role }) => {
   ]);
 
   /* =========================
-     🔍 Filter + Sort
+      🔍 Filter + Sort
      ========================= */
   const getProcessedList = () => {
     let list = salesList.filter((s) => {
@@ -131,7 +129,7 @@ const SalesTable = ({ role }) => {
   const totalPages = Math.ceil(processedList.length / rowsPerPage);
 
   /* =========================
-     🗑️ Delete
+      🗑️ Delete
      ========================= */
   const handleDelete = async (id) => {
     if (!isAuthorized) {
@@ -155,7 +153,7 @@ const SalesTable = ({ role }) => {
   };
 
   /* =========================
-     💾 Save (UPDATE)
+      💾 Save (UPDATE)
      ========================= */
   const handleSave = async () => {
     try {
@@ -170,10 +168,10 @@ const SalesTable = ({ role }) => {
         totalAmount: toSafeNumber(editData.totalAmount),
         amountReceived: toSafeNumber(editData.amountReceived),
         paymentDue: toSafeNumber(editData.paymentDue),
-        productName: editData.productName || "Corn Grit",
+        productName: editData.productName,
         goods: [
           {
-            product: editData.productName || "Corn Grit",
+            product: editData.productName,
             quantity: toSafeNumber(editData.quantity),
             rate: toSafeNumber(editData.rate),
             taxableAmount: toSafeNumber(editData.totalAmount),
@@ -199,7 +197,7 @@ const SalesTable = ({ role }) => {
   };
 
   /* =========================
-     ✏️ Start Edit
+      ✏️ Start Edit
      ========================= */
   const startEdit = (sale) => {
     if (!isAuthorized) {
@@ -231,7 +229,7 @@ const SalesTable = ({ role }) => {
   if (loading) return <Loader />;
 
   /* =========================
-     🧾 UI
+      🧾 UI
      ========================= */
   return (
     <>
@@ -291,23 +289,104 @@ const SalesTable = ({ role }) => {
               <tbody>
                 {currentRows.map((sale) => (
                   <tr key={sale._id}>
-                    <td>{editId === sale._id
-                      ? <input type="date" value={editData.date || ""} onChange={(e)=>setEditData({...editData,date:e.target.value})}/>
-                      : sale.date}
-                    </td>
-
-                    <td>{sale.billNo}<br />{sale.vehicleNo || "N/A"}</td>
-                    <td>{sale.customerName}</td>
-                    <td>{sale.quantity} @ ₹{sale.rate}</td>
-                    <td>₹{sale.freight || 0} / {sale.cashDiscount || 0}%</td>
-                    <td>₹{sale.totalAmount || sale.totalPrice || 0}</td>
-                    <td>₹{sale.amountReceived || 0}</td>
-                    <td style={{ color: "red" }}>₹{sale.paymentDue || 0}</td>
-                    <td>{sale.remarks}</td>
-                    <td>
-                      <button onClick={() => startEdit(sale)}>✏️</button>
-                      <button onClick={() => handleDelete(sale._id)}>🗑️</button>
-                    </td>
+                    {editId === sale._id ? (
+                      <>
+                        <td>
+                          <input 
+                            type="date" 
+                            className="edit-input"
+                            value={editData.date || ""} 
+                            onChange={(e) => setEditData({ ...editData, date: e.target.value })} 
+                          />
+                        </td>
+                        <td>
+                          <input 
+                            className="edit-input small" 
+                            value={editData.billNo} 
+                            onChange={(e) => setEditData({ ...editData, billNo: e.target.value })} 
+                          /><br/>
+                          <input 
+                            className="edit-input small" 
+                            value={editData.vehicleNo} 
+                            onChange={(e) => setEditData({ ...editData, vehicleNo: e.target.value })} 
+                          />
+                        </td>
+                        <td>
+                          <input 
+                            className="edit-input" 
+                            value={editData.customerName} 
+                            onChange={(e) => setEditData({ ...editData, customerName: e.target.value })} 
+                          />
+                        </td>
+                        <td>
+                          <input 
+                            type="number" 
+                            className="edit-input tiny" 
+                            value={editData.quantity} 
+                            onChange={(e) => setEditData({ ...editData, quantity: e.target.value })} 
+                          /> @ 
+                          <input 
+                            type="number" 
+                            className="edit-input tiny" 
+                            value={editData.rate} 
+                            onChange={(e) => setEditData({ ...editData, rate: e.target.value })} 
+                          />
+                        </td>
+                        <td>
+                          <input 
+                            type="number" 
+                            className="edit-input tiny" 
+                            value={editData.freight} 
+                            onChange={(e) => setEditData({ ...editData, freight: e.target.value })} 
+                          /> / 
+                          <input 
+                            type="number" 
+                            className="edit-input tiny" 
+                            value={editData.cashDiscount} 
+                            onChange={(e) => setEditData({ ...editData, cashDiscount: e.target.value })} 
+                          />%
+                        </td>
+                        <td className="bold-cell">₹{editData.totalAmount}</td>
+                        <td>
+                          <input 
+                            type="number" 
+                            className="edit-input small" 
+                            value={editData.amountReceived} 
+                            onChange={(e) => setEditData({ ...editData, amountReceived: e.target.value })} 
+                          />
+                        </td>
+                        <td className="due-cell">₹{editData.paymentDue}</td>
+                        <td>
+                          <input 
+                            className="edit-input" 
+                            value={editData.remarks} 
+                            onChange={(e) => setEditData({ ...editData, remarks: e.target.value })} 
+                          />
+                        </td>
+                        <td>
+                          <div className="action-btns">
+                            <button className="btn-save" onClick={handleSave}>✅</button>
+                            <button className="btn-cancel" onClick={() => setEditId(null)}>❌</button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td>{sale.date}</td>
+                        <td>{sale.billNo}<br />{sale.vehicleNo || "N/A"}</td>
+                        <td>{sale.customerName}</td>
+                        <td>{sale.quantity} @ ₹{sale.rate}</td>
+                        <td>₹{sale.freight || 0} / {sale.cashDiscount || 0}%</td>
+                        <td>₹{sale.totalAmount || sale.totalPrice || 0}</td>
+                        <td>₹{sale.amountReceived || 0}</td>
+                        <td style={{ color: "red" }}>₹{sale.paymentDue || 0}</td>
+                        <td>{sale.remarks}</td>
+                        <td>
+                          <button className="btn-edit" onClick={() => startEdit(sale)}>✏️</button>
+                          <button className="btn-delete" onClick={() => handleDelete(sale._id)}>🗑️</button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
