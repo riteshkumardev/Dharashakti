@@ -1,37 +1,25 @@
 import multer from "multer";
-import path from "path";
-import fs from "fs";
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
 
-// 📂 Ensure 'uploads/' folder exists manually or via code
-const uploadDir = 'uploads/';
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
+// ☁️ Cloudinary Configuration (Inhe apne Cloudinary Dashboard se bharein)
+cloudinary.config({
+  cloud_name: "your_cloud_name", 
+  api_key: "your_api_key",
+  api_secret: "your_api_secret",
+});
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // Error handling for directory
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    // File name ko unique aur clean banane ke liye
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    // Original extension (.jpg, .png) barkarar rakhein
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+// 📂 Vercel compatible storage (No local folder needed)
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "dharashakti_uploads", // Cloudinary mein folder ka naam
+    allowed_formats: ["jpg", "png", "jpeg"],
   },
 });
 
-// 🛡️ Security Filters
-const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith("image/")) {
-    cb(null, true); // Sirf images allow karein
-  } else {
-    cb(new Error("Only images are allowed!"), false);
-  }
-};
-
+// 🛡️ Filter & Limits
 export default multer({ 
   storage,
-  fileFilter,
-  limits: { fileSize: 2 * 1024 * 1024 } // ✅ 2MB Limit (Server stability ke liye)
+  limits: { fileSize: 2 * 1024 * 1024 } // 2MB Limit
 });

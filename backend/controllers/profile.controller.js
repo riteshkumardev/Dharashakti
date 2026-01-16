@@ -1,13 +1,12 @@
 import Employee from "../models/epmloyee.js"; 
-import fs from "fs";
-import path from "path";
+// Note: Vercel par fs aur path ka use crash de sakta hai agar disk write try karein
 
-/* ================= IMAGE UPLOAD (Fully Updated) ================= */
+/* ================= IMAGE UPLOAD (Vercel Compatible) ================= */
 export const uploadProfileImage = async (req, res) => {
   try {
     const { employeeId } = req.body;
 
-    // 1. Validation: File aur ID check karein
+    // 1. Validation
     if (!req.file || !employeeId) {
       return res.status(400).json({
         success: false,
@@ -15,28 +14,15 @@ export const uploadProfileImage = async (req, res) => {
       });
     }
 
-    // 2. Cleanup: Purani photo delete karne ka robust logic
-    const oldEmployee = await Employee.findOne({ employeeId });
-    if (oldEmployee && oldEmployee.photo) {
-      // Path fix: Pehla slash '/' check karke remove karein
-      const relativePath = oldEmployee.photo.startsWith('/') 
-        ? oldEmployee.photo.substring(1) 
-        : oldEmployee.photo;
-        
-      const oldFilePath = path.join(process.cwd(), relativePath);
-      
-      // Cleanup execution
-      if (fs.existsSync(oldFilePath)) {
-        try {
-          fs.unlinkSync(oldFilePath);
-        } catch (fileErr) {
-          console.error("Cleanup Error:", fileErr.message);
-        }
-      }
-    }
+    /**
+     * ⚠️ VERCEL WARNING: 
+     * Yahan se 'fs.unlinkSync' wala logic hata diya gaya hai kyunki 
+     * serverless functions disk storage allow nahi karte.
+     */
 
-    // 3. Database Update: Nayi photo ka path '/' ke saath save karein
-    const imagePath = `/uploads/${req.file.filename}`;
+    // 2. Database Update: Nayi photo ka path save karein
+    // Agar Cloudinary use kar rahe hain toh path 'req.file.path' hoga
+    const imagePath = req.file.path || `/uploads/${req.file.filename}`;
 
     const employee = await Employee.findOneAndUpdate(
       { employeeId },
@@ -54,8 +40,11 @@ export const uploadProfileImage = async (req, res) => {
       photo: imagePath, 
     });
   } catch (err) {
-    console.error("Critical Upload Error:", err);
-    res.status(500).json({ success: false, message: "Server error: Check uploads folder permissions" });
+    console.error("Upload Error:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: "Serverless invocation failed: Use Cloudinary for production" 
+    });
   }
 };
 
