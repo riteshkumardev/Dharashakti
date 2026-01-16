@@ -1,11 +1,13 @@
 import Employee from "../models/epmloyee.js"; 
+import fs from "fs";
+import path from "path";
 
-/* ================= IMAGE UPLOAD (Production Ready) ================= */
+/* ================= IMAGE UPLOAD ================= */
 export const uploadProfileImage = async (req, res) => {
   try {
     const { employeeId } = req.body;
 
-    // 1. Validation: File ya ID missing hone par crash rokne ke liye
+    // 1. Validation: Check karein file aur ID dono hain ya nahi
     if (!req.file || !employeeId) {
       return res.status(400).json({
         success: false,
@@ -13,16 +15,24 @@ export const uploadProfileImage = async (req, res) => {
       });
     }
 
-    /**
-     * ✅ IMPORTANT: Vercel par local disk par file save (diskStorage) 
-     * karne ki koshish hamesha crash degi.
-     * Cloudinary use karne par 'req.file.path' seedha 'https://...' URL dega.
-     */
-    const imagePath = req.file.path; 
-
-    if (!imagePath) {
-       return res.status(500).json({ success: false, message: "Storage upload failed" });
+    // 2. Cleanup: Purana record check karein taaki purani photo storage se delete ho sake
+    const oldEmployee = await Employee.findOne({ employeeId });
+    if (oldEmployee && oldEmployee.photo) {
+      // Relative path ko absolute path mein badlein (uploads/filename.jpg)
+      // .substring(1) isliye kyunki path '/uploads/...' slash se shuru hota hai
+      const oldFilePath = path.join(process.cwd(), oldEmployee.photo.substring(1));
+      
+      if (fs.existsSync(oldFilePath)) {
+        try {
+          fs.unlinkSync(oldFilePath); // File delete logic
+        } catch (fileErr) {
+          console.error("Purani file delete nahi ho saki:", fileErr);
+        }
+      }
     }
+
+    // 3. Save: Nayi photo ka path database mein update karein
+    const imagePath = `/uploads/${req.file.filename}`;
 
     const employee = await Employee.findOneAndUpdate(
       { employeeId },
@@ -36,19 +46,16 @@ export const uploadProfileImage = async (req, res) => {
 
     res.json({
       success: true,
-      message: "✅ Profile image updated successfully",
+      message: "Profile image updated successfully",
       photo: imagePath, 
     });
   } catch (err) {
-    console.error("Upload Error:", err.message);
-    res.status(500).json({ 
-      success: false, 
-      message: "Vercel Error: Ensure Cloudinary is configured. Local disk is read-only." 
-    });
+    console.error("Upload Error:", err);
+    res.status(500).json({ success: false, message: "Server error during upload" });
   }
 };
 
-/* ================= UPDATE DETAILS ================= */
+/* ================= UPDATE PROFILE (DETAILS) ================= */
 export const updateProfile = async (req, res) => {
   try {
     const { employeeId, name, phone } = req.body;
@@ -63,7 +70,7 @@ export const updateProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: "Employee not found" });
     }
 
-    res.json({ success: true, message: "✅ Details updated", data: employee });
+    res.json({ success: true, message: "Profile updated successfully", data: employee });
   } catch (err) {
     res.status(500).json({ success: false, message: "Update failed" });
   }
@@ -75,7 +82,10 @@ export const changePassword = async (req, res) => {
     const { employeeId, password } = req.body; 
 
     if (!password || password.length < 4) {
-      return res.status(400).json({ success: false, message: "Min 4 characters required" });
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 4 characters",
+      });
     }
 
     const employee = await Employee.findOneAndUpdate(
@@ -88,7 +98,7 @@ export const changePassword = async (req, res) => {
       return res.status(404).json({ success: false, message: "Employee not found" });
     }
 
-    res.json({ success: true, message: "🔐 Password updated" });
+    res.json({ success: true, message: "Password updated successfully" });
   } catch (err) {
     res.status(500).json({ success: false, message: "Password update failed" });
   }
@@ -98,8 +108,9 @@ export const changePassword = async (req, res) => {
 export const logoutUser = async (req, res) => {
   try {
     const { employeeId } = req.body;
+    // Session ID ko null karke logout handle karein
     await Employee.findOneAndUpdate({ employeeId }, { currentSessionId: null });
-    res.json({ success: true, message: "Logged out" });
+    res.json({ success: true, message: "Logged out successfully" });
   } catch (err) {
     res.status(500).json({ success: false, message: "Logout failed" });
   }
