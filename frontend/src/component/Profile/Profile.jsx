@@ -12,9 +12,10 @@ export default function Profile({ user, setUser }) {
   const [phone, setPhone] = useState(user?.phone || "");
   const [newPassword, setNewPassword] = useState("");
   
-  // Live Backend URL dynamically handle karne ke liye
+  // Dynamic Backend URL
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
+  // Initial Photo State
   const [photoURL, setPhotoURL] = useState(
     user?.photo || "https://i.imgur.com/6VBx3io.png"
   );
@@ -32,30 +33,31 @@ export default function Profile({ user, setUser }) {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  /* ================= UPDATE PROFILE ================= */
+  /* ================= UPDATE PROFILE DETAILS ================= */
   const updateProfile = async () => {
+    if (!name || !phone) {
+      showMsg("Name and Phone are required", "warning");
+      return;
+    }
+
     try {
       setLoading(true);
-
-      const res = await fetch(`${API_URL}/api/profile/update`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          employeeId: user.employeeId,
-          name,
-          phone,
-        }),
+      const res = await axios.put(`${API_URL}/api/profile/update`, {
+        employeeId: user.employeeId,
+        name,
+        phone,
       });
 
-      const data = await res.json();
-
-      if (!data.success) throw new Error();
-
-      localStorage.setItem("user", JSON.stringify(data.data));
-      setUser(data.data);
-      showMsg("✅ Profile updated successfully");
-    } catch {
-      showMsg("❌ Profile update failed", "error");
+      if (res.data.success) {
+        const updatedData = res.data.data;
+        localStorage.setItem("user", JSON.stringify(updatedData));
+        setUser(updatedData);
+        showMsg("✅ Profile updated successfully");
+      } else {
+        throw new Error(res.data.message);
+      }
+    } catch (err) {
+      showMsg(err.response?.data?.message || "❌ Profile update failed", "error");
     } finally {
       setLoading(false);
     }
@@ -70,35 +72,37 @@ export default function Profile({ user, setUser }) {
 
     try {
       setLoading(true);
-
-      const res = await fetch(`${API_URL}/api/profile/password`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          employeeId: user.employeeId,
-          password: newPassword,
-        }),
+      const res = await axios.put(`${API_URL}/api/profile/password`, {
+        employeeId: user.employeeId,
+        password: newPassword,
       });
 
-      const data = await res.json();
-      if (!data.success) throw new Error();
-
-      showMsg("🔐 Password updated");
-      setNewPassword("");
-    } catch {
-      showMsg("❌ Password update failed", "error");
+      if (res.data.success) {
+        showMsg("🔐 Password updated successfully");
+        setNewPassword("");
+      } else {
+        throw new Error(res.data.message);
+      }
+    } catch (err) {
+      showMsg(err.response?.data?.message || "❌ Password update failed", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  /* ================= IMAGE UPLOAD ================= */
+  /* ================= IMAGE UPLOAD LOGIC ================= */
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    // 1. Client-side Validation (Max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      showMsg("❌ File too large. Max limit is 2MB", "warning");
+      return;
+    }
+
     const formData = new FormData();
-    formData.append("photo", file); 
+    formData.append("photo", file); // Backend 'multer' field name must be 'photo'
     formData.append("employeeId", user.employeeId);
 
     try {
@@ -109,8 +113,8 @@ export default function Profile({ user, setUser }) {
       });
 
       if (res.data.success) {
-        // Live URL handle karne ke liye (Agar Vercel hai toh usi URL ko use karein)
         const photoPath = res.data.photo;
+        // Fix: Absolute vs Relative Path handling
         const fullPhotoPath = photoPath.startsWith('http') ? photoPath : `${API_URL}${photoPath}`;
 
         const updatedUser = { ...user, photo: fullPhotoPath };
@@ -119,11 +123,11 @@ export default function Profile({ user, setUser }) {
         setPhotoURL(fullPhotoPath); 
         
         localStorage.setItem("user", JSON.stringify(updatedUser));
-        showMsg("✅ Profile image updated successfully!", "success");
+        showMsg("✅ Profile image updated!", "success");
       }
     } catch (err) {
-      console.error("Upload Error:", err);
-      showMsg("❌ Image upload failed: " + (err.response?.data?.message || "Server Error"), "error");
+      console.error("Upload Error:", err.response?.data);
+      showMsg("❌ Upload failed: " + (err.response?.data?.message || "Internal Server Error"), "error");
     } finally {
       setLoading(false);
     }
@@ -133,14 +137,9 @@ export default function Profile({ user, setUser }) {
   const logout = async () => {
     try {
       setLoading(true);
-
-      await fetch(`${API_URL}/api/profile/logout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employeeId: user.employeeId }),
-      });
+      await axios.post(`${API_URL}/api/profile/logout`, { employeeId: user.employeeId });
     } catch (e) {
-      console.error(e);
+      console.error("Logout error", e);
     } finally {
       localStorage.removeItem("user");
       setUser(null);
@@ -156,9 +155,9 @@ export default function Profile({ user, setUser }) {
       <div className="profile-card-3d">
         <div className="profile-img">
           <img src={photoURL} alt="profile" style={{ objectFit: "cover" }} />
-          <label className="img-edit">
+          <label className="img-edit" title="Change Photo">
             📸
-            <input type="file" hidden onChange={handleImageChange} />
+            <input type="file" accept="image/*" hidden onChange={handleImageChange} />
           </label>
         </div>
 
@@ -166,21 +165,31 @@ export default function Profile({ user, setUser }) {
 
         <div className="field">
           <label>Employee ID</label>
-          <input value={user?.employeeId} disabled />
+          <input value={user?.employeeId || ""} disabled style={{backgroundColor: '#f1f5f9', cursor: 'not-allowed'}} />
         </div>
 
         <div className="field">
           <label>Full Name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} />
+          <input 
+            type="text"
+            value={name} 
+            placeholder="Enter your name"
+            onChange={(e) => setName(e.target.value)} 
+          />
         </div>
 
         <div className="field">
           <label>Phone Number</label>
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <input 
+            type="tel"
+            value={phone} 
+            placeholder="Enter phone number"
+            onChange={(e) => setPhone(e.target.value)} 
+          />
         </div>
 
-        <button onClick={updateProfile} className="update-btn">
-          Update Details
+        <button onClick={updateProfile} className="update-btn" disabled={loading}>
+          {loading ? "Updating..." : "Update Details"}
         </button>
 
         <div className="divider">Security & Password</div>
@@ -189,12 +198,18 @@ export default function Profile({ user, setUser }) {
           <label>New Password</label>
           <input
             type="password"
+            placeholder="Minimum 4 characters"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
           />
         </div>
 
-        <button onClick={changePassword} disabled={!newPassword}>
+        <button 
+          onClick={changePassword} 
+          className="password-btn"
+          disabled={!newPassword || loading}
+          style={{backgroundColor: !newPassword ? '#cbd5e1' : '#4d47f3'}}
+        >
           Change Password
         </button>
 
