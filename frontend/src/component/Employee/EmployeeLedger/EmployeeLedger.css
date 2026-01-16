@@ -165,3 +165,40 @@
 
 .summary-item b { font-size: 20px; }
 .yellow b { color: #f59e0b; }
+/* 🖥️ Screen par Payslip ko normal dikhao (Overlay ya Dashboard ke niche) */
+#printablePayslip {
+  background: white;
+  padding: 20px;
+  border: 1px solid #ddd;
+  margin-top: 20px;
+}
+
+/* 🖨️ PRINT LOGIC - Sabse Zaroori */
+@media print {
+  /* 1. Pure body ko hide karo */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* 2. Sirf printable area ko block karke dikhao */
+  #printablePayslip, 
+  #printablePayslip * {
+    visibility: visible !important;
+  }
+
+  /* 3. Payslip ko page ke top par fixed karo */
+  #printablePayslip {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    display: block !important;
+    border: none !important;
+    padding: 10mm !important; /* Margins for printer */
+  }
+
+  /* 4. Extra header/footer (No Print) wali cheezein hatao */
+  .no-print, .print-trigger-box {
+    display: none !important;
+  }
+}

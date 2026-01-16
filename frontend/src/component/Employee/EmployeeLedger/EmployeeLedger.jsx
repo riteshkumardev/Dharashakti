@@ -5,6 +5,7 @@ import 'react-calendar/dist/Calendar.css';
 import './EmployeeLedger.css';
 import Loader from "../../Core_Component/Loader/Loader";
 import ProfessionalPayslip from './Payslip/ProfessionalPayslip';
+import EmployeeIDCard from './EmployeeIDCard/EmployeeIDCard'; // 🆕 ID Card Import
 
 const EmployeeLedger = ({ role, user }) => {
   const isAuthorized = role === "Admin" || role === "Accountant";
@@ -19,8 +20,9 @@ const EmployeeLedger = ({ role, user }) => {
   const [incentive, setIncentive] = useState('');
   const [showCalendar, setShowCalendar] = useState(false);
   
-  // 🆕 Payslip Show/Hide State
+  // 🆕 Visibility States
   const [showPayslip, setShowPayslip] = useState(false);
+  const [showIDCard, setShowIDCard] = useState(false); // ID Card toggle
 
   const [fullAttendanceData, setFullAttendanceData] = useState({});
   const [loading, setLoading] = useState(true); 
@@ -68,6 +70,9 @@ const EmployeeLedger = ({ role, user }) => {
   const viewLedger = async (emp, month = selectedMonth) => {
     setFetchingDetail(true);
     setSelectedEmp(emp);
+    setShowPayslip(false); // Reset view on switch
+    setShowIDCard(false);  // Reset view on switch
+    
     const empId = emp.employeeId || emp._id;
     try {
       const payRes = await axios.get(`${API_URL}/api/salary-payments/${empId}`);
@@ -197,17 +202,29 @@ const EmployeeLedger = ({ role, user }) => {
                 <div className="summary-item green">P: <b>{stats.present}</b></div>
                 <div className="summary-item yellow">H/D: <b>{stats.halfDay}</b></div>
                 <div className="summary-item red">A: <b>{stats.absent}</b></div>
-                <button className="view-btn-small" onClick={() => setShowCalendar(true)}>🗓️ History</button>
                 
-                {/* ✅ Button updated to toggle Payslip view instead of printing */}
-                <button 
-                  className="view-btn-small print-btn" 
-                  onClick={() => setShowPayslip(!showPayslip)}
-                >
-                  {showPayslip ? "❌ Close Payslip" : "📄 View Payslip"}
-                </button>
+                <div className="action-buttons-group" style={{display: 'flex', gap: '8px'}}>
+                    <button className="view-btn-small" onClick={() => setShowCalendar(true)}>🗓️ History</button>
+                    
+                    {/* ✅ ID Card Toggle Button */}
+                    <button 
+                      className="view-btn-small id-card-btn" 
+                      onClick={() => { setShowIDCard(!showIDCard); setShowPayslip(false); }}
+                      style={{background: '#0ea5e9'}}
+                    >
+                      {showIDCard ? "❌ Close ID" : "🪪 View ID Card"}
+                    </button>
+
+                    <button 
+                      className="view-btn-small print-btn" 
+                      onClick={() => { setShowPayslip(!showPayslip); setShowIDCard(false); }}
+                    >
+                      {showPayslip ? "❌ Close Slip" : "📄 View Payslip"}
+                    </button>
+                </div>
               </div>
 
+              {/* ... Earnings/Deductions UI logic (Unchanged) ... */}
               <div className="pro-payroll-grid">
                 <div className="pro-card earnings-card">
                   <h4 className="card-header-text">💰 Earnings ({new Date(selectedMonth + "-01").toLocaleString('default', { month: 'short' })})</h4>
@@ -246,6 +263,7 @@ const EmployeeLedger = ({ role, user }) => {
         </div>
       </div>
 
+      {/* MODALS & OVERLAYS */}
       {showCalendar && (
         <div className="cal-modal-overlay">
           <div className="cal-modal-content">
@@ -254,28 +272,19 @@ const EmployeeLedger = ({ role, user }) => {
               <button className="cal-close-btn" onClick={() => setShowCalendar(false)}>&times;</button>
             </div>
             <div className="cal-body">
-              <Calendar 
-                activeStartDate={new Date(selectedMonth + "-01")}
-                tileClassName={getTileClassName} 
-              />
-              <div className="cal-legend">
-                <div className="leg-item"><span className="leg-box green"></span> P</div>
-                <div className="leg-item"><span className="leg-box yellow"></span> H/D</div>
-                <div className="leg-item"><span className="leg-box red"></span> A</div>
-              </div>
+              <Calendar activeStartDate={new Date(selectedMonth + "-01")} tileClassName={getTileClassName} />
             </div>
           </div>
         </div>
       )}
 
-      {/* ✅ Payslip Component with toggle visibility */}
+      {/* ✅ Dynamic Components: Payslip & ID Card */}
       {selectedEmp && showPayslip && (
-        <ProfessionalPayslip 
-          selectedEmp={selectedEmp}
-          stats={stats}
-          payroll={payroll}
-          currentMonth={selectedMonth}
-        />
+        <ProfessionalPayslip selectedEmp={selectedEmp} stats={stats} payroll={payroll} currentMonth={selectedMonth} />
+      )}
+
+      {selectedEmp && showIDCard && (
+        <EmployeeIDCard selectedEmp={selectedEmp} />
       )}
     </div>
   );

@@ -19,22 +19,22 @@ const ProfessionalPayslip = ({ selectedEmp, stats, payroll, currentMonth }) => {
     Verified: Dhara Shakti Agro
   `.trim();
 
-  // 🖨️ Handle Print Function
+  // 🖨️ Professional Print Logic
   const handlePrint = () => {
     window.print();
   };
 
   return (
     <div className="payslip-container-main">
-      {/* 1️⃣ Print Button (Sirf screen par dikhega) */}
-      <div className="no-print print-trigger-box">
+      {/* 1️⃣ Print Button (Screen par dikhega) */}
+      <div className="no-print print-trigger-box" style={{ textAlign: 'center', margin: '20px 0' }}>
         <button className="view-btn-small print-action-btn" onClick={handlePrint}>
           🖨️ Print Employee Payslip
         </button>
       </div>
 
-      {/* 2️⃣ Printable Content (Screen par hidden, Print mein visible) */}
-      <div id="printablePayslip" className="payslip-wrapper print-content-only">
+      {/* 2️⃣ Printable Content Area (Strict ID for CSS) */}
+      <div id="printablePayslip" className="payslip-wrapper">
         <div className="payslip-header-modern">
           <div className="company-branding">
             <h1>DHARA SHAKTI AGRO PRODUCTS</h1>
