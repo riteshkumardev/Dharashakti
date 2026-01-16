@@ -2,12 +2,12 @@ import Employee from "../models/epmloyee.js";
 import fs from "fs";
 import path from "path";
 
-/* ================= IMAGE UPLOAD ================= */
+/* ================= IMAGE UPLOAD (Fully Updated) ================= */
 export const uploadProfileImage = async (req, res) => {
   try {
     const { employeeId } = req.body;
 
-    // 1. Validation: Check karein file aur ID dono hain ya nahi
+    // 1. Validation: File aur ID check karein
     if (!req.file || !employeeId) {
       return res.status(400).json({
         success: false,
@@ -15,23 +15,27 @@ export const uploadProfileImage = async (req, res) => {
       });
     }
 
-    // 2. Cleanup: Purana record check karein taaki purani photo storage se delete ho sake
+    // 2. Cleanup: Purani photo delete karne ka robust logic
     const oldEmployee = await Employee.findOne({ employeeId });
     if (oldEmployee && oldEmployee.photo) {
-      // Relative path ko absolute path mein badlein (uploads/filename.jpg)
-      // .substring(1) isliye kyunki path '/uploads/...' slash se shuru hota hai
-      const oldFilePath = path.join(process.cwd(), oldEmployee.photo.substring(1));
+      // Path fix: Pehla slash '/' check karke remove karein
+      const relativePath = oldEmployee.photo.startsWith('/') 
+        ? oldEmployee.photo.substring(1) 
+        : oldEmployee.photo;
+        
+      const oldFilePath = path.join(process.cwd(), relativePath);
       
+      // Cleanup execution
       if (fs.existsSync(oldFilePath)) {
         try {
-          fs.unlinkSync(oldFilePath); // File delete logic
+          fs.unlinkSync(oldFilePath);
         } catch (fileErr) {
-          console.error("Purani file delete nahi ho saki:", fileErr);
+          console.error("Cleanup Error:", fileErr.message);
         }
       }
     }
 
-    // 3. Save: Nayi photo ka path database mein update karein
+    // 3. Database Update: Nayi photo ka path '/' ke saath save karein
     const imagePath = `/uploads/${req.file.filename}`;
 
     const employee = await Employee.findOneAndUpdate(
@@ -46,16 +50,16 @@ export const uploadProfileImage = async (req, res) => {
 
     res.json({
       success: true,
-      message: "Profile image updated successfully",
+      message: "✅ Profile image updated successfully",
       photo: imagePath, 
     });
   } catch (err) {
-    console.error("Upload Error:", err);
-    res.status(500).json({ success: false, message: "Server error during upload" });
+    console.error("Critical Upload Error:", err);
+    res.status(500).json({ success: false, message: "Server error: Check uploads folder permissions" });
   }
 };
 
-/* ================= UPDATE PROFILE (DETAILS) ================= */
+/* ================= UPDATE DETAILS ================= */
 export const updateProfile = async (req, res) => {
   try {
     const { employeeId, name, phone } = req.body;
@@ -70,7 +74,7 @@ export const updateProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: "Employee not found" });
     }
 
-    res.json({ success: true, message: "Profile updated successfully", data: employee });
+    res.json({ success: true, message: "✅ Details updated", data: employee });
   } catch (err) {
     res.status(500).json({ success: false, message: "Update failed" });
   }
@@ -82,10 +86,7 @@ export const changePassword = async (req, res) => {
     const { employeeId, password } = req.body; 
 
     if (!password || password.length < 4) {
-      return res.status(400).json({
-        success: false,
-        message: "Password must be at least 4 characters",
-      });
+      return res.status(400).json({ success: false, message: "Min 4 characters required" });
     }
 
     const employee = await Employee.findOneAndUpdate(
@@ -98,7 +99,7 @@ export const changePassword = async (req, res) => {
       return res.status(404).json({ success: false, message: "Employee not found" });
     }
 
-    res.json({ success: true, message: "Password updated successfully" });
+    res.json({ success: true, message: "🔐 Password updated" });
   } catch (err) {
     res.status(500).json({ success: false, message: "Password update failed" });
   }
@@ -108,9 +109,8 @@ export const changePassword = async (req, res) => {
 export const logoutUser = async (req, res) => {
   try {
     const { employeeId } = req.body;
-    // Session ID ko null karke logout handle karein
     await Employee.findOneAndUpdate({ employeeId }, { currentSessionId: null });
-    res.json({ success: true, message: "Logged out successfully" });
+    res.json({ success: true, message: "Logged out" });
   } catch (err) {
     res.status(500).json({ success: false, message: "Logout failed" });
   }
