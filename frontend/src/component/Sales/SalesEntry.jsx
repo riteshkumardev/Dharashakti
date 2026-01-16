@@ -18,11 +18,10 @@ const SalesEntry = ({ role }) => {
     gstin: "",
     mobile: "",
     address: "",
-    // Multiple items support
     items: [{ productName: "", quantity: "", rate: "" }],
     billNo: "",
     vehicleNo: "",
-    travelingCost: "", // Freight
+    travelingCost: "", 
     cashDiscount: "",
     totalPrice: 0,
     amountReceived: "",
@@ -72,8 +71,32 @@ const SalesEntry = ({ role }) => {
     fetchData();
   }, [API_URL]);
 
+  // ==========================================
+  // 🔘 UPDATED: Customer Select with Popup Logic
+  // ==========================================
   const handleCustomerSelect = (e) => {
     const selectedName = e.target.value;
+
+    // ✨ Yahan hum check kar rahe hain ki kya dropdown se "Local customer" select hua hai
+    if (selectedName === "Local customer") {
+      const customName = window.prompt("Please enter Local Customer Name for the Bill:");
+      
+      if (customName && customName.trim() !== "") {
+        setFormData((prev) => ({
+          ...prev,
+          customerName: customName.trim().toUpperCase(), // Popup wala naam yahan save hoga
+          gstin: "URD (Local)",
+          mobile: "",
+          address: "Local Market",
+        }));
+      } else {
+        // Agar user prompt cancel kar de
+        setFormData((prev) => ({ ...prev, customerName: "" }));
+      }
+      return; 
+    }
+
+    // Normal Registered Supplier Logic
     const customer = suppliers.find((s) => s.name === selectedName);
     if (customer) {
       setFormData((prev) => ({
@@ -88,7 +111,6 @@ const SalesEntry = ({ role }) => {
     }
   };
 
-  // --- Dynamic Items Logic ---
   const handleItemChange = (index, e) => {
     const { name, value } = e.target;
     const newItems = [...formData.items];
@@ -110,7 +132,6 @@ const SalesEntry = ({ role }) => {
     }
   };
 
-  // --- Calculations Logic ---
   useEffect(() => {
     let subTotal = 0;
     formData.items.forEach(item => {
@@ -165,7 +186,7 @@ const SalesEntry = ({ role }) => {
 
       const payload = {
         ...formData,
-        travelingCost: freightValue * -1, // Sending as negative as per your requirement
+        travelingCost: freightValue * -1, 
         si: nextSi,
         taxableValue: totalTaxable,
         totalAmount: formData.totalPrice,
@@ -192,33 +213,33 @@ const SalesEntry = ({ role }) => {
         <h2 className="form-title">Professional Sales & Multi-Item Entry</h2>
         
         <form onSubmit={handleSubmit} className="sales-form-grid">
-          {/* Row 1: Basic Info */}
           <div className="input-group"><label>Invoice Date</label><input type="date" name="date" value={formData.date} onChange={handleChange} /></div>
           <div className="input-group"><label>Invoice No</label><input name="billNo" value={formData.billNo} onChange={handleChange} required /></div>
           <div className="input-group">
             <label>Customer Name</label>
-            <select name="customerName" value={formData.customerName} onChange={handleCustomerSelect} required>
+            <select 
+               name="customerNameSelect" 
+               value={suppliers.some(s => s.name === formData.customerName) ? formData.customerName : (formData.gstin === "URD (Local)" ? "Local customer" : "")} 
+               onChange={handleCustomerSelect} 
+               required
+            >
               <option value="">-- Select Customer --</option>
               {suppliers.map((s) => (<option key={s._id} value={s.name}>{s.name}</option>))}
             </select>
           </div>
 
-          {/* Row 2: Customer Details */}
           <div className="input-group"><label>GSTIN</label><input value={formData.gstin} readOnly className="readonly-input" /></div>
           <div className="input-group"><label>Mobile</label><input value={formData.mobile} readOnly className="readonly-input" /></div>
           <div className="input-group"><label>Vehicle No</label><input name="vehicleNo" value={formData.vehicleNo} onChange={handleChange} placeholder="BR01..." /></div>
 
-          {/* Row 3: Delivery Details */}
           <div className="input-group"><label>Delivery Note (Bags)</label><input name="deliveryNote" value={formData.deliveryNote} onChange={handleChange} /></div>
           <div className="input-group"><label>Delivery Note Date</label><input type="date" name="deliveryNoteDate" value={formData.deliveryNoteDate} onChange={handleChange} /></div>
           <div className="input-group"><label>Buyer Order No</label><input name="buyerOrderNo" value={formData.buyerOrderNo} onChange={handleChange} /></div>
 
-          {/* Row 4: Order/Dispatch Details */}
           <div className="input-group"><label>Buyer Order Date</label><input type="date" name="buyerOrderDate" value={formData.buyerOrderDate} onChange={handleChange} /></div>
           <div className="input-group"><label>Dispatch Doc No</label><input name="dispatchDocNo" value={formData.dispatchDocNo} onChange={handleChange} /></div>
           <div className="input-group"><label>Dispatch Date</label><input type="date" name="dispatchDate" value={formData.dispatchDate} onChange={handleChange} /></div>
 
-          {/* Row 5: Logistics */}
           <div className="input-group">
             <label>Dispatched Through</label>
             <select name="dispatchedThrough" value={formData.dispatchedThrough} onChange={handleChange}>
@@ -244,7 +265,6 @@ const SalesEntry = ({ role }) => {
           </div>
           <div className="input-group span-2"><label>Address</label><input value={formData.address} readOnly className="readonly-input" /></div>
 
-          {/* DYNAMIC ITEMS SECTION */}
           <div className="span-3 item-section-container" style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '8px', margin: '10px 0', backgroundColor: '#f9f9f9' }}>
             <h3 style={{ marginBottom: '15px', color: '#333', borderBottom: '1px solid #ccc' }}>Product Details</h3>
             {formData.items.map((item, index) => (
@@ -277,7 +297,6 @@ const SalesEntry = ({ role }) => {
             <button type="button" onClick={addItem} style={{ padding: '8px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>+ Add Item</button>
           </div>
 
-          {/* Financials */}
           <div className="input-group"><label>Freight Charge (₹) [-]</label><input type="number" name="travelingCost" value={formData.travelingCost} onChange={handleChange} placeholder="Subtracts from total" /></div>
           <div className="input-group"><label>Discount %</label><input type="number" name="cashDiscount" value={formData.cashDiscount} onChange={handleChange} /></div>
           
@@ -286,7 +305,6 @@ const SalesEntry = ({ role }) => {
             <textarea name="termsOfDelivery" value={formData.termsOfDelivery} onChange={handleChange} style={{width: '100%', borderRadius: '5px', border: '1px solid #ccc', padding: '10px', minHeight: '60px'}} placeholder="Delivery terms..." />
           </div>
 
-          {/* Totals */}
           <div className="input-group readonly-group"><label>Final Bill Amount</label><input value={formData.totalPrice.toFixed(2)} readOnly style={{backgroundColor: '#e9ecef', fontWeight: 'bold'}} /></div>
           <div className="input-group"><label>Received Amount (₹)</label><input type="number" name="amountReceived" value={formData.amountReceived} onChange={handleChange} /></div>
           <div className="input-group readonly-group"><label>Balance Due</label><input value={formData.paymentDue.toFixed(2)} readOnly style={{color: formData.paymentDue > 0 ? 'red' : 'green', fontWeight:'bold', backgroundColor: '#e9ecef'}} /></div>

@@ -169,12 +169,14 @@ const SalesTable = ({ role }) => {
         amountReceived: toSafeNumber(editData.amountReceived),
         paymentDue: toSafeNumber(editData.paymentDue),
         productName: editData.productName,
+        // ✅ Goods array update using single product edit logic
         goods: [
           {
             product: editData.productName,
             quantity: toSafeNumber(editData.quantity),
             rate: toSafeNumber(editData.rate),
             taxableAmount: toSafeNumber(editData.totalAmount),
+            hsn: editData.goods?.[0]?.hsn || ""
           },
         ],
       };
@@ -211,8 +213,9 @@ const SalesTable = ({ role }) => {
       billNo: sale.billNo || "",
       vehicleNo: sale.vehicleNo || "",
       customerName: sale.customerName || "",
-      quantity: toSafeNumber(sale.quantity),
-      rate: toSafeNumber(sale.rate),
+      // ✅ Goods array se quantity aur rate uthana
+      quantity: toSafeNumber(sale.goods?.[0]?.quantity || sale.quantity),
+      rate: toSafeNumber(sale.goods?.[0]?.rate || sale.rate),
       freight: toSafeNumber(sale.freight || sale.travelingCost),
       cashDiscount: toSafeNumber(sale.cashDiscount),
       amountReceived: toSafeNumber(sale.amountReceived),
@@ -220,8 +223,8 @@ const SalesTable = ({ role }) => {
       paymentDue: toSafeNumber(sale.paymentDue),
       remarks: sale.remarks || "",
       productName:
-        sale.productName ||
         sale.goods?.[0]?.product ||
+        sale.productName ||
         "Corn Grit",
     });
   };
@@ -375,7 +378,19 @@ const SalesTable = ({ role }) => {
                         <td>{sale.date}</td>
                         <td>{sale.billNo}<br />{sale.vehicleNo || "N/A"}</td>
                         <td>{sale.customerName}</td>
-                        <td>{sale.quantity} @ ₹{sale.rate}</td>
+                        {/* ✅ Goods array se multi-item data dikhana */}
+                        <td>
+                          {sale.goods && sale.goods.length > 0 ? (
+                            sale.goods.map((g, i) => (
+                              <div key={i} style={{fontSize: '0.85em'}}>
+                                {g.quantity} @ ₹{g.rate}
+                                {sale.goods.length > 1 && <span style={{color: '#888'}}> ({g.product})</span>}
+                              </div>
+                            ))
+                          ) : (
+                            `${sale.quantity} @ ₹${sale.rate}`
+                          )}
+                        </td>
                         <td>₹{sale.freight || 0} / {sale.cashDiscount || 0}%</td>
                         <td>₹{sale.totalAmount || sale.totalPrice || 0}</td>
                         <td>₹{sale.amountReceived || 0}</td>
