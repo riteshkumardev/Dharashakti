@@ -4,6 +4,7 @@ import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css'; 
 import './EmployeeLedger.css';
 import Loader from "../../Core_Component/Loader/Loader";
+import ProfessionalPayslip from './Payslip/ProfessionalPayslip';
 
 const EmployeeLedger = ({ role, user }) => {
   const isAuthorized = role === "Admin" || role === "Accountant";
@@ -29,7 +30,6 @@ const EmployeeLedger = ({ role, user }) => {
     return strID.length > 4 ? "XXXX" + strID.slice(-4) : strID;
   };
 
-  // 1️⃣ Fetch Staff List (Boss Only)
   useEffect(() => {
     const fetchEmployees = async () => {
       if (!isBoss) { setLoading(false); return; }
@@ -42,23 +42,18 @@ const EmployeeLedger = ({ role, user }) => {
     fetchEmployees();
   }, [isBoss, API_URL]);
 
-  // 2️⃣ View Detailed Ledger
   const viewLedger = async (emp) => {
     setFetchingDetail(true);
     setSelectedEmp(emp);
     const empId = emp.employeeId || emp._id;
-
     try {
       const payRes = await axios.get(`${API_URL}/api/salary-payments/${empId}`);
       if (payRes.data.success) setPaymentHistory(payRes.data.data.reverse());
-
       const currentMonth = new Date().toISOString().slice(0, 7); 
       const attRes = await axios.get(`${API_URL}/api/attendance/report/${empId}`);
-      
       if (attRes.data.success) {
         const history = attRes.data.data; 
         let p = 0, a = 0, h = 0;
-        
         Object.keys(history).forEach(date => {
           if (date.startsWith(currentMonth)) {
             if (history[date] === "Present") p++;
@@ -73,18 +68,39 @@ const EmployeeLedger = ({ role, user }) => {
     finally { setFetchingDetail(false); }
   };
 
-  // 🧮 Professional Payroll Calculations
+  // 🧮 CALCULATIONS WRAPPED IN OBJECTS (Fixes ESLint Errors)
   const monthlySalary = selectedEmp ? Number(selectedEmp.salary) : 0;
   const dayRate = monthlySalary / 30;
-  const effectiveDaysWorked = attendanceStats.present + (attendanceStats.halfDay * 0.5);
-  const grossEarned = Math.round(dayRate * effectiveDaysWorked);
+  
+  const stats = {
+    effectiveDaysWorked: attendanceStats.present + (attendanceStats.halfDay * 0.5),
+    present: attendanceStats.present,
+    absent: attendanceStats.absent,
+    halfDay: attendanceStats.halfDay
+  };
+
+  const grossEarned = Math.round(dayRate * stats.effectiveDaysWorked);
   const pfDeduction = selectedEmp?.role === "Worker" ? 0 : Math.round(grossEarned * 0.12);
   const esiDeduction = Math.round(grossEarned * 0.0075);
   const totalAdvance = paymentHistory.reduce((sum, p) => sum + Number(p.amount), 0);
   const otEarning = (Number(overtimeHours) || 0) * (dayRate / 8);
+  
   const totalEarnings = Math.round(grossEarned + otEarning + (Number(incentive) || 0));
   const totalDeductions = Math.round(pfDeduction + esiDeduction + totalAdvance);
   const netPayable = totalEarnings - totalDeductions;
+
+  const payroll = {
+    grossEarned,
+    pfDeduction,
+    esiDeduction,
+    totalAdvance,
+    otEarning,
+    totalEarnings,
+    totalDeductions,
+    netPayable,
+    incentive,
+    overtimeHours
+  };
 
   const handlePayment = async (e) => {
     e.preventDefault();
@@ -140,10 +156,10 @@ const EmployeeLedger = ({ role, user }) => {
           {selectedEmp && (
             <div className="ledger-detail-view full-width-ledger">
               <div className="attendance-summary-bar">
-                <div className="summary-item">Days: <b>{effectiveDaysWorked}</b></div>
-                <div className="summary-item green">P: <b>{attendanceStats.present}</b></div>
-                <div className="summary-item yellow">H/D: <b>{attendanceStats.halfDay}</b></div>
-                <div className="summary-item red">A: <b>{attendanceStats.absent}</b></div>
+                <div className="summary-item">Days: <b>{stats.effectiveDaysWorked}</b></div>
+                <div className="summary-item green">P: <b>{stats.present}</b></div>
+                <div className="summary-item yellow">H/D: <b>{stats.halfDay}</b></div>
+                <div className="summary-item red">A: <b>{stats.absent}</b></div>
                 <button className="view-btn-small" onClick={() => setShowCalendar(true)}>🗓️ History</button>
                 <button className="view-btn-small print-btn" onClick={() => window.print()}>🖨️ Payslip</button>
               </div>
@@ -209,29 +225,11 @@ const EmployeeLedger = ({ role, user }) => {
       )}
 
       {selectedEmp && (
-        <div className="payslip-print-view only-print">
-            <div className="payslip-header">
-                <h1>DHARA SHAKTI AGRO PRODUCTS</h1>
-                <h3>Salary Slip - {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
-            </div>
-            <div className="payslip-meta">
-                <p><b>Name:</b> {selectedEmp.name} | <b>Designation:</b> {selectedEmp.designation}</p>
-                <p><b>Aadhar:</b> {selectedEmp.aadhar} | <b>Account:</b> {selectedEmp.accountNo || 'N/A'}</p>
-            </div>
-            <table className="payslip-table">
-                <thead><tr><th>Earnings</th><th>Amount</th><th>Deductions</th><th>Amount</th></tr></thead>
-                <tbody>
-                    <tr><td>Basic Salary</td><td>₹{grossEarned}</td><td>PF (Provident Fund)</td><td>₹{pfDeduction}</td></tr>
-                    <tr><td>Incentives</td><td>₹{incentive || 0}</td><td>ESI</td><td>₹{esiDeduction}</td></tr>
-                    <tr><td>OT Pay ({overtimeHours || 0} Hrs)</td><td>₹{Math.round(otEarning)}</td><td>Advances Taken</td><td>₹{totalAdvance}</td></tr>
-                    <tr className="payslip-total-row"><td><b>Total Earnings</b></td><td><b>₹{totalEarnings}</b></td><td><b>Total Deductions</b></td><td><b>₹{totalDeductions}</b></td></tr>
-                </tbody>
-            </table>
-            <div className="net-salary-box">
-                NET PAYABLE: ₹{netPayable.toLocaleString()}
-                <p><small>(In words: Rupee {netPayable} Only)</small></p>
-            </div>
-        </div>
+        <ProfessionalPayslip 
+          selectedEmp={selectedEmp}
+          stats={stats}
+          payroll={payroll}
+        />
       )}
     </div>
   );
