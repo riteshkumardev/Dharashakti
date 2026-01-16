@@ -1,13 +1,88 @@
+/* --- Global Reset & Base --- */
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #f4f7f6; /* Light professional background */
+  overflow-x: hidden; /* Mobile par side scrolling rokne ke liye */
+}
+
+/* --- Container Responsiveness --- */
+.home-container, .table-container-wide, .sales-container {
+  padding: 10px; /* Mobile par thoda kam padding */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* --- Dashboard & Stock Summary Cards Fix --- */
+.features, .stock-summary-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Automatic adjustment */
+  gap: 15px;
+  margin-top: 20px;
+}
+
+/* --- Table Responsiveness (Sabse Zaroori) --- */
+.table-responsive-wrapper {
+  width: 100%;
+  overflow-x: auto; /* Mobile par table swipe karne ke liye */
+  -webkit-overflow-scrolling: touch;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.modern-sales-table {
+  min-width: 800px; /* Table ko chota hone se rokta hai taaki data overlap na ho */
+  width: 100%;
+}
+
+/* --- Mobile Specific Queries (Screens smaller than 768px) --- */
+@media (max-width: 768px) {
+  /* 1. Header & Title Adjustments */
+  .table-header-row, .professional-header, .hero-section {
+    flex-direction: column !important;
+    text-align: center;
+    padding: 15px !important;
+  }
+
+  /* 2. Search Box full width */
+  .modern-search, .search-wrapper {
+    width: 100% !important;
+    margin-top: 10px;
+  }
+
+  /* 3. Font Sizes */
+  .card-value {
+    font-size: 1.5rem !important;
+  }
+
+  .table-title {
+    font-size: 1.2rem !important;
+  }
+
+  /* 4. Action Buttons (Edit/Del) ko mobile par touch-friendly banana */
+  .btn-group-pro, .action-btns-cell {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+}
+
+/* --- Form Grid Fix (Sales Entry Form) --- */
+.sales-form-grid {
+  display: grid;
+  grid-template-columns: 1fr; /* Default 1 column for mobile */
+  gap: 15px;
+}
+
+@media (min-width: 992px) {
+  .sales-form-grid {
+    grid-template-columns: repeat(3, 1fr); /* Desktop par 3 columns */
+  }
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }

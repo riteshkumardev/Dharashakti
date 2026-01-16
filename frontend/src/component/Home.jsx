@@ -10,8 +10,8 @@ const Home = ({ user }) => {
   
   // 📊 States
   const [stats, setStats] = useState({ salesCount: 0, purchaseCount: 0, stockCount: 0 });
-  const [allSales, setAllSales] = useState([]); // Sales alerts ke liye
-  const [allPurchases, setAllPurchases] = useState([]); // Purchase alerts ke liye
+  const [allSales, setAllSales] = useState([]); 
+  const [allPurchases, setAllPurchases] = useState([]); 
   const [loading, setLoading] = useState(true);
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -28,7 +28,7 @@ const Home = ({ user }) => {
       try {
         setLoading(true);
         
-        // Sales, Purchases aur Stocks teeno ka data parallel fetch ho raha hai
+        // parallel fetch for speed
         const [salesRes, purchaseRes, stockRes] = await Promise.all([
           axios.get(`${API_URL}/api/sales`),
           axios.get(`${API_URL}/api/purchases`),
@@ -48,7 +48,7 @@ const Home = ({ user }) => {
         });
 
       } catch (err) {
-        console.error("Dashboard data load error:", err);
+        console.error("Dashboard load error:", err);
       } finally {
         setTimeout(() => setLoading(false), 600);
       }
@@ -57,13 +57,9 @@ const Home = ({ user }) => {
     fetchDashboardData();
   }, [API_URL]);
 
-  // Alert click par sahi page par bhejne ka logic
-  const handleAlertAction = (item, type) => {
-    if (type === 'SALE') {
-      navigate("/invoices"); 
-    } else {
-      navigate("/purchase-list"); // Ya aapka purchase history route
-    }
+  // Navigation Logic
+  const handleNavigate = (path) => {
+    navigate(path);
   };
 
   if (loading) return <Loader />;
@@ -71,10 +67,10 @@ const Home = ({ user }) => {
   return (
     <div className="home-container">
       
-      {/* 🚀 Floating Profile Card */}
+      {/* 🚀 Profile Section */}
       <div className="floating-profile-card">
         <div className="mini-info">
-          <h4>{user?.name || "User Name"}</h4>
+          <h4>{user?.name || "User"}</h4>
           <p className="emp-id-tag">ID: {maskID(user?.employeeId)}</p>
           <span className="badge">{user?.role || 'Staff'}</span>
         </div>
@@ -87,53 +83,54 @@ const Home = ({ user }) => {
         </div>
       </div>
 
-      {/* Hero Welcome Section */}
       <section className="hero-section">
         <div className="hero-content">
           <h1>Welcome, <span className="highlight">{user?.name || "Guest"}</span></h1>
-          <p>Dhara Shakti Agro dashboard is synced live.</p>
+          <p>Dhara Shakti Agro live control panel.</p>
         </div>
       </section>
 
-      {/* 🚩 Payment Alerts Section (Sales & Purchase Integrated) */}
+      {/* 🚩 Payment Alerts */}
       <section style={{ padding: "0 20px" }}>
         <OverdueAlerts 
           salesData={allSales} 
-          purchaseData={allPurchases} // Purchase data pass kiya
+          purchaseData={allPurchases} 
           daysLimit={10} 
-          onViewDetails={handleAlertAction} 
+          onViewDetails={(item, type) => handleNavigate(type === 'SALE' ? "/invoices" : "/purchase-list")} 
         />
       </section>
 
-      {/* Stats Cards Section */}
+      {/* 📈 Stats Cards (Clickable to Tables) */}
       <section className="features">
-        <div className="feature-card" onClick={() => navigate("/invoices")} style={{cursor: 'pointer'}}>
+        
+        <div className="feature-card clickable-card" onClick={() => handleNavigate("/sales-table")}>
           <div className="card-icon">📈</div>
           <h3>Total Sales</h3>
           <p className="stat-number">{stats.salesCount}</p>
-          <small>Total Invoices</small>
+          <small>Click to view Sales Table</small>
         </div>
         
-        <div className="feature-card" onClick={() => navigate("/purchase-list")} style={{cursor: 'pointer'}}>
+        <div className="feature-card clickable-card" onClick={() => handleNavigate("/purchase-table")}>
           <div className="card-icon">🛒</div>
           <h3>Total Purchases</h3>
           <p className="stat-number">{stats.purchaseCount}</p>
-          <small>Stock Inward Entries</small>
+          <small>Click to view Purchase Table</small>
         </div>
 
-        <div className="feature-card" onClick={() => navigate("/stocks")} style={{cursor: 'pointer'}}>
+        <div className="feature-card clickable-card" onClick={() => handleNavigate("/stock-management")}>
           <div className="card-icon">📦</div>
           <h3>Stock Items</h3>
           <p className="stat-number">{stats.stockCount}</p>
-          <small>Live Inventory</small>
+          <small>Click to view Inventory</small>
         </div>
 
         <div className="feature-card">
           <div className="card-icon">👤</div>
-          <h3>Role</h3>
+          <h3>User Authority</h3>
           <p className="stat-number" style={{ fontSize: '20px' }}>{user?.role}</p>
-          <small>Access: {user?.role === 'Admin' ? 'Full' : 'Limited'}</small>
+          <small>{user?.role === 'Admin' ? 'Full System Access' : 'View Only Access'}</small>
         </div>
+
       </section>
   
     </div>
