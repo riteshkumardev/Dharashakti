@@ -18,11 +18,14 @@ const EmployeeLedger = ({ role, user }) => {
   const [overtimeHours, setOvertimeHours] = useState('');
   const [incentive, setIncentive] = useState('');
   const [showCalendar, setShowCalendar] = useState(false);
+  
+  // 🆕 Payslip Show/Hide State
+  const [showPayslip, setShowPayslip] = useState(false);
+
   const [fullAttendanceData, setFullAttendanceData] = useState({});
   const [loading, setLoading] = useState(true); 
   const [fetchingDetail, setFetchingDetail] = useState(false);
 
-  // 🗓️ MAIN ANCHOR: Current Month set as default (YYYY-MM)
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -33,29 +36,20 @@ const EmployeeLedger = ({ role, user }) => {
     return strID.length > 4 ? "XXXX" + strID.slice(-4) : strID;
   };
 
-  // 📅 Dropdown logic update: January 2026 ko list mein force add kiya gaya hai
   const availableMonths = useMemo(() => {
     const now = new Date();
-    const currentStr = now.toISOString().slice(0, 7); // "2026-01"
-
+    const currentStr = now.toISOString().slice(0, 7); 
     if (!selectedEmp?.joiningDate) return [currentStr];
-    
     const start = new Date(selectedEmp.joiningDate);
     const end = new Date();
     const months = [];
-    
     if (isNaN(start.getTime())) return [currentStr];
-
-    // Loop through months from joining till today
     let tempDate = new Date(start.getFullYear(), start.getMonth(), 1);
     while (tempDate <= end) {
       months.push(tempDate.toISOString().slice(0, 7));
       tempDate.setMonth(tempDate.getMonth() + 1);
     }
-
-    // Ensure January 2026 is always there even if joining is recent
     if (!months.includes(currentStr)) months.push(currentStr);
-
     return months.reverse(); 
   }, [selectedEmp]);
 
@@ -78,17 +72,14 @@ const EmployeeLedger = ({ role, user }) => {
     try {
       const payRes = await axios.get(`${API_URL}/api/salary-payments/${empId}`);
       if (payRes.data.success) {
-        // Strict Month Filtering for Payments
         const filteredPay = payRes.data.data.filter(p => p.date.startsWith(month));
         setPaymentHistory(filteredPay.reverse());
       }
-
       const attRes = await axios.get(`${API_URL}/api/attendance/report/${empId}`);
       if (attRes.data.success) {
         const history = attRes.data.data; 
         let p = 0, a = 0, h = 0;
         Object.keys(history).forEach(date => {
-          // Strict Month Filtering for Attendance
           if (date.startsWith(month)) {
             if (history[date] === "Present") p++;
             else if (history[date] === "Absent") a++;
@@ -207,7 +198,14 @@ const EmployeeLedger = ({ role, user }) => {
                 <div className="summary-item yellow">H/D: <b>{stats.halfDay}</b></div>
                 <div className="summary-item red">A: <b>{stats.absent}</b></div>
                 <button className="view-btn-small" onClick={() => setShowCalendar(true)}>🗓️ History</button>
-                <button className="view-btn-small print-btn" onClick={() => window.print()}>🖨️ Payslip</button>
+                
+                {/* ✅ Button updated to toggle Payslip view instead of printing */}
+                <button 
+                  className="view-btn-small print-btn" 
+                  onClick={() => setShowPayslip(!showPayslip)}
+                >
+                  {showPayslip ? "❌ Close Payslip" : "📄 View Payslip"}
+                </button>
               </div>
 
               <div className="pro-payroll-grid">
@@ -270,7 +268,8 @@ const EmployeeLedger = ({ role, user }) => {
         </div>
       )}
 
-      {selectedEmp && (
+      {/* ✅ Payslip Component with toggle visibility */}
+      {selectedEmp && showPayslip && (
         <ProfessionalPayslip 
           selectedEmp={selectedEmp}
           stats={stats}
