@@ -224,7 +224,7 @@ const fetchPurchases = async () => {
                       }
                     </td>
 
-                    <td style={{color: 'red', fontWeight: 'bold'}}>₹{editId === item._id ? editData.balanceAmount : item.balanceAmount}</td>
+                    <td style={{color: 'red', fontWeight: 'bold'}}>₹{editId === item._id ? editData.balanceAmount : item.totalAmount - item.paidAmount}</td>
 
                     <td>
                       {editId === item._id ? 
