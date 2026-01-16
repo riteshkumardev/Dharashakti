@@ -97,59 +97,49 @@ export const updatePurchase = async (req, res) => {
     if (!oldPurchase)
       return res.status(404).json({ success: false, message: "Record not found" });
 
-    const {
-      productName,
-      quantity = oldPurchase.quantity,
-      gstin,      // 🆕 For update
-      mobile,     // 🆕 For update
-      address     // 🆕 For update
-    } = req.body;
+    // ✨ Fix: Nullish Coalescing (??) use karein taaki 0 value bypass na ho
+    const updatedFields = {
+      ...req.body,
+      quantity: Number(req.body.quantity ?? oldPurchase.quantity),
+      rate: Number(req.body.rate ?? oldPurchase.rate),
+      travelingCost: Number(req.body.travelingCost ?? oldPurchase.travelingCost),
+      cashDiscount: Number(req.body.cashDiscount ?? oldPurchase.cashDiscount),
+      paidAmount: Number(req.body.paidAmount ?? oldPurchase.paidAmount),
+      totalAmount: Number(req.body.totalAmount ?? oldPurchase.totalAmount),
+      // Yahan 0 ab bypass nahi hoga
+      balanceAmount: Number(req.body.balanceAmount ?? oldPurchase.balanceAmount) 
+    };
 
-    // Update with new numbers and new strings
     const updatedPurchase = await Purchase.findByIdAndUpdate(
       req.params.id,
-      {
-        ...req.body,
-        gstin,    // 🆕 Update GST
-        mobile,   // 🆕 Update Mobile
-        address,  // 🆕 Update Address
-        quantity: Number(quantity),
-        rate: Number(req.body.rate || oldPurchase.rate),
-        travelingCost: Number(req.body.travelingCost || oldPurchase.travelingCost),
-        cashDiscount: Number(req.body.cashDiscount || oldPurchase.cashDiscount),
-        paidAmount: Number(req.body.paidAmount || oldPurchase.paidAmount),
-        totalAmount: Number(req.body.totalAmount || oldPurchase.totalAmount),
-        balanceAmount: Number(req.body.balanceAmount || oldPurchase.balanceAmount)
-      },
+      updatedFields,
       { new: true }
     );
 
-    /* 🔁 STOCK ADJUSTMENT LOGIC */
-    // 1️⃣ Old product quantity roll-back (minus)
-    await Stock.findOneAndUpdate(
-      { productName: oldPurchase.productName },
-      { $inc: { totalQuantity: -oldPurchase.quantity } }
-    );
+    /* 🔁 STOCK ADJUSTMENT LOGIC (Reliable way) */
+    if (oldPurchase.quantity !== updatedPurchase.quantity || oldPurchase.productName !== updatedPurchase.productName) {
+      // 1️⃣ Purana stock wapas minus karein
+      await Stock.findOneAndUpdate(
+        { productName: oldPurchase.productName },
+        { $inc: { totalQuantity: -oldPurchase.quantity } }
+      );
 
-    // 2️⃣ New product quantity add
-    const stock = await Stock.findOneAndUpdate(
-      { productName: productName || updatedPurchase.productName },
-      { $inc: { totalQuantity: updatedPurchase.quantity } },
-      { upsert: true, new: true }
-    );
+      // 2️⃣ Naya stock add karein
+      await Stock.findOneAndUpdate(
+        { productName: updatedPurchase.productName },
+        { $inc: { totalQuantity: updatedPurchase.quantity } },
+        { upsert: true }
+      );
+    }
 
     res.json({
       success: true,
-      message: "Update successful and Stock adjusted",
-      purchase: updatedPurchase,
-      stock
+      message: "Purchase updated & Balance synced! ✅",
+      data: updatedPurchase
     });
 
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: error.message
-    });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
