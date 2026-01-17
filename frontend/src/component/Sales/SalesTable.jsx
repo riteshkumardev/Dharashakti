@@ -23,7 +23,7 @@ const SalesTable = ({ role }) => {
   const [editData, setEditData] = useState({});
   const [sortBy, setSortBy] = useState("dateNewest");
   const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 5;
+  const rowsPerPage = 10; // Increased for better view
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -59,35 +59,49 @@ const SalesTable = ({ role }) => {
   }, [API_URL]);
 
   /* =========================
-      🧮 Auto Calculation (FIXED)
+      🧮 Auto Calculation (Multi-Goods Friendly)
      ========================= */
   useEffect(() => {
-    if (!editId) return;
+    if (!editId || !editData.goods) return;
 
-    const qty = toSafeNumber(editData.quantity);
-    const rate = toSafeNumber(editData.rate);
+    // 1. Calculate Sum of all items in goods array
+    const totalTaxable = editData.goods.reduce((sum, item) => {
+        return sum + (toSafeNumber(item.quantity) * toSafeNumber(item.rate));
+    }, 0);
+
     const freight = toSafeNumber(editData.freight);
     const cdPercent = toSafeNumber(editData.cashDiscount);
     const received = toSafeNumber(editData.amountReceived);
 
-    const base = qty * rate;
-    const discount = (base * cdPercent) / 100;
-    const total = base - freight - discount;
-    const due = total - received;
+    const discount = (totalTaxable * cdPercent) / 100;
+    const finalTotal = totalTaxable - freight - discount;
+    const due = finalTotal - received;
 
-    setEditData((prev) => ({
-      ...prev,
-      totalAmount: total,
-      paymentDue: due,
-    }));
+    // Prevent infinite loop by checking if values actually changed
+    if (editData.totalAmount !== finalTotal || editData.paymentDue !== due) {
+        setEditData((prev) => ({
+            ...prev,
+            taxableValue: totalTaxable,
+            totalAmount: finalTotal,
+            paymentDue: due,
+        }));
+    }
   }, [
     editId,
-    editData.quantity,
-    editData.rate,
+    editData.goods,
     editData.freight,
     editData.cashDiscount,
     editData.amountReceived,
   ]);
+
+  /* =========================
+      📝 Handle Goods Array Changes
+     ========================= */
+  const handleGoodsChange = (index, field, value) => {
+    const updatedGoods = [...editData.goods];
+    updatedGoods[index] = { ...updatedGoods[index], [field]: value };
+    setEditData({ ...editData, goods: updatedGoods });
+  };
 
   /* =========================
       🔍 Filter + Sort
@@ -104,7 +118,7 @@ const SalesTable = ({ role }) => {
         vehicleStr.toLowerCase().includes(search.toLowerCase());
 
       const matchesProduct =
-        selectedProduct === "All" || s.productName === selectedProduct;
+        selectedProduct === "All" || (s.goods && s.goods.some(g => g.product === selectedProduct));
 
       return matchesSearch && matchesProduct;
     });
@@ -153,38 +167,24 @@ const SalesTable = ({ role }) => {
   };
 
   /* =========================
-      💾 Save (UPDATE)
+      💾 Save (UPDATE) 
      ========================= */
   const handleSave = async () => {
     try {
       setLoading(true);
 
+      // We send the whole editData which contains updated goods array and totals
       const payload = {
         ...editData,
-        quantity: toSafeNumber(editData.quantity),
-        rate: toSafeNumber(editData.rate),
-        freight: toSafeNumber(editData.freight),
-        cashDiscount: toSafeNumber(editData.cashDiscount),
-        totalAmount: toSafeNumber(editData.totalAmount),
-        amountReceived: toSafeNumber(editData.amountReceived),
-        paymentDue: toSafeNumber(editData.paymentDue),
-        productName: editData.productName,
-        // ✅ Goods array update using single product edit logic
-        goods: [
-          {
-            product: editData.productName,
-            quantity: toSafeNumber(editData.quantity),
-            rate: toSafeNumber(editData.rate),
-            taxableAmount: toSafeNumber(editData.totalAmount),
-            hsn: editData.goods?.[0]?.hsn || ""
-          },
-        ],
+        goods: editData.goods.map(g => ({
+            ...g,
+            quantity: toSafeNumber(g.quantity),
+            rate: toSafeNumber(g.rate),
+            taxableAmount: toSafeNumber(g.quantity) * toSafeNumber(g.rate)
+        }))
       };
 
-      const res = await axios.put(
-        `${API_URL}/api/sales/${editId}`,
-        payload
-      );
+      const res = await axios.put(`${API_URL}/api/sales/${editId}`, payload);
 
       if (res.data.success) {
         showMsg("Updated Successfully!");
@@ -209,31 +209,18 @@ const SalesTable = ({ role }) => {
 
     setEditId(sale._id);
     setEditData({
-      ...sale,
-      billNo: sale.billNo || "",
-      vehicleNo: sale.vehicleNo || "",
-      customerName: sale.customerName || "",
-      // ✅ Goods array se quantity aur rate uthana
-      quantity: toSafeNumber(sale.goods?.[0]?.quantity || sale.quantity),
-      rate: toSafeNumber(sale.goods?.[0]?.rate || sale.rate),
-      freight: toSafeNumber(sale.freight || sale.travelingCost),
+      ...sale, // Preserve ALL hidden fields (gstin, address, etc.)
+      goods: sale.goods ? [...sale.goods] : [], // Deep copy goods array
+      freight: toSafeNumber(sale.freight),
       cashDiscount: toSafeNumber(sale.cashDiscount),
       amountReceived: toSafeNumber(sale.amountReceived),
-      totalAmount: toSafeNumber(sale.totalAmount || sale.totalPrice),
+      totalAmount: toSafeNumber(sale.totalAmount),
       paymentDue: toSafeNumber(sale.paymentDue),
-      remarks: sale.remarks || "",
-      productName:
-        sale.goods?.[0]?.product ||
-        sale.productName ||
-        "Corn Grit",
     });
   };
 
   if (loading) return <Loader />;
 
-  /* =========================
-      🧾 UI
-     ========================= */
   return (
     <>
       <div className="table-container-wide">
@@ -248,13 +235,7 @@ const SalesTable = ({ role }) => {
                 <option value="billDesc">Bill No (H → L)</option>
               </select>
 
-              <select
-                value={selectedProduct}
-                onChange={(e) => {
-                  setSelectedProduct(e.target.value);
-                  setCurrentPage(1);
-                }}
-              >
+              <select value={selectedProduct} onChange={(e) => { setSelectedProduct(e.target.value); setCurrentPage(1); }}>
                 <option value="All">All Products</option>
                 <option value="Corn Grit">Corn Grit</option>
                 <option value="Cattle Feed">Cattle Feed</option>
@@ -265,10 +246,7 @@ const SalesTable = ({ role }) => {
               <input
                 placeholder="Search Customer/Vehicle..."
                 value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
               />
             </div>
           </div>
@@ -280,8 +258,8 @@ const SalesTable = ({ role }) => {
                   <th>Date</th>
                   <th>Bill/Vehicle</th>
                   <th>Customer</th>
-                  <th>Qty/Rate</th>
-                  <th>Travel/CD%</th>
+                  <th>Items (Qty @ Rate)</th>
+                  <th>Travel / CD%</th>
                   <th>Total</th>
                   <th>Received</th>
                   <th>Due</th>
@@ -295,76 +273,45 @@ const SalesTable = ({ role }) => {
                     {editId === sale._id ? (
                       <>
                         <td>
-                          <input 
-                            type="date" 
-                            className="edit-input"
-                            value={editData.date || ""} 
-                            onChange={(e) => setEditData({ ...editData, date: e.target.value })} 
-                          />
+                          <input type="date" className="edit-input" value={editData.date?.split('T')[0] || ""} 
+                            onChange={(e) => setEditData({ ...editData, date: e.target.value })} />
                         </td>
                         <td>
-                          <input 
-                            className="edit-input small" 
-                            value={editData.billNo} 
-                            onChange={(e) => setEditData({ ...editData, billNo: e.target.value })} 
-                          /><br/>
-                          <input 
-                            className="edit-input small" 
-                            value={editData.vehicleNo} 
-                            onChange={(e) => setEditData({ ...editData, vehicleNo: e.target.value })} 
-                          />
+                          <input className="edit-input small" value={editData.billNo} placeholder="Bill No"
+                            onChange={(e) => setEditData({ ...editData, billNo: e.target.value })} /><br/>
+                          <input className="edit-input small" value={editData.vehicleNo} placeholder="Vehicle"
+                            onChange={(e) => setEditData({ ...editData, vehicleNo: e.target.value })} />
                         </td>
                         <td>
-                          <input 
-                            className="edit-input" 
-                            value={editData.customerName} 
-                            onChange={(e) => setEditData({ ...editData, customerName: e.target.value })} 
-                          />
+                          <input className="edit-input" value={editData.customerName} 
+                            onChange={(e) => setEditData({ ...editData, customerName: e.target.value })} />
                         </td>
                         <td>
-                          <input 
-                            type="number" 
-                            className="edit-input tiny" 
-                            value={editData.quantity} 
-                            onChange={(e) => setEditData({ ...editData, quantity: e.target.value })} 
-                          /> @ 
-                          <input 
-                            type="number" 
-                            className="edit-input tiny" 
-                            value={editData.rate} 
-                            onChange={(e) => setEditData({ ...editData, rate: e.target.value })} 
-                          />
+                          {editData.goods.map((g, idx) => (
+                            <div key={idx} className="edit-item-row" style={{marginBottom: '8px', borderBottom: '1px dashed #ddd', paddingBottom: '4px'}}>
+                              <span style={{fontSize: '10px', fontWeight: 'bold'}}>{g.product}</span><br/>
+                              <input type="number" className="edit-input tiny" value={g.quantity} 
+                                onChange={(e) => handleGoodsChange(idx, 'quantity', e.target.value)} /> @ 
+                              <input type="number" className="edit-input tiny" value={g.rate} 
+                                onChange={(e) => handleGoodsChange(idx, 'rate', e.target.value)} />
+                            </div>
+                          ))}
                         </td>
                         <td>
-                          <input 
-                            type="number" 
-                            className="edit-input tiny" 
-                            value={editData.freight} 
-                            onChange={(e) => setEditData({ ...editData, freight: e.target.value })} 
-                          /> / 
-                          <input 
-                            type="number" 
-                            className="edit-input tiny" 
-                            value={editData.cashDiscount} 
-                            onChange={(e) => setEditData({ ...editData, cashDiscount: e.target.value })} 
-                          />%
+                          <input type="number" className="edit-input tiny" value={editData.freight} 
+                            onChange={(e) => setEditData({ ...editData, freight: e.target.value })} /> / 
+                          <input type="number" className="edit-input tiny" value={editData.cashDiscount} 
+                            onChange={(e) => setEditData({ ...editData, cashDiscount: e.target.value })} />%
                         </td>
-                        <td className="bold-cell">₹{editData.totalAmount}</td>
+                        <td className="bold-cell">₹{editData.totalAmount?.toLocaleString()}</td>
                         <td>
-                          <input 
-                            type="number" 
-                            className="edit-input small" 
-                            value={editData.amountReceived} 
-                            onChange={(e) => setEditData({ ...editData, amountReceived: e.target.value })} 
-                          />
+                          <input type="number" className="edit-input small" value={editData.amountReceived} 
+                            onChange={(e) => setEditData({ ...editData, amountReceived: e.target.value })} />
                         </td>
-                        <td className="due-cell">₹{editData.paymentDue}</td>
+                        <td className="due-cell">₹{editData.paymentDue?.toLocaleString()}</td>
                         <td>
-                          <input 
-                            className="edit-input" 
-                            value={editData.remarks} 
-                            onChange={(e) => setEditData({ ...editData, remarks: e.target.value })} 
-                          />
+                          <input className="edit-input" value={editData.remarks} 
+                            onChange={(e) => setEditData({ ...editData, remarks: e.target.value })} />
                         </td>
                         <td>
                           <div className="action-btns">
@@ -375,30 +322,26 @@ const SalesTable = ({ role }) => {
                       </>
                     ) : (
                       <>
-                        <td>{sale.date}</td>
-                        <td>{sale.billNo}<br />{sale.vehicleNo || "N/A"}</td>
-                        <td>{sale.customerName}</td>
-                        {/* ✅ Goods array se multi-item data dikhana */}
+                        <td>{sale.date ? sale.date.split('T')[0] : "---"}</td>
+                        <td>{sale.billNo}<br /><small>{sale.vehicleNo || "N/A"}</small></td>
+                        <td style={{fontWeight: '500'}}>{sale.customerName}</td>
                         <td>
-                          {sale.goods && sale.goods.length > 0 ? (
-                            sale.goods.map((g, i) => (
-                              <div key={i} style={{fontSize: '0.85em'}}>
-                                {g.quantity} @ ₹{g.rate}
-                                {sale.goods.length > 1 && <span style={{color: '#888'}}> ({g.product})</span>}
-                              </div>
-                            ))
-                          ) : (
-                            `${sale.quantity} @ ₹${sale.rate}`
-                          )}
+                          {sale.goods && sale.goods.map((g, i) => (
+                            <div key={i} style={{fontSize: '0.85em', borderBottom: i < sale.goods.length-1 ? '1px solid #eee' : 'none'}}>
+                              {g.quantity} @ ₹{g.rate} <small style={{color: '#777'}}>({g.product})</small>
+                            </div>
+                          ))}
                         </td>
-                        <td>₹{sale.freight || 0} / {sale.cashDiscount || 0}%</td>
-                        <td>₹{sale.totalAmount || sale.totalPrice || 0}</td>
-                        <td>₹{sale.amountReceived || 0}</td>
-                        <td style={{ color: "red" }}>₹{sale.paymentDue || 0}</td>
-                        <td>{sale.remarks}</td>
+                        <td>₹{sale.freight} / {sale.cashDiscount}%</td>
+                        <td className="bold-cell">₹{toSafeNumber(sale.totalAmount).toLocaleString()}</td>
+                        <td style={{color: 'green'}}>₹{toSafeNumber(sale.amountReceived).toLocaleString()}</td>
+                        <td style={{ color: "red", fontWeight: 'bold' }}>₹{toSafeNumber(sale.paymentDue).toLocaleString()}</td>
+                        <td><small>{sale.remarks || "-"}</small></td>
                         <td>
-                          <button className="btn-edit" onClick={() => startEdit(sale)}>✏️</button>
-                          <button className="btn-delete" onClick={() => handleDelete(sale._id)}>🗑️</button>
+                          <div className="action-btns">
+                            <button className="btn-edit" onClick={() => startEdit(sale)}>✏️</button>
+                            <button className="btn-delete" onClick={() => handleDelete(sale._id)}>🗑️</button>
+                          </div>
                         </td>
                       </>
                     )}

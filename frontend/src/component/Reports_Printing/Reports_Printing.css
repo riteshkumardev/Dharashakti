@@ -1,158 +1,155 @@
-/* --- 1. Screen View Styling --- */
+/* --- 1. Screen View Settings --- */
 .reports-full-screen {
-    font-size: small;
-    padding: 20px;
-    background: #ffffff !important;
-    min-height: 100vh;
+    padding: 10px;
+    background-color: #f4f7f6;
 }
 
 .report-controls {
-    font-size: small;
     background: #fff;
-    /* padding: 25px; */
-    border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-    margin-top: 0px;
-    /* margin-bottom: 20px; */
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
 }
 
-.report-form-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 15px;
+/* Screen par printable area ko hidden rakhein agar aap sirf preview chahte hain */
+.printable-report-wrapper {
+    display: none; 
 }
 
-/* --- 2. Table Professional Styling (Black & White Only) --- */
-.modern-report-table {
-    width: 100%;
-    border-collapse: collapse;
-    /* margin-top: 20px; */
-    background: #fff !important;
-}
-
-.modern-report-table th {
-    background: #f2f2f2 !important; 
-    color: #000 !important;
-    border: 1px solid #000 !important; /* Sharp black border for clear print */
-    padding: 10px;
-    font-size: 13px;
-    text-transform: uppercase;
-}
-
-.modern-report-table td {
-    border: 1px solid #000 !important;
-    padding: 10px;
-    font-size: 13px;
-    color: #000 !important;
-}
-
-.grand-total-row td {
-    background: #f2f2f2 !important;
-    font-weight: bold;
-    border-top: 2px solid #000 !important;
-}
-
-/* --- 3. PRINT ENGINE (A4 Fix & No Blue Tint) --- */
+/* --- 2. 🖨️ Master Print Engine (All Errors Fixed) --- */
 @media print {
-    @page {
-        size: A4;
-        margin: 15mm !important; /* Proper margin to prevent cutting [cite: 12] */
-    }
-
-    /* Force Remove Browser UI (URL, Date) and blue tints */
+    /* 1. Global Reset: Index.css ki sabhi rukawato ko khatam karein */
     html, body {
-        background: #ffffff !important;
-        background-color: #ffffff !important;
+        height: auto !important;
+        overflow: visible !important;
         margin: 0 !important;
         padding: 0 !important;
+        background: #fff !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
 
-    /* Hide Navigation & Buttons  */
-    nav, .navbar, .sidebar, .no-print, .report-controls, .report-actions, header, footer {
-        display: none !important;
+    /* 2. Hide Everything except the report */
+    body * {
         visibility: hidden !important;
-        height: 0 !important;
     }
 
-    .reports-full-screen {
-        padding: 0 !important;
-        margin: 0 !important;
+    /* 3. Show ONLY the Printable Area */
+    .printable-report-wrapper, 
+    .printable-report-wrapper * {
+        visibility: visible !important;
     }
 
-    .printable-invoice {
+    /* 4. Positioning the report on top left */
+    .printable-report-wrapper {
         display: block !important;
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
         width: 100% !important;
-        border: none !important;
-        box-shadow: none !important; /* Removes blue/grey tint */
-        background: #fff !important;
     }
 
-    /* Page Break Logic: Table aur Signature ko cutne se bachayein  */
-    table { 
-        page-break-inside: auto; 
-    }
-    tr { 
-        page-break-inside: avoid !important; 
-        page-break-after: auto !important; 
-    }
-    thead { 
-        display: table-header-group !important; 
+    @page {
+        size: A4;
+        margin: 1.5cm !important;
     }
 
-    /* Invoice Header Styling */
-    .invoice-header {
-        display: flex !important;
-        justify-content: space-between;
-        align-items: flex-start;
-        border-bottom: 2px solid #000;
-        padding-bottom: 15px;
-        margin-bottom: 25px;
+    /* Table Styles for clear print */
+    .print-main-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
     }
 
-    .company-info h1 {
-        font-size: 24pt !important;
-        font-weight: bold !important;
-        margin: 0;
+    .print-main-table th, .print-main-table td {
+        border: 1px solid #000 !important;
+        padding: 8px;
         color: #000 !important;
     }
 
-    /* Signature Section Fix: Table ke niche chipka rahega [cite: 9, 11] */
-    .invoice-footer {
-        margin-top: 40px;
-        display: flex !important;
-        flex-direction: row !important;
-        justify-content: space-between !important;
-        page-break-inside: avoid !important; /* Prevents signature from going to page 2 [cite: 12] */
-    }
+    .text-right { text-align: right !important; }
 
-    .signature-box {
-     
+    /* Header & Signature */
+    .print-header-top {
         text-align: center;
-        width: 250px;
+        border-bottom: 2px solid #000;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
     }
 
-    .signature-box p {
-        
-        margin: 5px 0;
-        font-size: 11pt;
-        color: #000 !important;
+    .signature-section {
+        margin-top: 60px;
+        display: flex !important;
+        justify-content: space-between !important;
+    }
+
+    .sig-box {
+        width: 200px;
+        text-align: center;
+    }
+
+    .sig-line {
+        border-top: 1px solid #000;
+        margin-bottom: 5px;
     }
 }
 @media print {
+    /* Prevent the footer from repeating on every page and overlapping content */
+    .report-summary-footer {
+        display: table-row-group !important; /* Forces total to sit only at the end of the data */
+    }
+
+    /* Styling for the total row */
+    .report-summary-footer tr td {
+        border-top: 2px solid #000 !important;
+        font-weight: bold !important;
+        background-color: #f2f2f2 !important;
+        padding: 10px !important;
+    }
+
+    /* Avoid splitting a single row across two pages */
+    .print-main-table tr {
+        page-break-inside: avoid !important;
+    }
+
+    /* Table styling for sharp print */
+    .print-main-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .print-main-table th, .print-main-table td {
+        border: 1px solid black !important;
+        padding: 5px;
+    }
+
+    /* Proper page margins to prevent cut-off */
     @page {
         size: A4;
-        /* Isse browser ke default header/footer (React App, URL) dab jayenge */
-        margin: 0 !important; 
-    }
-
-    body {
-        /* Content ko manually margin dena taaki text kinaro se na kate */
-        margin: 1.5cm !important; 
+        margin: 15mm;
     }
 }
-.signboauthsign {
-    justify-content: space-between !important;
+@media print {
+    /* Date column ko ek line mein rakhne ke liye */
+    .print-main-table th:first-child, 
+    .print-main-table td:first-child {
+        width: 100px !important; /* Width thodi badhayi gayi hai */
+        white-space: nowrap !important; /* Date ko break hone se rokta hai */
+        text-align: center !important;
+        font-size: 10pt !important;
+    }
 
+    /* Product Detail column ki width thodi adjust karein taaki balance rahe */
+    .print-main-table th:nth-child(4),
+    .print-main-table td:nth-child(4) {
+        width: auto !important;
+        min-width: 150px !important;
+    }
+
+    /* Table borders aur padding check karein */
+    .print-main-table th, .print-main-table td {
+        padding: 6px 4px !important; /* Padding thodi kam ki gayi hai space banane ke liye */
+        border: 1px solid black !important;
+    }
 }
