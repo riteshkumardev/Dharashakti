@@ -1,8 +1,8 @@
-import Employee from "../models/epmloyee.js"; // Fixed typo to match your file name
+import Employee from "../models/epmloyee.js"; 
 import ActivityLog from "../models/activityLog.js";
 
 /**
- * ✅ 1. Get All Employees for Master Panel
+ * ✅ 1. Get All Employees
  */
 export const getAllEmployees = async (req, res) => {
   try {
@@ -14,39 +14,56 @@ export const getAllEmployees = async (req, res) => {
 };
 
 /**
- * ✅ 2. Admin Update: Change Role or Block Status
+ * ✅ 2. Master Update: Update ALL Employee Details
+ * समस्या: पहले सिर्फ role और isBlocked अपडेट हो रहा था। अब सब कुछ अपडेट होगा।
  */
-export const updateEmployeeStatus = async (req, res) => {
+export const updateEmployee = async (req, res) => {
   try {
-    const { employeeId } = req.params;
-    const { role, isBlocked, adminName } = req.body;
+    const { id } = req.params; // यहाँ हम URL से ID ले रहे हैं
+    const updateData = req.body;
 
+    // सुरक्षा के लिए: employeeId को मैन्युअली बदलने से रोकें
+    delete updateData.employeeId;
+
+    // { new: true } अपडेट के बाद नया डेटा रिटर्न करता है
+    // runValidators: true स्कीमा के नियमों (Enum, Length) को चेक करता है
     const updatedEmployee = await Employee.findOneAndUpdate(
-      { employeeId: employeeId },
-      { role, isBlocked },
-      { new: true }
+      { $or: [{ _id: id }, { employeeId: id }] }, // यह _id या employeeId दोनों को सपोर्ट करेगा
+      updateData,
+      { new: true, runValidators: true }
     );
 
     if (!updatedEmployee) {
       return res.status(404).json({ success: false, message: "Employee not found" });
     }
 
-    // Record admin activity
+    // एक्टिविटी लॉग रिकॉर्ड करें
     await ActivityLog.create({
-      adminName: adminName || "Admin",
-      action: `Updated ${updatedEmployee.name}: Role to ${role}, Blocked: ${isBlocked}`,
-      targetEmployeeId: employeeId
+      adminName: updateData.adminName || "Admin",
+      action: `Profile Updated for ${updatedEmployee.name}`,
+      targetEmployeeId: updatedEmployee.employeeId
     });
 
     res.status(200).json({ success: true, data: updatedEmployee });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Update failed" });
+    console.error("Update Error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message.includes('enum') ? "Invalid Role/Designation" : "Update failed" 
+    });
   }
 };
+
+/**
+ * ✅ 3. Delete Employee
+ */
 export const deleteEmployee = async (req, res) => {
   try {
     const { id } = req.params;
-    await Employee.findByIdAndDelete(id);
+    const deleted = await Employee.findByIdAndDelete(id);
+    
+    if (!deleted) return res.status(404).json({ success: false, message: "Not found" });
+
     res.status(200).json({ success: true, message: "Employee Deleted" });
   } catch (error) {
     res.status(500).json({ success: false, message: "Delete failed" });
@@ -54,25 +71,21 @@ export const deleteEmployee = async (req, res) => {
 };
 
 /**
- * ✅ 3. Create New Employee (Registration)
+ * ✅ 4. Create New Employee
  */
 export const createEmployee = async (req, res) => {
   try {
-    const {
-      name, fatherName, phone, emergencyPhone, aadhar, address,
-      designation, joiningDate, salary, bankName, accountNo,
-      ifscCode, photo, password, role
-    } = req.body;
+    const data = req.body;
 
-    if (!name || !aadhar || !salary || !password) {
-      return res.status(400).json({ success: false, message: "Required fields missing" });
-    }
+    // पक्का करें कि सैलरी नंबर है
+    if(data.salary) data.salary = Number(data.salary);
 
-    const existing = await Employee.findOne({ aadhar });
+    const existing = await Employee.findOne({ aadhar: data.aadhar });
     if (existing) {
       return res.status(409).json({ success: false, message: "Aadhar already exists" });
     }
 
+    // Employee ID Generation
     let employeeId;
     let exists = true;
     while (exists) {
@@ -81,11 +94,9 @@ export const createEmployee = async (req, res) => {
     }
 
     const employee = await Employee.create({
-      employeeId, name, fatherName, phone, emergencyPhone, aadhar,
-      address, designation, joiningDate, salary, bankName,
-      accountNo, ifscCode, photo, password,
-      // FIX: Use the designation as the role if role is not provided
-      role: role || designation || "Worker", 
+      ...data,
+      employeeId,
+      role: data.role || data.designation || "Worker", 
       isBlocked: false,
     });
 
@@ -97,6 +108,9 @@ export const createEmployee = async (req, res) => {
     });
   } catch (error) {
     console.error("Employee Create Error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({ 
+      success: false, 
+      message: error.name === 'ValidationError' ? error.message : "Server error" 
+    });
   }
 };
