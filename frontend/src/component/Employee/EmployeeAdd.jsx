@@ -31,19 +31,38 @@ const EmployeeAdd = ({ onEntrySaved }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    // --- Validation Logic ---
+    // मोबाइल नंबर 10 अंक से ज्यादा न हो
+    if ((name === "phone" || name === "emergencyPhone") && value.length > 10) return;
+    
+    // आधार नंबर 12 अंक से ज्यादा न हो
+    if (name === "aadhar" && value.length > 12) return;
+
     setFormData({ ...formData, [name]: value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.aadhar || !formData.salary || !formData.password) {
-      showMsg("Name, Aadhar, Salary aur Password zaroori hain!", "warning");
+    
+    // Final check for length before submission
+    if (formData.phone.length !== 10) {
+      showMsg("Mobile number 10 digits ka hona chahiye!", "error");
+      return;
+    }
+    if (formData.aadhar.length !== 12) {
+      showMsg("Aadhar number 12 digits ka hona chahiye!", "error");
       return;
     }
 
     setLoading(true);
     try {
-      const dataToSubmit = { ...formData, role: formData.designation };
+      const dataToSubmit = { 
+        ...formData, 
+        salary: Number(formData.salary),
+        role: formData.designation 
+      };
+
       const res = await fetch(`${API_URL}/api/employees`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -51,10 +70,15 @@ const EmployeeAdd = ({ onEntrySaved }) => {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Registration failed");
+
+      if (!res.ok) {
+        throw new Error(data.message || "Registration fail ho gaya!");
+      }
 
       showMsg(`🎉 Employee Registered! ID: ${data.employeeId}`, "success");
+      
       if (onEntrySaved) onEntrySaved();
+
       setFormData({
         name: "", fatherName: "", phone: "", emergencyPhone: "",
         aadhar: "", address: "", designation: "Worker",
@@ -62,6 +86,7 @@ const EmployeeAdd = ({ onEntrySaved }) => {
         salary: "", bankName: "", accountNo: "", ifscCode: "",
         photo: "", password: ""
       });
+
     } catch (err) {
       showMsg(err.message, "error");
     } finally {
@@ -69,7 +94,6 @@ const EmployeeAdd = ({ onEntrySaved }) => {
     }
   };
 
-  // Common style for 3 columns
   const gridStyle = {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
@@ -88,7 +112,6 @@ const EmployeeAdd = ({ onEntrySaved }) => {
 
       <form onSubmit={handleSubmit} className="employee-form-structured">
         
-        {/* --- SECTION 1: Personal Details --- */}
         <h3 className="form-section-title">👤 Personal Information</h3>
         <div style={gridStyle}>
           <div className="input-group">
@@ -100,16 +123,36 @@ const EmployeeAdd = ({ onEntrySaved }) => {
             <input type="text" name="fatherName" value={formData.fatherName} onChange={handleChange} />
           </div>
           <div className="input-group">
-            <label>Aadhar Number *</label>
-            <input type="number" name="aadhar" value={formData.aadhar} onChange={handleChange} required />
+            <label>Aadhar Number * (12 Digits)</label>
+            <input 
+              type="number" 
+              name="aadhar" 
+              value={formData.aadhar} 
+              onChange={handleChange} 
+              onInput={(e) => e.target.value = e.target.value.slice(0, 12)}
+              required 
+            />
           </div>
           <div className="input-group">
-            <label>Contact Number *</label>
-            <input type="number" name="phone" value={formData.phone} onChange={handleChange} required />
+            <label>Contact Number * (10 Digits)</label>
+            <input 
+              type="number" 
+              name="phone" 
+              value={formData.phone} 
+              onChange={handleChange} 
+              onInput={(e) => e.target.value = e.target.value.slice(0, 10)}
+              required 
+            />
           </div>
           <div className="input-group">
             <label>Emergency Contact</label>
-            <input type="number" name="emergencyPhone" value={formData.emergencyPhone} onChange={handleChange} />
+            <input 
+              type="number" 
+              name="emergencyPhone" 
+              value={formData.emergencyPhone} 
+              onChange={handleChange} 
+              onInput={(e) => e.target.value = e.target.value.slice(0, 10)}
+            />
           </div>
           <div className="input-group">
             <label>Profile Photo</label>
@@ -117,7 +160,6 @@ const EmployeeAdd = ({ onEntrySaved }) => {
           </div>
         </div>
 
-        {/* --- SECTION 2: Employment Details --- */}
         <h3 className="form-section-title">💼 Employment & Security</h3>
         <div style={gridStyle}>
           <div className="input-group">
@@ -145,7 +187,6 @@ const EmployeeAdd = ({ onEntrySaved }) => {
           </div>
         </div>
 
-        {/* --- SECTION 3: Bank Details --- */}
         <h3 className="form-section-title">🏦 Bank & Payroll Details</h3>
         <div style={gridStyle}>
           <div className="input-group">
@@ -162,7 +203,6 @@ const EmployeeAdd = ({ onEntrySaved }) => {
           </div>
         </div>
         
-        {/* Full width address field */}
         <div className="input-group" style={{marginTop: '10px'}}>
           <label>Permanent Address</label>
           <input type="text" name="address" value={formData.address} onChange={handleChange} style={{width: '100%'}} />

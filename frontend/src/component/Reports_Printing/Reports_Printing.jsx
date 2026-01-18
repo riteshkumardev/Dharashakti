@@ -17,7 +17,7 @@ const Reports_Printing = () => {
     const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
 
     const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
-    const productCategories = ["Corn Grit", "Corn Flour", "Cattle Feed", "Rice Grit", "Rice Flour", "Packing Bag"];
+    const productCategories = ["Corn", "Corn Grit", "Corn Flour", "Cattle Feed", "Rice Grit", "Rice Flour", "Packing Bag", "Rice Broken"];
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -28,11 +28,10 @@ const Reports_Printing = () => {
                 const list = res.data.data;
                 setRawData(list);
                 setFilteredData([]); 
-                if (category !== "stock") generatePersonList(list, "All");
-                else setPersonList([]);
+                generatePersonList(list, category);
             }
         } catch (err) {
-            setSnackbar({ open: true, message: "Error fetching live data!", severity: "error" });
+            setSnackbar({ open: true, message: "Error fetching data!", severity: "error" });
         } finally {
             setTimeout(() => setLoading(false), 500);
         }
@@ -44,44 +43,64 @@ const Reports_Printing = () => {
         setSelectedPerson("All");
     }, [fetchData]);
 
-    const generatePersonList = (data, pFilter) => {
+    const generatePersonList = (data, cat) => {
+        if (cat === "stock") {
+            setPersonList([]);
+            return;
+        }
         let names = [];
-        if (category === "sales") names = [...new Set(data.map(item => item.customerName))];
-        else if (category === "purchases") names = [...new Set(data.map(item => item.supplierName))];
+        if (cat === "sales") names = [...new Set(data.map(item => item.customerName))];
+        else if (cat === "purchases") names = [...new Set(data.map(item => item.supplierName))];
         setPersonList(names.filter(Boolean).sort());
-    };
-
-    const handleProductChange = (val) => {
-        setProductFilter(val);
-        setSelectedPerson("All");
     };
 
     const handleFilter = () => {
         let temp = [...rawData];
 
-        if (startDate && endDate) {
+        // Date Filter (Not usually applied to aggregate Stock, but kept for Sales/Purchase)
+        if (startDate && endDate && category !== "stock") {
             temp = temp.filter(item => item.date >= startDate && item.date <= endDate);
         }
 
-        if (selectedPerson !== "All") {
+        // Party Filter (Only for Sales/Purchase)
+        if (selectedPerson !== "All" && category !== "stock") {
             temp = temp.filter(item => (item.customerName === selectedPerson) || (item.supplierName === selectedPerson));
         }
 
-        // Logic to filter based on products inside the 'goods' array
+        // Product Filter (Works for all)
         if (productFilter !== "All") {
-            temp = temp.filter(item => 
-                item.goods && item.goods.some(g => g.product.toLowerCase().includes(productFilter.toLowerCase()))
-            );
+            temp = temp.filter(item => {
+                const pName = item.productName || "";
+                const inGoods = item.goods && item.goods.some(g => g.product.toLowerCase().includes(productFilter.toLowerCase()));
+                return pName.toLowerCase().includes(productFilter.toLowerCase()) || inGoods;
+            });
         }
 
         setFilteredData(temp);
-        setSnackbar({ open: true, message: `${temp.length} Main Records Found!`, severity: "success" });
+        setSnackbar({ open: true, message: `${temp.length} Records Found!`, severity: "success" });
     };
 
-    const calculateGrandTotal = () => {
+    const calculateTotalQty = () => {
         return filteredData.reduce((total, item) => {
-            const goodsTotal = item.goods ? item.goods.reduce((sum, g) => sum + (Number(g.taxableAmount) || 0), 0) : 0;
-            return total + goodsTotal;
+            if (category === "sales") {
+                return total + (item.goods ? item.goods.reduce((sum, g) => sum + (Number(g.quantity) || 0), 0) : 0);
+            } else if (category === "purchases") {
+                return total + (Number(item.quantity) || 0);
+            } else {
+                // Stock Logic
+                return total + (Number(item.totalQuantity) || 0);
+            }
+        }, 0);
+    };
+
+    const calculateGrandTotalVal = () => {
+        if (category === "stock") return 0; // Inventory doesn't usually have a "Taxable Amount" in this JSON
+        return filteredData.reduce((total, item) => {
+            if (category === "sales") {
+                return total + (item.goods ? item.goods.reduce((sum, g) => sum + (Number(g.taxableAmount) || 0), 0) : 0);
+            } else {
+                return total + (Number(item.totalAmount) || 0);
+            }
         }, 0);
     };
 
@@ -91,7 +110,7 @@ const Reports_Printing = () => {
             
             <div className="report-controls no-print">
                 <div className="report-header-flex">
-                    <h2 className="table-title">🖨️ Professional Report Center</h2>
+                    <h2 className="table-title">🖨️ Report Center</h2>
                 </div>
                 <div className="report-form-grid">
                     <div className="input-group">
@@ -103,28 +122,30 @@ const Reports_Printing = () => {
                         </select>
                     </div>
                     <div className="input-group">
-                        <label>Product Category Filter</label>
-                        <select value={productFilter} onChange={(e) => handleProductChange(e.target.value)}>
-                            <option value="All">All Categories</option>
+                        <label>Product Filter</label>
+                        <select value={productFilter} onChange={(e) => setProductFilter(e.target.value)}>
+                            <option value="All">All Items</option>
                             {productCategories.map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                     </div>
                     {category !== "stock" && (
-                        <div className="input-group">
-                            <label>Party Name</label>
-                            <select value={selectedPerson} onChange={(e) => setSelectedPerson(e.target.value)}>
-                                <option value="All">-- All Parties --</option>
-                                {personList.map((name, i) => <option key={i} value={name}>{name}</option>)}
-                            </select>
-                        </div>
+                        <>
+                            <div className="input-group">
+                                <label>Party Name</label>
+                                <select value={selectedPerson} onChange={(e) => setSelectedPerson(e.target.value)}>
+                                    <option value="All">-- All Parties --</option>
+                                    {personList.map((name, i) => <option key={i} value={name}>{name}</option>)}
+                                </select>
+                            </div>
+                            <div className="input-group">
+                                <label>Date Range</label>
+                                <div className="date-flex">
+                                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                                </div>
+                            </div>
+                        </>
                     )}
-                    <div className="input-group">
-                        <label>Date Range</label>
-                        <div className="date-flex">
-                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-                        </div>
-                    </div>
                 </div>
                 <div className="report-actions">
                     <button className="btn-filter" onClick={handleFilter}>🔍 Generate</button>
@@ -135,69 +156,90 @@ const Reports_Printing = () => {
             <div className="printable-report-wrapper">
                 <div className="print-header-top">
                     <h1>DHARA SHAKTI AGRO PRODUCTS</h1>
-                    <p>Quality Manufacturers of Corn Grits & Animal Feed</p>
-                    <p><strong>GSTIN:</strong> 10DZTPM1457E1ZE | <strong>Report:</strong> {category.toUpperCase()} Ledger</p>
-                    <p>Period: {startDate || "N/A"} to {endDate || "N/A"}</p>
+                    <div className="header-meta-row">
+                        <span><strong>GSTIN:</strong> 10DZTPM1457E1ZE</span>
+                        <span><strong>Report:</strong> {category.toUpperCase()} Ledger</span>
+                        <span><strong>Generated:</strong> {new Date().toLocaleDateString()}</span>
+                    </div>
                 </div>
 
                 <table className="print-main-table">
                     <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Bill No</th>
-                            <th>Party Name</th>
-                            <th>Product Detail</th>
-                            <th>Qty</th>
-                            <th className="text-right">Taxable Amount</th>
-                        </tr>
+                        {category === "stock" ? (
+                            <tr>
+                                <th>Product Name</th>
+                                <th>Last Updated</th>
+                                <th className="text-right">Available Stock (Qty)</th>
+                            </tr>
+                        ) : (
+                            <tr>
+                                <th className="col-date">Date</th>
+                                <th className="col-bill">Bill No</th>
+                                <th>Party Name</th>
+                                <th>Product Detail</th>
+                                <th className="col-qty">Qty</th>
+                                <th className="text-right col-amt">Taxable Amt</th>
+                            </tr>
+                        )}
                     </thead>
                     <tbody>
-                        {filteredData.map((item) => (
-                            // Use Fragment to allow multiple <tr> per item
-                            <React.Fragment key={item._id}>
-                                {item.goods && item.goods.map((g, idx) => (
-                                    <tr key={`${item._id}-${idx}`}>
-                                        {/* Show primary info only on the first row of a bill for clarity */}
-                                        <td>{idx === 0 ? item.date : ""}</td>
-                                        <td>{idx === 0 ? item.billNo : ""}</td>
-                                        <td>{idx === 0 ? (item.customerName || item.supplierName) : ""}</td>
-                                        
-                                        {/* Data coming from the 'goods' array */}
+                        {filteredData.map((item, idx) => (
+                            <React.Fragment key={item._id || idx}>
+                                {category === "sales" && item.goods && item.goods.map((g, gIdx) => (
+                                    <tr key={`${item._id}-${gIdx}`}>
+                                        <td className="nowrap-cell">{gIdx === 0 ? item.date : ""}</td>
+                                        <td>{gIdx === 0 ? item.billNo : ""}</td>
+                                        <td>{gIdx === 0 ? item.customerName : ""}</td>
                                         <td className="bold-text">{g.product}</td>
                                         <td>{g.quantity}</td>
                                         <td className="text-right">₹{Number(g.taxableAmount || 0).toLocaleString()}</td>
                                     </tr>
                                 ))}
+                                {category === "purchases" && (
+                                    <tr>
+                                        <td className="nowrap-cell">{item.date}</td>
+                                        <td>{item.billNo || "-"}</td>
+                                        <td>{item.supplierName}</td>
+                                        <td className="bold-text">{item.productName}</td>
+                                        <td>{item.quantity}</td>
+                                        <td className="text-right">₹{Number(item.totalAmount || 0).toLocaleString()}</td>
+                                    </tr>
+                                )}
+                                {category === "stock" && (
+                                    <tr>
+                                        <td className="bold-text">{item.productName}</td>
+                                        <td>{new Date(item.updatedAt).toLocaleDateString()}</td>
+                                        <td className={`text-right ${item.totalQuantity < 0 ? 'red-text' : ''}`}>
+                                            {Number(item.totalQuantity).toLocaleString()} kg
+                                        </td>
+                                    </tr>
+                                )}
                             </React.Fragment>
                         ))}
                     </tbody>
                     <tfoot className="report-summary-footer">
-                        <tr>
-                            <td colSpan="5" className="text-right">GRAND TOTAL (TAXABLE):</td>
-                            <td className="text-right">₹{calculateGrandTotal().toLocaleString()}</td>
-                        </tr>
+                        {category === "stock" ? (
+                            <tr>
+                                <td colSpan="2" className="text-right">TOTAL INVENTORY QTY:</td>
+                                <td className="text-right">{calculateTotalQty().toLocaleString()} kg</td>
+                            </tr>
+                        ) : (
+                            <tr>
+                                <td colSpan="4" className="text-right">GRAND TOTAL:</td>
+                                <td>{calculateTotalQty().toLocaleString()}</td>
+                                <td className="text-right">₹{calculateGrandTotalVal().toLocaleString()}</td>
+                            </tr>
+                        )}
                     </tfoot>
                 </table>
 
                 <div className="signature-section">
-                    <div className="sig-box">
-                        <div className="sig-line"></div>
-                        <p>Prepared By</p>
-                    </div>
-                    <div className="sig-box">
-                        <div className="sig-line"></div>
-                        <p>Authorized Signatory</p>
-                    </div>
+                    <div className="sig-box"><div className="sig-line"></div><p>Prepared By</p></div>
+                    <div className="sig-box"><div className="sig-line"></div><p>Authorized Signatory</p></div>
                 </div>
-                <p className="timestamp-footer">Report Generated | {new Date().toLocaleString()}</p>
             </div>
 
-            <CustomSnackbar 
-                open={snackbar.open} 
-                message={snackbar.message} 
-                severity={snackbar.severity} 
-                onClose={() => setSnackbar({ ...snackbar, open: false })} 
-            />
+            <CustomSnackbar open={snackbar.open} message={snackbar.message} severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })} />
         </div>
     );
 };

@@ -153,3 +153,7 @@
         border: 1px solid black !important;
     }
 }
+.red-text {
+    color: red !important;
+    font-weight: bold;
+}

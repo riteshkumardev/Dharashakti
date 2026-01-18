@@ -30,7 +30,6 @@ const EmployeeLedger = ({ role, user }) => {
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-  // 📸 Helper function to fix Photo URL mismatch
   const getPhotoURL = (photoPath) => {
     if (!photoPath) return "https://i.imgur.com/6VBx3io.png";
     return photoPath.startsWith('http') ? photoPath : `${API_URL}${photoPath}`;
@@ -77,13 +76,19 @@ const EmployeeLedger = ({ role, user }) => {
     setShowPayslip(false); 
     setShowIDCard(false); 
     
+    // कर्मचारी की ID (employeeId को प्राथमिकता दें)
     const empId = emp.employeeId || emp._id;
+
     try {
+      // 1. एडवांस पेमेंट हिस्ट्री प्राप्त करना
       const payRes = await axios.get(`${API_URL}/api/salary-payments/${empId}`);
       if (payRes.data.success) {
-        const filteredPay = payRes.data.data.filter(p => p.date.startsWith(month));
+        // फ़िल्टरिंग सुधार: सुनिश्चित करें कि चुनी गई माह का ही एडवांस दिखे
+        const filteredPay = payRes.data.data.filter(p => p.date.substring(0, 7) === month);
         setPaymentHistory(filteredPay.reverse());
       }
+
+      // 2. अटेंडेंस रिपोर्ट प्राप्त करना
       const attRes = await axios.get(`${API_URL}/api/attendance/report/${empId}`);
       if (attRes.data.success) {
         const history = attRes.data.data; 
@@ -98,7 +103,7 @@ const EmployeeLedger = ({ role, user }) => {
         setAttendanceStats({ present: p, absent: a, halfDay: h });
         setFullAttendanceData(history);
       }
-    } catch (err) { console.error("Fetch error"); } 
+    } catch (err) { console.error("Fetch error", err); } 
     finally { setFetchingDetail(false); }
   };
 
@@ -119,7 +124,10 @@ const EmployeeLedger = ({ role, user }) => {
   };
 
   const grossEarned = Math.round(dayRate * stats.effectiveDaysWorked);
+  
+  // एडवांस पेमेंट्स का योग (Deductions)
   const totalAdvance = paymentHistory.reduce((sum, p) => sum + Number(p.amount), 0);
+  
   const otEarning = (Number(overtimeHours) || 0) * (dayRate / 8);
   const totalEarnings = Math.round(grossEarned + otEarning + (Number(incentive) || 0));
   const netPayable = totalEarnings - totalAdvance;
@@ -132,19 +140,30 @@ const EmployeeLedger = ({ role, user }) => {
   const handlePayment = async (e) => {
     e.preventDefault();
     if (!isAuthorized || !advanceAmount) return;
+
     try {
+      // सुनिश्चित करें कि एडवांस उसी महीने में रिकॉर्ड हो जिसे आप अभी देख रहे हैं
+      const currentMonthStr = new Date().toISOString().slice(0, 7);
+      const paymentDate = selectedMonth === currentMonthStr 
+        ? new Date().toISOString().split('T')[0] 
+        : `${selectedMonth}-01`;
+
       const res = await axios.post(`${API_URL}/api/salary-payments`, {
         employeeId: selectedEmp.employeeId || selectedEmp._id,
-        amount: advanceAmount,
-        date: new Date().toISOString().split('T')[0],
+        amount: Number(advanceAmount),
+        date: paymentDate,
         type: 'Advance'
       });
+
       if (res.data.success) {
         setAdvanceAmount('');
-        alert("✅ Payment Recorded!");
+        alert(`✅ Payment Recorded for ${selectedMonth}!`);
+        // डेटा रिफ्रेश करें
         viewLedger(selectedEmp, selectedMonth);
       }
-    } catch (err) { alert("Error saving payment"); }
+    } catch (err) { 
+        alert("Error saving payment: " + (err.response?.data?.message || err.message)); 
+    }
   };
 
   const getTileClassName = ({ date, view }) => {
@@ -183,7 +202,6 @@ const EmployeeLedger = ({ role, user }) => {
           {selectedEmp && (
             <div className="ledger-detail-view full-width-ledger">
               
-              {/* 📸 EMPLOYEE HEADER WITH PHOTO */}
               <div className="emp-ledger-profile-header" style={{display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px', background: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0'}}>
                 <div className="ledger-profile-circle" style={{width: '70px', height: '70px', borderRadius: '50%', overflow: 'hidden', border: '3px solid #4d47f3'}}>
                   <img 
@@ -272,7 +290,12 @@ const EmployeeLedger = ({ role, user }) => {
 
               {isAuthorized && (
                 <form onSubmit={handlePayment} className="pro-action-bar">
-                  <input type="number" placeholder="Enter Advance Amount..." value={advanceAmount} onChange={(e)=>setAdvanceAmount(e.target.value)} />
+                  <input 
+                    type="number" 
+                    placeholder="Enter Advance Amount..." 
+                    value={advanceAmount} 
+                    onChange={(e)=>setAdvanceAmount(e.target.value)} 
+                  />
                   <button type="submit">RECORD DISBURSEMENT</button>
                 </form>
               )}

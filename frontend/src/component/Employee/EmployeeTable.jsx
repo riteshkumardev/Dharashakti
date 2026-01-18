@@ -69,20 +69,31 @@ const EmployeeTable = ({ role }) => {
     }
   };
 
+  // --- ✨ 100% FIXED SAVE FUNCTION ✨ ---
   const handleSave = async () => {
     if (!isAuthorized) return;
+    
     try {
-      const res = await axios.put(`${API_URL}/api/employees/${editData.employeeId}`, {
-        ...editData
+      // बैकएंड 'employeeId' (8-digit) के आधार पर खोज रहा है
+      const targetId = editData.employeeId; 
+
+      // डेटा को क्लीन करें: _id और सैलरी का सही टाइप सुनिश्चित करें
+      const { _id, createdAt, updatedAt, __v, ...payload } = editData;
+      
+      const res = await axios.put(`${API_URL}/api/employees/${targetId}`, {
+        ...payload,
+        salary: Number(editData.salary) // सैलरी को नंबर में बदलना अनिवार्य है
       });
 
       if (res.data.success) {
-        alert("✅ Employee Data Updated!");
+        alert("✅ Employee Data Updated Successfully!");
         setEditId(null);
         fetchEmployees(); 
       }
     } catch (err) {
-      alert("Update Error: " + (err.response?.data?.message || err.message));
+      const errorMsg = err.response?.data?.message || err.message;
+      console.error("Update error detail:", err.response?.data);
+      alert("Update Error: " + errorMsg);
     }
   };
 
@@ -141,10 +152,7 @@ const EmployeeTable = ({ role }) => {
             <tbody>
               {filtered.map((emp) => (
                 <tr key={emp._id} className={editId === emp._id ? "active-edit-row" : ""}>
-                  
                   <td style={{fontWeight: '800', color: '#1e293b'}}>{emp.employeeId}</td>
-
-                  {/* 📸 FIXED PHOTO SECTION */}
                   <td>
                     <div className="emp-profile-circle edit-photo-wrapper">
                       <img 
@@ -212,7 +220,7 @@ const EmployeeTable = ({ role }) => {
                     {editId === emp._id ? (
                       <input name="joiningDate" type="date" value={editData.joiningDate?.split('T')[0]} onChange={handleEditChange} className="edit-input-field" />
                     ) : (
-                      <span className="sub-text">{new Date(emp.joiningDate).toLocaleDateString()}</span>
+                      <span className="sub-text">{emp.joiningDate ? new Date(emp.joiningDate).toLocaleDateString() : 'N/A'}</span>
                     )}
                   </td>
 
@@ -226,11 +234,10 @@ const EmployeeTable = ({ role }) => {
                       <div className="btn-group-row">
                         <button className="row-edit-btn" onClick={() => startEdit(emp)} disabled={!isAuthorized}>✏️</button>
                         <button className="row-delete-btn" onClick={() => handleDelete(emp._id, emp.name)} disabled={!isAuthorized}>🗑️</button>
-                        <button className="ledger-btn-ui" onClick={() => navigate(`/staff-ledger/${emp._id}`)}>👁️</button>
+                        <button className="ledger-btn-ui" onClick={() => navigate(`/staff-ledger/${emp.employeeId}`)}>👁️</button>
                       </div>
                     )}
                   </td>
-
                 </tr>
               ))}
             </tbody>
