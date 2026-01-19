@@ -1,7 +1,7 @@
 import Employee from "../models/epmloyee.js"; // Fixed typo to match your file name
 import ActivityLog from "../models/activityLog.js";
 
-/**
+/**   
  * ✅ 1. Get All Employees for Master Panel
  */
 export const getAllEmployees = async (req, res) => {
