@@ -56,18 +56,12 @@ const Reports_Printing = () => {
 
     const handleFilter = () => {
         let temp = [...rawData];
-
-        // Date Filter (Not usually applied to aggregate Stock, but kept for Sales/Purchase)
         if (startDate && endDate && category !== "stock") {
             temp = temp.filter(item => item.date >= startDate && item.date <= endDate);
         }
-
-        // Party Filter (Only for Sales/Purchase)
         if (selectedPerson !== "All" && category !== "stock") {
             temp = temp.filter(item => (item.customerName === selectedPerson) || (item.supplierName === selectedPerson));
         }
-
-        // Product Filter (Works for all)
         if (productFilter !== "All") {
             temp = temp.filter(item => {
                 const pName = item.productName || "";
@@ -75,11 +69,25 @@ const Reports_Printing = () => {
                 return pName.toLowerCase().includes(productFilter.toLowerCase()) || inGoods;
             });
         }
-
         setFilteredData(temp);
         setSnackbar({ open: true, message: `${temp.length} Records Found!`, severity: "success" });
     };
 
+    // --- Dynamic Data Helpers ---
+    const getPaidVal = (item) => {
+        return category === "sales" ? Number(item.amountReceived || 0) : Number(item.paidAmount || 0);
+    };
+
+    const getDueVal = (item) => {
+        return category === "sales" ? Number(item.paymentDue || 0) : Number(item.balanceAmount || 0);
+    };
+
+    const getFreightVal = (item) => {
+        // Mapping freight (Sales) and travelingCost (Purchases)
+        return category === "sales" ? Number(item.freight || 0) : Number(item.travelingCost || 0);
+    };
+
+    // --- Totals Calculation Logic ---
     const calculateTotalQty = () => {
         return filteredData.reduce((total, item) => {
             if (category === "sales") {
@@ -87,21 +95,26 @@ const Reports_Printing = () => {
             } else if (category === "purchases") {
                 return total + (Number(item.quantity) || 0);
             } else {
-                // Stock Logic
                 return total + (Number(item.totalQuantity) || 0);
             }
         }, 0);
     };
 
     const calculateGrandTotalVal = () => {
-        if (category === "stock") return 0; // Inventory doesn't usually have a "Taxable Amount" in this JSON
-        return filteredData.reduce((total, item) => {
-            if (category === "sales") {
-                return total + (item.goods ? item.goods.reduce((sum, g) => sum + (Number(g.taxableAmount) || 0), 0) : 0);
-            } else {
-                return total + (Number(item.totalAmount) || 0);
-            }
-        }, 0);
+        if (category === "stock") return 0;
+        return filteredData.reduce((total, item) => total + Number(item.totalAmount || 0), 0);
+    };
+
+    const calculatePaidTotal = () => {
+        return filteredData.reduce((total, item) => total + getPaidVal(item), 0);
+    };
+
+    const calculateDueTotal = () => {
+        return filteredData.reduce((total, item) => total + getDueVal(item), 0);
+    };
+
+    const calculateFreightTotal = () => {
+        return filteredData.reduce((total, item) => total + getFreightVal(item), 0);
     };
 
     return (
@@ -176,9 +189,13 @@ const Reports_Printing = () => {
                                 <th className="col-date">Date</th>
                                 <th className="col-bill">Bill No</th>
                                 <th>Party Name</th>
-                                <th>Product Detail</th>
-                                <th className="col-qty">Qty</th>
-                                <th className="text-right col-amt">Taxable Amt</th>
+                                <th>Product Details</th>
+                                <th>Rate</th>
+                                <th>Qty</th>
+                                <th className="text-right">Freight</th>
+                                <th className="text-right">Total Amount</th>
+                                <th className="text-right">Paid</th>
+                                <th className="text-right">Due</th>
                             </tr>
                         )}
                     </thead>
@@ -191,8 +208,12 @@ const Reports_Printing = () => {
                                         <td>{gIdx === 0 ? item.billNo : ""}</td>
                                         <td>{gIdx === 0 ? item.customerName : ""}</td>
                                         <td className="bold-text">{g.product}</td>
+                                        <td>₹{Number(g.rate || 0).toLocaleString()}</td>
                                         <td>{g.quantity}</td>
-                                        <td className="text-right">₹{Number(g.taxableAmount || 0).toLocaleString()}</td>
+                                        <td className="text-right">{gIdx === 0 ? `₹${getFreightVal(item).toLocaleString()}` : ""}</td>
+                                        <td className="text-right">{gIdx === 0 ? `₹${Number(item.totalAmount || 0).toLocaleString()}` : ""}</td>
+                                        <td className="text-right">{gIdx === 0 ? `₹${getPaidVal(item).toLocaleString()}` : ""}</td>
+                                        <td className="text-right red-text">{gIdx === 0 ? `₹${getDueVal(item).toLocaleString()}` : ""}</td>
                                     </tr>
                                 ))}
                                 {category === "purchases" && (
@@ -201,15 +222,19 @@ const Reports_Printing = () => {
                                         <td>{item.billNo || "-"}</td>
                                         <td>{item.supplierName}</td>
                                         <td className="bold-text">{item.productName}</td>
+                                        <td>₹{Number(item.rate || 0).toLocaleString()}</td>
                                         <td>{item.quantity}</td>
+                                        <td className="text-right">₹{getFreightVal(item).toLocaleString()}</td>
                                         <td className="text-right">₹{Number(item.totalAmount || 0).toLocaleString()}</td>
+                                        <td className="text-right">₹{getPaidVal(item).toLocaleString()}</td>
+                                        <td className="text-right red-text">₹{getDueVal(item).toLocaleString()}</td>
                                     </tr>
                                 )}
                                 {category === "stock" && (
                                     <tr>
                                         <td className="bold-text">{item.productName}</td>
                                         <td>{new Date(item.updatedAt).toLocaleDateString()}</td>
-                                        <td className={`text-right ${item.totalQuantity < 0 ? 'red-text' : ''}`}>
+                                        <td className="text-right">
                                             {Number(item.totalQuantity).toLocaleString()} kg
                                         </td>
                                     </tr>
@@ -224,11 +249,16 @@ const Reports_Printing = () => {
                                 <td className="text-right">{calculateTotalQty().toLocaleString()} kg</td>
                             </tr>
                         ) : (
-                            <tr>
-                                <td colSpan="4" className="text-right">GRAND TOTAL:</td>
-                                <td>{calculateTotalQty().toLocaleString()}</td>
-                                <td className="text-right">₹{calculateGrandTotalVal().toLocaleString()}</td>
-                            </tr>
+                            <>
+                                <tr style={{backgroundColor: '#f9f9f9', fontWeight: 'bold'}}>
+                                    <td colSpan="5" className="text-right">GRAND TOTAL:</td>
+                                    <td>{calculateTotalQty().toLocaleString()}</td>
+                                    <td className="text-right">₹{calculateFreightTotal().toLocaleString()}</td>
+                                    <td className="text-right">₹{calculateGrandTotalVal().toLocaleString()}</td>
+                                    <td className="text-right">₹{calculatePaidTotal().toLocaleString()}</td>
+                                    <td className="text-right red-text">₹{calculateDueTotal().toLocaleString()}</td>
+                                </tr>
+                            </>
                         )}
                     </tfoot>
                 </table>

@@ -1,12 +1,12 @@
 /* --- 1. Screen View Settings --- */
 .reports-full-screen {
-    padding: 10px;
+    padding: 5px;
     background-color: #f4f7f6;
 }
 
 .report-controls {
     background: #fff;
-    padding: 20px;
+    padding: 10px;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     margin-bottom: 20px;
@@ -17,9 +17,15 @@
     display: none; 
 }
 
-/* --- 2. 🖨️ Master Print Engine (All Errors Fixed) --- */
+/* Red Text for Due Amounts */
+.red-text {
+    color: red !important;
+    font-weight: bold;
+}
+
+/* --- 2. 🖨️ Master Print Engine (Consolidated & Smooth) --- */
 @media print {
-    /* 1. Global Reset: Index.css ki sabhi rukawato ko khatam karein */
+    /* 1. Global Reset */
     html, body {
         height: auto !important;
         overflow: visible !important;
@@ -30,7 +36,7 @@
         print-color-adjust: exact !important;
     }
 
-    /* 2. Hide Everything except the report */
+    /* 2. Hide UI elements */
     body * {
         visibility: hidden !important;
     }
@@ -41,7 +47,6 @@
         visibility: visible !important;
     }
 
-    /* 4. Positioning the report on top left */
     .printable-report-wrapper {
         display: block !important;
         position: absolute !important;
@@ -51,109 +56,104 @@
     }
 
     @page {
-        size: A4;
-        margin: 1.5cm !important;
+        size: A4 landscape; /* Recommended for many columns */
+        margin: 10mm !important;
     }
 
-    /* Table Styles for clear print */
+    /* --- 3. Table Alignment Logic --- */
     .print-main-table {
         width: 100%;
         border-collapse: collapse;
         margin-top: 20px;
+        table-layout: fixed; /* Fixed layout ensures columns align perfectly */
     }
 
     .print-main-table th, .print-main-table td {
         border: 1px solid #000 !important;
-        padding: 8px;
+        padding: 6px 4px !important;
         color: #000 !important;
+        font-size: 9pt !important;
+        word-wrap: break-word;
+        vertical-align: middle;
     }
 
-    .text-right { text-align: right !important; }
+    .print-main-table th {
+        background-color: #f2f2f2 !important;
+        text-align: center !important;
+        font-weight: bold !important;
+    }
 
-    /* Header & Signature */
+    /* Column Specific Alignments & Widths */
+    /* Date & Bill No */
+    .print-main-table td:nth-child(1),
+    .print-main-table td:nth-child(2) {
+        text-align: center !important;
+        width: 60px;
+    }
+
+    /* Party Name & Product Details (Left Aligned) */
+    .print-main-table td:nth-child(3),
+    .print-main-table td:nth-child(4) {
+        text-align: left !important;
+        padding-left: 8px !important;
+    }
+
+    /* Values: Rate, Qty, Freight, Total, Paid, Due (Right Aligned) */
+    .print-main-table td:nth-child(5),
+    .print-main-table td:nth-child(6),
+    .print-main-table td:nth-child(7),
+    .print-main-table td:nth-child(8),
+    .print-main-table td:nth-child(9),
+    .print-main-table td:nth-child(10) {
+        text-align: right !important;
+        padding-right: 8px !important;
+    }
+
+    /* Formatting for first child (Date) as per your previous rule */
+    .print-main-table td:first-child {
+        white-space: nowrap !important;
+    }
+
+    /* --- 4. Footer & Totals --- */
+    .report-summary-footer {
+        display: table-row-group !important;
+    }
+
+    .report-summary-footer tr td {
+        border-top: 2px solid #000 !important;
+        font-weight: bold !important;
+        background-color: #f2f2f2 !important;
+        padding: 8px !important;
+    }
+
+    .print-main-table tr {
+        page-break-inside: avoid !important;
+    }
+
+    /* --- 5. Header & Signature --- */
     .print-header-top {
         text-align: center;
         border-bottom: 2px solid #000;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
+        margin-bottom: 15px;
+        padding-bottom: 5px;
     }
 
     .signature-section {
-        margin-top: 60px;
+        margin-top: 50px;
         display: flex !important;
         justify-content: space-between !important;
+        visibility: visible !important;
     }
 
     .sig-box {
         width: 200px;
         text-align: center;
+        visibility: visible !important;
     }
 
     .sig-line {
         border-top: 1px solid #000;
         margin-bottom: 5px;
+        visibility: visible !important;
     }
-}
-@media print {
-    /* Prevent the footer from repeating on every page and overlapping content */
-    .report-summary-footer {
-        display: table-row-group !important; /* Forces total to sit only at the end of the data */
-    }
-
-    /* Styling for the total row */
-    .report-summary-footer tr td {
-        border-top: 2px solid #000 !important;
-        font-weight: bold !important;
-        background-color: #f2f2f2 !important;
-        padding: 10px !important;
-    }
-
-    /* Avoid splitting a single row across two pages */
-    .print-main-table tr {
-        page-break-inside: avoid !important;
-    }
-
-    /* Table styling for sharp print */
-    .print-main-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-    .print-main-table th, .print-main-table td {
-        border: 1px solid black !important;
-        padding: 5px;
-    }
-
-    /* Proper page margins to prevent cut-off */
-    @page {
-        size: A4;
-        margin: 15mm;
-    }
-}
-@media print {
-    /* Date column ko ek line mein rakhne ke liye */
-    .print-main-table th:first-child, 
-    .print-main-table td:first-child {
-        width: 100px !important; /* Width thodi badhayi gayi hai */
-        white-space: nowrap !important; /* Date ko break hone se rokta hai */
-        text-align: center !important;
-        font-size: 10pt !important;
-    }
-
-    /* Product Detail column ki width thodi adjust karein taaki balance rahe */
-    .print-main-table th:nth-child(4),
-    .print-main-table td:nth-child(4) {
-        width: auto !important;
-        min-width: 150px !important;
-    }
-
-    /* Table borders aur padding check karein */
-    .print-main-table th, .print-main-table td {
-        padding: 6px 4px !important; /* Padding thodi kam ki gayi hai space banane ke liye */
-        border: 1px solid black !important;
-    }
-}
-.red-text {
-    color: red !important;
-    font-weight: bold;
 }
