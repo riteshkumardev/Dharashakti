@@ -1,4 +1,5 @@
 import React from "react";
+import SinghImage from './rkSig.png';
 
 const EWayBillContainer = ({ data }) => {
   console.log(data, "data contanor");
@@ -110,7 +111,7 @@ const EWayBillContainer = ({ data }) => {
           .decl-box { width: 50%; padding: 5px; border-right: 1px solid #000; font-size: 10px; text-align: justify; }
           .bank-sig-box { width: 50%; display: flex; flex-direction: column; }
           .bank-inner { padding: 5px; font-size: 10px; border-bottom: 1px solid #000; flex-grow: 1; }
-          .auth-sig-box { padding: 5px; text-align: right; height: 80px; display: flex; flex-direction: column; justify-content: space-between; }
+          .auth-sig-box { padding: 5px; text-align: right; height: 90px; display: flex; flex-direction: column; justify-content: space-between; }
         `}
       </style>
 
@@ -270,6 +271,10 @@ const EWayBillContainer = ({ data }) => {
                 </div>
                 <div className="auth-sig-box">
                   <span>for DHARA SHAKTI AGRO PRODUCTS</span>
+                 <div>
+      {/* Variable ko src mein pass karein */}
+      <img src={SinghImage} alt="Singh" style={{ width: '80px', height: '40px',marginTop: 'auto' }} />
+    </div>
                   <strong style={{marginTop: 'auto'}}>Authorised Signatory</strong>
                 </div>
               </div>
