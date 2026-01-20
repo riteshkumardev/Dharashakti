@@ -28,7 +28,7 @@ const EWayBillContainer = ({ data }) => {
   const subTotal = Number(data.taxableValue || 0);
   const freightAmt = Number(data.freight || 0);
   const finalTotal = Number(data.totalAmount || 0);
-  const roundOffValue = (finalTotal - (subTotal - freightAmt)).toFixed(2);
+  const roundOffValue = (finalTotal - (subTotal + freightAmt)).toFixed(2);
 
   const invoiceData = {
     billNo: data?.billNo || "N/A",
@@ -64,7 +64,7 @@ const EWayBillContainer = ({ data }) => {
           <title>Bill No: ${invoiceData.billNo}</title>
           <style>${styleContent}</style>
           <style>
-            @page { size: A4; margin: 0mm; }
+            @page { size: A4; margin: 10mm; }
             body { margin-top: 5mm; padding: 0; background: #fff; }
             .invoice-wrapper { width: 100%; border: none; box-shadow: none; padding: 0; }
           </style>
@@ -87,7 +87,7 @@ const EWayBillContainer = ({ data }) => {
     <div className="invoice-container-main">
       <style id="invoiceStyles">
         {`
-          .invoice-wrapper { width: 210mm; min-height: 290mm; padding: 15mm; margin: auto; background: #fff; font-family: 'Arial Narrow', Arial, sans-serif; font-size: 11px; color: #000; line-height: 1.3; }
+          .invoice-wrapper { width: 210mm; min-height: 290mm; padding: 10mm; margin: auto; background: #fff; font-family: 'Arial Narrow', Arial, sans-serif; font-size: 11px; color: #000; line-height: 1.3; }
           .main-border { border: 1.5px solid #000; }
           .title-center { text-align: center; font-weight: bold; border-bottom: 1.5px solid #000; padding: 2px; font-size: 12px; }
           .flex-container { display: flex; width: 100%; }
