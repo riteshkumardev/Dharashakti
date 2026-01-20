@@ -3,7 +3,7 @@ import axios from 'axios';
 import './Reports_Printing.css';
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
-
+import SinghImage from '../rkSig.png';
 const Reports_Printing = () => {
     const [loading, setLoading] = useState(false);
     const [category, setCategory] = useState("sales"); 
@@ -265,7 +265,15 @@ const Reports_Printing = () => {
 
                 <div className="signature-section">
                     <div className="sig-box"><div className="sig-line"></div><p>Prepared By</p></div>
-                    <div className="sig-box"><div className="sig-line"></div><p>Authorized Signatory</p></div>
+
+                    <div className="sig-box">
+      <img src={SinghImage} alt="Singh" style={{ width: '80px', height: '40px',marginTop: 'auto' }} />
+                        <div className="sig-line">
+                             {/* Variable ko src mein pass karein */}
+                            </div>
+                            <p>Authorized Signatory</p>
+                            
+                            </div>
                 </div>
             </div>
 

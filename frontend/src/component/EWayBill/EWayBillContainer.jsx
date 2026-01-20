@@ -1,5 +1,5 @@
 import React from "react";
-import SinghImage from './rkSig.png';
+import SinghImage from '../rkSig.png';
 
 const EWayBillContainer = ({ data }) => {
   console.log(data, "data contanor");
@@ -272,7 +272,7 @@ const EWayBillContainer = ({ data }) => {
                 <div className="auth-sig-box">
                   <span>for DHARA SHAKTI AGRO PRODUCTS</span>
                  <div>
-      {/* Variable ko src mein pass karein */}
+  
       <img src={SinghImage} alt="Singh" style={{ width: '80px', height: '40px',marginTop: 'auto' }} />
     </div>
                   <strong style={{marginTop: 'auto'}}>Authorised Signatory</strong>

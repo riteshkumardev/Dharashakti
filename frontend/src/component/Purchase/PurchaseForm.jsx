@@ -13,9 +13,9 @@ const PurchaseForm = ({ onCancel, role }) => {
   const initialState = {
     date: new Date().toISOString().split("T")[0],
     supplierName: "",
-    gstin: "",      // 🆕 Auto-fill logic ke liye
-    mobile: "",     // 🆕 Auto-fill logic ke liye
-    address: "",    // 🆕 Auto-fill logic ke liye
+    gstin: "",      
+    mobile: "",     
+    address: "",    
     productName: "",
     billNo: "",
     vehicleNo: "",
@@ -30,9 +30,12 @@ const PurchaseForm = ({ onCancel, role }) => {
   };
 
   const [formData, setFormData] = useState(initialState);
-  const [suppliers, setSuppliers] = useState([]); // 🆕 Suppliers list state
+  const [suppliers, setSuppliers] = useState([]); 
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
+  
+  // 🆕 Traveling Cost Mode State (+ ya - select karne ke liye)
+  const [travelMode, setTravelMode] = useState("-"); 
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -42,9 +45,6 @@ const PurchaseForm = ({ onCancel, role }) => {
 
   const productList = ["Corn", "Corn Greet", "Cattle Feed", "Aatarice", "Rice Greet", "Packing Bag","Rice Broken"];
 
-  /* =========================================
-      📡 Fetch Suppliers List on Load
-  ========================================== */
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
@@ -63,15 +63,11 @@ const PurchaseForm = ({ onCancel, role }) => {
     fetchSuppliers();
   }, [API_URL]);
 
-  /* =========================================
-      🎯 Auto-Fill Supplier Logic (Updated)
-  ========================================== */
   const handleSupplierSelect = (e) => {
     const selectedName = e.target.value;
     const supplier = suppliers.find((s) => s.name === selectedName);
 
     if (supplier) {
-      // ✨ Logic for Local Customer: Ask for custom name
       let finalName = supplier.name;
       if (supplier.name === "Local customer") {
         const customName = prompt("Please enter Local Customer Name for the Bill:");
@@ -82,7 +78,7 @@ const PurchaseForm = ({ onCancel, role }) => {
 
       setFormData((prev) => ({
         ...prev,
-        supplierName: finalName, // Yahan final name save hoga
+        supplierName: finalName,
         gstin: supplier.gstin || "N/A",
         mobile: supplier.phone || "N/A",
         address: supplier.address || "N/A",
@@ -98,7 +94,7 @@ const PurchaseForm = ({ onCancel, role }) => {
     }
   };
 
-  // 2️⃣ Live Calculations (Qty*Rate - CD% + Travel)
+  // 🧮 Live Calculations (Updated with Travel Mode Logic)
   useEffect(() => {
     const qty = Number(formData.quantity) || 0;
     const rate = Number(formData.rate) || 0;
@@ -108,7 +104,10 @@ const PurchaseForm = ({ onCancel, role }) => {
     const basePrice = qty * rate;
     const discountAmount = (basePrice * cdPercent) / 100;
 
-    const total = basePrice - discountAmount - travel; 
+    // Logic: Agar mode '+' hai toh add, agar '-' hai toh subtract
+    const travelEffect = travelMode === "+" ? travel : -travel;
+
+    const total = basePrice - discountAmount + travelEffect; 
     const balance = total - (Number(formData.paidAmount) || 0);
 
     setFormData((prev) => ({
@@ -116,7 +115,7 @@ const PurchaseForm = ({ onCancel, role }) => {
       totalAmount: total,
       balanceAmount: balance,
     }));
-  }, [formData.quantity, formData.rate, formData.cashDiscount, formData.paidAmount, formData.travelingCost]);
+  }, [formData.quantity, formData.rate, formData.cashDiscount, formData.paidAmount, formData.travelingCost, travelMode]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -134,6 +133,7 @@ const PurchaseForm = ({ onCancel, role }) => {
     try {
       const payload = {
         ...formData,
+        travelMode: travelMode, // Backend ke liye mode send karein
         quantity: Number(formData.quantity),
         rate: Number(formData.rate),
         travelingCost: Number(formData.travelingCost) || 0,
@@ -234,9 +234,36 @@ const PurchaseForm = ({ onCancel, role }) => {
             <input type="number" name="rate" value={formData.rate} onChange={handleChange} required placeholder="0.00" disabled={loading || !isAuthorized} />
           </div>
 
+          {/* 🆕 UPDATED: Traveling Cost with Toggle Button */}
           <div className="input-group">
             <label>Traveling Cost (₹)</label>
-            <input type="number" name="travelingCost" value={formData.travelingCost} onChange={handleChange} placeholder="0" disabled={loading || !isAuthorized} />
+            <div style={{ display: 'flex', gap: '5px' }}>
+              <button 
+                type="button" 
+                onClick={() => setTravelMode(prev => prev === "+" ? "-" : "+")}
+                style={{
+                  width: '40px',
+                  backgroundColor: travelMode === "+" ? '#28a745' : '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+                disabled={loading || !isAuthorized}
+              >
+                {travelMode}
+              </button>
+              <input 
+                type="number" 
+                name="travelingCost" 
+                value={formData.travelingCost} 
+                onChange={handleChange} 
+                placeholder="0" 
+                disabled={loading || !isAuthorized} 
+                style={{ flex: 1 }}
+              />
+            </div>
           </div>
 
           <div className="input-group">

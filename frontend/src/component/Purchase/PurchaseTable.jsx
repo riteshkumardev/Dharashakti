@@ -13,6 +13,7 @@ const PurchaseTable = ({ role }) => {
   const [editId, setEditId] = useState(null); 
   const [editData, setEditData] = useState({}); 
   const [currentPage, setCurrentPage] = useState(1);
+  const [travelMode, setTravelMode] = useState("-"); // 🆕 Toggle Mode (+/-)
   const rowsPerPage = 5;
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -23,44 +24,45 @@ const PurchaseTable = ({ role }) => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-const fetchPurchases = async () => {
-  try {
-    setLoading(true);
-
-    const res = await axios.get(`${API_URL}/api/purchases`);
-    console.log("PURCHASE API RESPONSE 👉", res.data); // 👈 MUST
-
-    if (res.data?.success && Array.isArray(res.data.data)) {
-      setPurchaseData(res.data.data);
-    } else {
+  const fetchPurchases = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API_URL}/api/purchases`);
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        setPurchaseData(res.data.data);
+      } else {
+        setPurchaseData([]);
+        showMsg("Purchase data empty hai", "warning");
+      }
+    } catch (err) {
+      console.error("FETCH ERROR ❌", err);
       setPurchaseData([]);
-      showMsg("Purchase data empty hai", "warning");
+      showMsg("Server se data load nahi ho paya", "error");
+    } finally {
+      setLoading(false);
     }
-
-  } catch (err) {
-    console.error("FETCH ERROR ❌", err);
-    setPurchaseData([]);
-    showMsg("Server se data load nahi ho paya", "error");
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   useEffect(() => {
     fetchPurchases();
   }, [API_URL]);
 
-  // 2️⃣ Auto Calculation in Edit Mode (Qty * Rate - CD%)
+  /* =========================================
+      🧮 Auto Calculation with Traveling Cost
+  ========================================== */
   useEffect(() => {
     if (editId) {
       const qty = Number(editData.quantity) || 0;
       const rate = Number(editData.rate) || 0;
       const cdPercent = Number(editData.cashDiscount) || 0;
+      const travel = Number(editData.travelingCost) || 0;
 
       const basePrice = qty * rate;
       const discountAmount = (basePrice * cdPercent) / 100;
-      const total = basePrice - discountAmount; 
+      
+      // logic: Mode ke hisaab se add ya subtract karein
+      const travelEffect = travelMode === "+" ? travel : -travel;
+      const total = basePrice - discountAmount + travelEffect; 
       
       const balance = total - (Number(editData.paidAmount) || 0);
 
@@ -70,7 +72,7 @@ const fetchPurchases = async () => {
         balanceAmount: balance 
       }));
     }
-  }, [editData.quantity, editData.rate, editData.cashDiscount, editData.paidAmount, editId]);
+  }, [editData.quantity, editData.rate, editData.cashDiscount, editData.paidAmount, editData.travelingCost, travelMode, editId]);
 
   const startEdit = (item) => {
     if (!isAuthorized) {
@@ -78,6 +80,8 @@ const fetchPurchases = async () => {
       return;
     }
     setEditId(item._id);
+    // Agar traveling cost negative hai toh mode set karein (optional check)
+    setTravelMode("-"); 
     setEditData({ ...item });
   };
 
@@ -153,7 +157,7 @@ const fetchPurchases = async () => {
                   <th>Bill/Vehicle</th>
                   <th>Supplier / Item</th>
                   <th>Qty / Rate</th>
-                  <th>CD (%)</th>
+                  <th>CD (%) / Travel</th>
                   <th>Total</th>
                   <th>Paid</th>
                   <th>Balance</th>
@@ -210,12 +214,29 @@ const fetchPurchases = async () => {
                     </td>
 
                     <td>
-                        {editId === item._id ? 
-                          <input type="number" value={editData.cashDiscount} onChange={(e) => setEditData({...editData, cashDiscount: e.target.value})} /> 
-                          : `${item.cashDiscount || 0}%`}
+                        {editId === item._id ? (
+                          <>
+                            <input type="number" placeholder="CD %" value={editData.cashDiscount} onChange={(e) => setEditData({...editData, cashDiscount: e.target.value})} />
+                            <div style={{ display: 'flex', gap: '2px', marginTop: '5px' }}>
+                              <button 
+                                type="button" 
+                                onClick={() => setTravelMode(prev => prev === "+" ? "-" : "+")}
+                                style={{ backgroundColor: travelMode === "+" ? '#28a745' : '#dc3545', color: 'white', border: 'none', cursor: 'pointer', padding: '0 5px' }}
+                              >
+                                {travelMode}
+                              </button>
+                              <input type="number" placeholder="Travel" value={editData.travelingCost} onChange={(e) => setEditData({...editData, travelingCost: e.target.value})} />
+                            </div>
+                          </>
+                        ) : (
+                          <div>
+                            <small>CD: {item.cashDiscount || 0}%</small><br/>
+                            <small>Travel: ₹{item.travelingCost || 0}</small>
+                          </div>
+                        )}
                     </td>
 
-                    <td style={{fontWeight: 'bold'}}>₹{editId === item._id ? editData.totalAmount : item.totalAmount}</td>
+                    <td style={{fontWeight: 'bold'}}>₹{editId === item._id ? Number(editData.totalAmount).toFixed(2) : Number(item.totalAmount).toFixed(2)}</td>
 
                     <td>
                       {editId === item._id ? 
@@ -224,7 +245,7 @@ const fetchPurchases = async () => {
                       }
                     </td>
 
-                    <td style={{color: 'red', fontWeight: 'bold'}}>₹{editId === item._id ? editData.balanceAmount : item.balanceAmount}</td>
+                    <td style={{color: 'red', fontWeight: 'bold'}}>₹{editId === item._id ? Number(editData.balanceAmount).toFixed(2) : Number(item.balanceAmount).toFixed(2)}</td>
 
                     <td>
                       {editId === item._id ? 

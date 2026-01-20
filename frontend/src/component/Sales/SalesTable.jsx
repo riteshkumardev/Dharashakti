@@ -21,9 +21,10 @@ const SalesTable = ({ role }) => {
   const [selectedProduct, setSelectedProduct] = useState("All");
   const [editId, setEditId] = useState(null);
   const [editData, setEditData] = useState({});
+  const [freightMode, setFreightMode] = useState("-"); // Toggle between + and -
   const [sortBy, setSortBy] = useState("dateNewest");
   const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 10; // Increased for better view
+  const rowsPerPage = 10;
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -37,9 +38,6 @@ const SalesTable = ({ role }) => {
     setSnackbar({ open: true, message: msg, severity: type });
   };
 
-  /* =========================
-      📡 Fetch Sales
-     ========================= */
   const fetchSales = async () => {
     try {
       setLoading(true);
@@ -59,12 +57,11 @@ const SalesTable = ({ role }) => {
   }, [API_URL]);
 
   /* =========================
-      🧮 Auto Calculation (Multi-Goods Friendly)
+      🧮 Updated Auto Calculation with +/- Option
      ========================= */
   useEffect(() => {
     if (!editId || !editData.goods) return;
 
-    // 1. Calculate Sum of all items in goods array
     const totalTaxable = editData.goods.reduce((sum, item) => {
         return sum + (toSafeNumber(item.quantity) * toSafeNumber(item.rate));
     }, 0);
@@ -74,11 +71,15 @@ const SalesTable = ({ role }) => {
     const received = toSafeNumber(editData.amountReceived);
 
     const discount = (totalTaxable * cdPercent) / 100;
-    const finalTotal = totalTaxable - freight - discount;
+    
+    // Yahan check hota hai ki freight add karna hai ya subtract
+    const finalTotal = freightMode === "+" 
+        ? (totalTaxable + freight - discount) 
+        : (totalTaxable - freight - discount);
+        
     const due = finalTotal - received;
 
-    // Prevent infinite loop by checking if values actually changed
-    if (editData.totalAmount !== finalTotal || editData.paymentDue !== due) {
+    if (Math.abs(editData.totalAmount - finalTotal) > 0.01 || Math.abs(editData.paymentDue - due) > 0.01) {
         setEditData((prev) => ({
             ...prev,
             taxableValue: totalTaxable,
@@ -92,20 +93,15 @@ const SalesTable = ({ role }) => {
     editData.freight,
     editData.cashDiscount,
     editData.amountReceived,
+    freightMode // Calculation triggers on mode change
   ]);
 
-  /* =========================
-      📝 Handle Goods Array Changes
-     ========================= */
   const handleGoodsChange = (index, field, value) => {
     const updatedGoods = [...editData.goods];
     updatedGoods[index] = { ...updatedGoods[index], [field]: value };
     setEditData({ ...editData, goods: updatedGoods });
   };
 
-  /* =========================
-      🔍 Filter + Sort
-     ========================= */
   const getProcessedList = () => {
     let list = salesList.filter((s) => {
       const billStr = String(s.billNo || "");
@@ -142,9 +138,6 @@ const SalesTable = ({ role }) => {
   const currentRows = processedList.slice(indexOfFirstRow, indexOfLastRow);
   const totalPages = Math.ceil(processedList.length / rowsPerPage);
 
-  /* =========================
-      🗑️ Delete
-     ========================= */
   const handleDelete = async (id) => {
     if (!isAuthorized) {
       showMsg("Permission required.", "error");
@@ -166,16 +159,13 @@ const SalesTable = ({ role }) => {
     }
   };
 
-  /* =========================
-      💾 Save (UPDATE) 
-     ========================= */
   const handleSave = async () => {
     try {
       setLoading(true);
-
-      // We send the whole editData which contains updated goods array and totals
       const payload = {
         ...editData,
+        // Backend ko batane ke liye ki freight mode kya tha
+        freightMeta: freightMode, 
         goods: editData.goods.map(g => ({
             ...g,
             quantity: toSafeNumber(g.quantity),
@@ -185,7 +175,6 @@ const SalesTable = ({ role }) => {
       };
 
       const res = await axios.put(`${API_URL}/api/sales/${editId}`, payload);
-
       if (res.data.success) {
         showMsg("Updated Successfully!");
         setEditId(null);
@@ -198,9 +187,6 @@ const SalesTable = ({ role }) => {
     }
   };
 
-  /* =========================
-      ✏️ Start Edit
-     ========================= */
   const startEdit = (sale) => {
     if (!isAuthorized) {
       showMsg("Permission Required.", "warning");
@@ -208,10 +194,12 @@ const SalesTable = ({ role }) => {
     }
 
     setEditId(sale._id);
+    // Agar purana data negative hai toh subtract mode set karein
+    setFreightMode(toSafeNumber(sale.freight) < 0 ? "-" : "-"); 
     setEditData({
-      ...sale, // Preserve ALL hidden fields (gstin, address, etc.)
-      goods: sale.goods ? [...sale.goods] : [], // Deep copy goods array
-      freight: toSafeNumber(sale.freight),
+      ...sale,
+      goods: sale.goods ? [...sale.goods] : [],
+      freight: Math.abs(toSafeNumber(sale.freight)), // Always positive in input for easier editing
       cashDiscount: toSafeNumber(sale.cashDiscount),
       amountReceived: toSafeNumber(sale.amountReceived),
       totalAmount: toSafeNumber(sale.totalAmount),
@@ -259,7 +247,7 @@ const SalesTable = ({ role }) => {
                   <th>Bill/Vehicle</th>
                   <th>Customer</th>
                   <th>Items (Qty @ Rate)</th>
-                  <th>Travel / CD%</th>
+                  <th>Freight / CD%</th>
                   <th>Total</th>
                   <th>Received</th>
                   <th>Due</th>
@@ -298,10 +286,21 @@ const SalesTable = ({ role }) => {
                           ))}
                         </td>
                         <td>
-                          <input type="number" className="edit-input tiny" value={editData.freight} 
-                            onChange={(e) => setEditData({ ...editData, freight: e.target.value })} /> / 
-                          <input type="number" className="edit-input tiny" value={editData.cashDiscount} 
-                            onChange={(e) => setEditData({ ...editData, cashDiscount: e.target.value })} />%
+                          <div style={{display: 'flex', alignItems: 'center', gap: '2px'}}>
+                            <button 
+                              type="button"
+                              onClick={() => setFreightMode(prev => prev === "+" ? "-" : "+")}
+                              style={{padding: '2px 5px', cursor: 'pointer', background: freightMode === "+" ? "#28a745" : "#dc3545", color: "white", border: "none", borderRadius: "3px", fontWeight: "bold"}}
+                            >
+                              {freightMode}
+                            </button>
+                            <input type="number" className="edit-input tiny" style={{width: '50px'}} value={editData.freight} 
+                              onChange={(e) => setEditData({ ...editData, freight: e.target.value })} />
+                          </div>
+                          <div style={{marginTop: '5px'}}>
+                             <input type="number" className="edit-input tiny" value={editData.cashDiscount} 
+                              onChange={(e) => setEditData({ ...editData, cashDiscount: e.target.value })} />%
+                          </div>
                         </td>
                         <td className="bold-cell">₹{editData.totalAmount?.toLocaleString()}</td>
                         <td>

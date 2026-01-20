@@ -21,7 +21,7 @@ const SalesEntry = ({ role }) => {
     items: [{ productName: "", quantity: "", rate: "" }],
     billNo: "",
     vehicleNo: "",
-    travelingCost: "", 
+    travelingCost: "", // Freight Charge Field
     cashDiscount: "",
     totalPrice: 0,
     amountReceived: "",
@@ -71,32 +71,23 @@ const SalesEntry = ({ role }) => {
     fetchData();
   }, [API_URL]);
 
-  // ==========================================
-  // 🔘 UPDATED: Customer Select with Popup Logic
-  // ==========================================
   const handleCustomerSelect = (e) => {
     const selectedName = e.target.value;
-
-    // ✨ Yahan hum check kar rahe hain ki kya dropdown se "Local customer" select hua hai
     if (selectedName === "Local customer") {
       const customName = window.prompt("Please enter Local Customer Name for the Bill:");
-      
       if (customName && customName.trim() !== "") {
         setFormData((prev) => ({
           ...prev,
-          customerName: customName.trim().toUpperCase(), // Popup wala naam yahan save hoga
+          customerName: customName.trim().toUpperCase(),
           gstin: "URD (Local)",
           mobile: "",
           address: "Local Market",
         }));
       } else {
-        // Agar user prompt cancel kar de
         setFormData((prev) => ({ ...prev, customerName: "" }));
       }
       return; 
     }
-
-    // Normal Registered Supplier Logic
     const customer = suppliers.find((s) => s.name === selectedName);
     if (customer) {
       setFormData((prev) => ({
@@ -138,6 +129,7 @@ const SalesEntry = ({ role }) => {
       subTotal += toSafeNumber(item.quantity) * toSafeNumber(item.rate);
     });
 
+    // Freight Calculation Logic (Subtracting as per your requirement)
     const freight = toSafeNumber(formData.travelingCost);
     const cdPercent = toSafeNumber(formData.cashDiscount);
     const received = toSafeNumber(formData.amountReceived);
@@ -297,7 +289,18 @@ const SalesEntry = ({ role }) => {
             <button type="button" onClick={addItem} style={{ padding: '8px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>+ Add Item</button>
           </div>
 
-          <div className="input-group"><label>Freight Charge (₹) [-]</label><input type="number" name="travelingCost" value={formData.travelingCost} onChange={handleChange} placeholder="Subtracts from total" /></div>
+          {/* Update Section: Freight Charge */}
+          <div className="input-group">
+            <label>Freight Charge (₹) [Deductable]</label>
+            <input 
+              type="number" 
+              name="travelingCost" 
+              value={formData.travelingCost} 
+              onChange={handleChange} 
+              placeholder="Amount to subtract" 
+            />
+          </div>
+
           <div className="input-group"><label>Discount %</label><input type="number" name="cashDiscount" value={formData.cashDiscount} onChange={handleChange} /></div>
           
           <div className="input-group span-3">
