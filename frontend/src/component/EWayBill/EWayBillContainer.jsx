@@ -86,7 +86,7 @@ const EWayBillContainer = ({ data }) => {
     <div className="invoice-container-main">
       <style id="invoiceStyles">
         {`
-          .invoice-wrapper { width: 210mm; min-height: 290mm; padding: 5mm; margin: auto; background: #fff; font-family: 'Arial Narrow', Arial, sans-serif; font-size: 11px; color: #000; line-height: 1.3; }
+          .invoice-wrapper { width: 210mm; min-height: 290mm; padding: 15mm; margin: auto; background: #fff; font-family: 'Arial Narrow', Arial, sans-serif; font-size: 11px; color: #000; line-height: 1.3; }
           .main-border { border: 1.5px solid #000; }
           .title-center { text-align: center; font-weight: bold; border-bottom: 1.5px solid #000; padding: 2px; font-size: 12px; }
           .flex-container { display: flex; width: 100%; }
@@ -217,7 +217,7 @@ const EWayBillContainer = ({ data }) => {
               <tr>
                 <td colSpan="3"></td>
                 <td colSpan="3" className="text-right"><strong>ROUND OFF</strong></td>
-                <td className="text-right" style={{borderRight: 'none'}}><strong>({roundOffValue})</strong></td>
+                <td className="text-right" style={{borderRight: 'none'}}><strong>({0})</strong></td>
               </tr>
 
               <tr style={{borderTop: '1.5px solid #000', fontWeight: 'bold'}}>
