@@ -157,3 +157,15 @@
         visibility: visible !important;
     }
 }
+@media print {
+  body {
+    visibility: hidden;
+  }
+  #bill-container { /* Aapka bill ka main div */
+    visibility: visible;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}
