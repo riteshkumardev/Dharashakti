@@ -28,7 +28,7 @@ const EWayBillContainer = ({ data }) => {
   const subTotal = Number(data.taxableValue || 0);
   const freightAmt = Number(data.freight || 0);
   const finalTotal = Number(data.totalAmount || 0);
-  const roundOffValue = (finalTotal - (subTotal + freightAmt)).toFixed(2);
+  const roundOffValue = (finalTotal - (subTotal - freightAmt)).toFixed(2);
 
   const invoiceData = {
     billNo: data?.billNo || "N/A",
