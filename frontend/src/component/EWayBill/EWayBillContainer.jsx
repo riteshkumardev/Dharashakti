@@ -78,8 +78,8 @@ const EWayBillContainer = ({ data }) => {
             window.onload = function() {
               setTimeout(function() {
                 window.print();
-                setTimeout(function() { window.close(); }, 500);
-              }, 1000);
+                setTimeout(function() { window.close(); }, 1000);
+              }, 2000);
             };
           </script>
         </body>
