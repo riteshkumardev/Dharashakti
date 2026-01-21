@@ -137,9 +137,9 @@ const InvoicePage = () => {
             <button onClick={() => setShowPreview(false)} style={{ padding: "12px 25px", backgroundColor: "#607D8B", color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}>
               ⬅️ Back to List
             </button>
-            <button onClick={() => window.print()} style={{ padding: "12px 25px", backgroundColor: "#4CAF50", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>
+            {/* <button onClick={() => window.print()} style={{ padding: "12px 25px", backgroundColor: "#4CAF50", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>
               🖨️ Print Now
-            </button>
+            </button> */}
           </div>
           <EWayBillContainer data={ewayData} />
         </>

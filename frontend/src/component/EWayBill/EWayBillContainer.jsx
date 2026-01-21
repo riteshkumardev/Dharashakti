@@ -2,8 +2,6 @@ import React from "react";
 import SinghImage from '../rkSig.png';
 
 const EWayBillContainer = ({ data }) => {
-  console.log(data, "data contanor");
-  
   if (!data) return null;
 
   // 1. Function: Number to Words (INR)
@@ -28,7 +26,6 @@ const EWayBillContainer = ({ data }) => {
   const subTotal = Number(data.taxableValue || 0);
   const freightAmt = Number(data.freight || 0);
   const finalTotal = Number(data.totalAmount || 0);
-  const roundOffValue = (finalTotal - (subTotal + freightAmt)).toFixed(2);
 
   const invoiceData = {
     billNo: data?.billNo || "N/A",
@@ -52,7 +49,7 @@ const EWayBillContainer = ({ data }) => {
 
   const uniqueHSNs = invoiceData.goods ? [...new Set(invoiceData.goods.map(item => item.hsn))].filter(h => h) : [];
 
-  // 🔥 FINAL PRINT FIX: Isolated New Tab Printing
+  // 🔥 MOBILE PRINT FIX: Isolated New Tab Printing with Delay
   const handlePrint = () => {
     const printContent = document.getElementById('printableInvoice').innerHTML;
     const styleContent = document.getElementById('invoiceStyles').innerHTML;
@@ -61,20 +58,42 @@ const EWayBillContainer = ({ data }) => {
     printWindow.document.write(`
       <html>
         <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Bill No: ${invoiceData.billNo}</title>
           <style>${styleContent}</style>
           <style>
-            @page { size: A4; margin: 10mm; }
-            body { margin-top: 5mm; padding: 0; background: #fff; }
-            .invoice-wrapper { width: 100%; border: none; box-shadow: none; padding: 0; }
+            @page { size: A4; margin: 5mm; }
+            body { 
+              margin: 0; 
+              padding: 0; 
+              background: #fff; 
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .invoice-wrapper { 
+              width: 100% !important; 
+              max-width: 210mm;
+              border: none; 
+              box-shadow: none; 
+              padding: 5mm;
+              margin: 0 auto;
+            }
+            @media print {
+              .no-print { display: none !important; }
+            }
           </style>
         </head>
         <body>
           <div class="invoice-wrapper">${printContent}</div>
           <script>
             window.onload = function() {
-              window.print();
-              window.close();
+              // Delay for image and style rendering on mobile
+              setTimeout(function() {
+                window.print();
+                // Close window after print dialog is closed
+                setTimeout(function() { window.close(); }, 500);
+              }, 1000);
             };
           </script>
         </body>
@@ -87,7 +106,7 @@ const EWayBillContainer = ({ data }) => {
     <div className="invoice-container-main">
       <style id="invoiceStyles">
         {`
-          .invoice-wrapper { width: 210mm; min-height: 290mm; padding: 10mm; margin: auto; background: #fff; font-family: 'Arial Narrow', Arial, sans-serif; font-size: 11px; color: #000; line-height: 1.3; }
+          .invoice-wrapper { width: 210mm; min-height: 290mm; padding: 10mm; margin: auto; background: #fff; font-family: 'Arial Narrow', Arial, sans-serif; font-size: 11px; color: #000; line-height: 1.3; box-sizing: border-box; }
           .main-border { border: 1.5px solid #000; }
           .title-center { text-align: center; font-weight: bold; border-bottom: 1.5px solid #000; padding: 2px; font-size: 12px; }
           .flex-container { display: flex; width: 100%; }
@@ -99,23 +118,27 @@ const EWayBillContainer = ({ data }) => {
           .info-col { flex: 1; padding: 2px 5px; border-right: 1px solid #000; }
           .info-col:last-child { border-right: none; }
           .items-table { width: 100%; border-collapse: collapse; border-top: 1.5px solid #000; }
-          .items-table th, .items-table td { border-right: 1px solid #000; padding: 4px 6px; text-align: center; vertical-align: top; }
-          .items-table th { border-bottom: 1px solid #000; font-weight: normal; }
+          .items-table th, .items-table td { border-right: 1px solid #000; padding: 4px 6px; text-align: center; vertical-align: top; border-bottom: 1px solid #000; }
+          .items-table th { font-weight: bold; }
           .items-table .text-left { text-align: left; }
           .items-table .text-right { text-align: right; }
           .spacer-row { height: 160px; }
+          .spacer-row td { border-bottom: none !important; }
           .footer-section { border-top: 1.5px solid #000; }
-          .hsn-tax-table { width: 100%; border-collapse: collapse; border-top: 1px solid #000; }
+          .hsn-tax-table { width: 100%; border-collapse: collapse; }
           .hsn-tax-table td { border: 1px solid #000; padding: 3px 8px; }
           .bottom-split { display: flex; border-top: 1px solid #000; min-height: 120px; }
-          .decl-box { width: 50%; padding: 5px; border-right: 1px solid #000; font-size: 10px; text-align: justify; }
+          .decl-box { width: 50%; padding: 5px; border-right: 1.5px solid #000; font-size: 10px; text-align: justify; }
           .bank-sig-box { width: 50%; display: flex; flex-direction: column; }
           .bank-inner { padding: 5px; font-size: 10px; border-bottom: 1px solid #000; flex-grow: 1; }
-          .auth-sig-box { padding: 5px; text-align: right; height: 90px; display: flex; flex-direction: column; justify-content: space-between; }
+          .auth-sig-box { padding: 5px; text-align: right; height: 90px; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
+          img { -webkit-print-color-adjust: exact; }
+          @media print {
+            .invoice-wrapper { width: 100% !important; margin: 0 !important; padding: 5mm !important; }
+          }
         `}
       </style>
 
-      {/* Wrapping content in printableInvoice ID for extraction */}
       <div id="printableInvoice" className="invoice-wrapper">
         <div className="main-border">
           <div className="title-center">BILL OF SUPPLY (ORIGINAL FOR RECIPIENT)</div>
@@ -218,7 +241,7 @@ const EWayBillContainer = ({ data }) => {
               <tr>
                 <td colSpan="3"></td>
                 <td colSpan="3" className="text-right"><strong>ROUND OFF</strong></td>
-                <td className="text-right" style={{borderRight: 'none'}}><strong>({0})</strong></td>
+                <td className="text-right" style={{borderRight: 'none'}}><strong>(0.00)</strong></td>
               </tr>
 
               <tr style={{borderTop: '1.5px solid #000', fontWeight: 'bold'}}>
@@ -260,7 +283,7 @@ const EWayBillContainer = ({ data }) => {
 
             <div className="bottom-split">
               <div className="decl-box">
-          We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct. We hereby certify that food/ foods mentioned in this invoice is/are warranted to be of the nature and quality which it/these purports/purported to be.
+                We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct. We hereby certify that food/ foods mentioned in this invoice is/are warranted to be of the nature and quality which it/these purports/purported to be.
               </div>
               <div className="bank-sig-box">
                 <div className="bank-inner">
@@ -271,10 +294,9 @@ const EWayBillContainer = ({ data }) => {
                 </div>
                 <div className="auth-sig-box">
                   <span>for DHARA SHAKTI AGRO PRODUCTS</span>
-                 <div>
-  
-      <img src={SinghImage} alt="Singh" style={{ width: '80px', height: '40px',marginTop: 'auto' }} />
-    </div>
+                  <div style={{ textAlign: 'right', width: '100%' }}>
+                    <img src={SinghImage} alt="Singh" style={{ width: '80px', height: '40px', objectFit: 'contain' }} />
+                  </div>
                   <strong style={{marginTop: 'auto'}}>Authorised Signatory</strong>
                 </div>
               </div>
@@ -283,13 +305,12 @@ const EWayBillContainer = ({ data }) => {
         </div>
       </div>
       
-      {/* Updated Print Button */}
       <button 
         className="no-print" 
         onClick={handlePrint} 
-        style={{marginTop: '10px', padding: '10px 20px', cursor: 'pointer', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px'}}
+        style={{marginTop: '10px', padding: '12px 24px', cursor: 'pointer', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', width: '100%'}}
       >
-        Print Bill Now
+        Print Bill
       </button>
     </div>
   );
