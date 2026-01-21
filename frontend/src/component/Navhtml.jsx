@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "../App.css";
-// ✅ Import ko ensure karein ki file name folder mein exact 'dharasakti.png' hi ho
+
+// 1. Image import fix: Case check karein (kya file ka naam Dharasakti.png toh nahi?)
 import dharasakti from "./dharasakti.png"; 
 import DashboardSidebar from "./Dashboard/DashboardSidebar";
 
@@ -9,21 +10,14 @@ export default function Navbar({ user, setUser }) {
   const [showSidebar, setShowSidebar] = useState(false);
   const navigate = useNavigate();
 
-  const forceLogout = (reason) => {
-    if (reason) alert(reason);
-    localStorage.removeItem("user");
-    setUser(null);
-    setShowSidebar(false);
-    navigate("/login");
-  };
-
-  // ✅ Profile Image Fix for Production (Vercel)
+  // 2. Profile Image logic update: Null check aur fallback image
   const getProfileImage = () => {
-    if (user?.photo && user.photo.startsWith("http")) {
+    // Agar user logged in hai aur uski photo exist karti hai
+    if (user && user.photo) {
       return user.photo;
     }
-    // Default placeholder agar user photo missing ho
-    return "https://i.imgur.com/6VBx3io.png"; 
+    // Default system placeholder
+    return "https://i.imgur.com/6VBx3io.png";
   };
 
   return (
@@ -45,8 +39,11 @@ export default function Navbar({ user, setUser }) {
               className="logo"
               onClick={() => navigate("/")}
               style={{ cursor: "pointer" }}
-              // ✅ Fallback logic agar image path production mein na mile
-              onError={(e) => { e.target.style.display = 'none'; }} 
+              // 3. Logo Error Handling: Agar vercel par import fail ho
+              onError={(e) => {
+                console.log("Logo load failed on Vercel");
+                e.target.style.display = 'none';
+              }} 
             />
           )}
         </div>
@@ -73,8 +70,10 @@ export default function Navbar({ user, setUser }) {
               <img
                 src={getProfileImage()}
                 alt="profile"
-                // ✅ Error handling: agar DB ka image URL break ho jaye
-                onError={(e) => { e.target.src = "https://i.imgur.com/6VBx3io.png"; }}
+                // 4. Image Fallback: Agar URL break ho jaye
+                onError={(e) => {
+                  e.target.src = "https://i.imgur.com/6VBx3io.png";
+                }}
               />
             </div>
           ) : (
@@ -85,10 +84,8 @@ export default function Navbar({ user, setUser }) {
         </div>
       </nav>
 
-      <div
-        className={`sidebar-overlay ${showSidebar ? "active" : ""}`}
-        onClick={() => setShowSidebar(false)}
-      >
+      {/* Sidebar logic... */}
+      <div className={`sidebar-overlay ${showSidebar ? "active" : ""}`} onClick={() => setShowSidebar(false)}>
         <div className="sidebar-content" onClick={(e) => e.stopPropagation()}>
           <div className="sidebar-header">
             <h3 className="DharashaktiH3">Dharashakti</h3>
