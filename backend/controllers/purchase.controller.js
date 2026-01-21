@@ -1,17 +1,16 @@
 import Purchase from "../models/Purchase.js";
-import Stock from "../models/Stock.js";
 
 /* =============================================
-    ➕ ADD PURCHASE (Updated with New Fields)
+    ➕ ADD PURCHASE (Independent)
 ============================================= */
 export const addPurchase = async (req, res) => {
   try {
     const {
       date,
       supplierName,
-      gstin,      // 🆕 New var
-      mobile,     // 🆕 New var
-      address,    // 🆕 New var
+      gstin,      
+      mobile,     
+      address,    
       productName,
       billNo,
       vehicleNo,
@@ -25,12 +24,13 @@ export const addPurchase = async (req, res) => {
       remarks
     } = req.body;
 
+    // Sirf Purchase record create hoga, Stock logic hata di gayi hai
     const purchase = await Purchase.create({
       date,
       supplierName,
-      gstin,      // 🆕 Save to DB
-      mobile,     // 🆕 Save to DB
-      address,    // 🆕 Save to DB
+      gstin,      
+      mobile,     
+      address,    
       productName,
       billNo,
       vehicleNo,
@@ -44,21 +44,10 @@ export const addPurchase = async (req, res) => {
       remarks
     });
 
-    // 🔄 STOCK UPDATE
-    const stock = await Stock.findOneAndUpdate(
-      { productName },
-      {
-        $inc: { totalQuantity: purchase.quantity },
-        $set: { updatedAt: new Date() }
-      },
-      { upsert: true, new: true }
-    );
-
     res.status(201).json({
       success: true,
-      message: "Purchase saved & Stock updated ✅",
-      purchase,
-      stock
+      message: "Purchase saved successfully (No stock adjustment) ✅",
+      purchase
     });
 
   } catch (error) {
@@ -89,15 +78,17 @@ export const getPurchases = async (req, res) => {
 };
 
 /* =============================================
-    🛠 UPDATE PURCHASE (Updated with New Fields)
+    🛠 UPDATE PURCHASE (Independent)
 ============================================= */
 export const updatePurchase = async (req, res) => {
   try {
-    const oldPurchase = await Purchase.findById(req.params.id);
+    const { id } = req.params;
+    const oldPurchase = await Purchase.findById(id);
+    
     if (!oldPurchase)
       return res.status(404).json({ success: false, message: "Record not found" });
 
-    // ✨ Fix: Nullish Coalescing (??) use karein taaki 0 value bypass na ho
+    // Stock re-adjustment ka pura logic yahan se remove kar diya gaya hai
     const updatedFields = {
       ...req.body,
       quantity: Number(req.body.quantity ?? oldPurchase.quantity),
@@ -106,35 +97,18 @@ export const updatePurchase = async (req, res) => {
       cashDiscount: Number(req.body.cashDiscount ?? oldPurchase.cashDiscount),
       paidAmount: Number(req.body.paidAmount ?? oldPurchase.paidAmount),
       totalAmount: Number(req.body.totalAmount ?? oldPurchase.totalAmount),
-      // Yahan 0 ab bypass nahi hoga
       balanceAmount: Number(req.body.balanceAmount ?? oldPurchase.balanceAmount) 
     };
 
     const updatedPurchase = await Purchase.findByIdAndUpdate(
-      req.params.id,
+      id,
       updatedFields,
-      { new: true }
+      { new: true, runValidators: true }
     );
-
-    /* 🔁 STOCK ADJUSTMENT LOGIC (Reliable way) */
-    if (oldPurchase.quantity !== updatedPurchase.quantity || oldPurchase.productName !== updatedPurchase.productName) {
-      // 1️⃣ Purana stock wapas minus karein
-      await Stock.findOneAndUpdate(
-        { productName: oldPurchase.productName },
-        { $inc: { totalQuantity: -oldPurchase.quantity } }
-      );
-
-      // 2️⃣ Naya stock add karein
-      await Stock.findOneAndUpdate(
-        { productName: updatedPurchase.productName },
-        { $inc: { totalQuantity: updatedPurchase.quantity } },
-        { upsert: true }
-      );
-    }
 
     res.json({
       success: true,
-      message: "Purchase updated & Balance synced! ✅",
+      message: "Purchase record updated independently ✅",
       data: updatedPurchase
     });
 
@@ -148,23 +122,15 @@ export const updatePurchase = async (req, res) => {
 ========================= */
 export const deletePurchase = async (req, res) => {
   try {
-    const purchase = await Purchase.findById(req.params.id);
+    const purchase = await Purchase.findByIdAndDelete(req.params.id);
+
     if (!purchase)
       return res.status(404).json({ success: false, message: "Record not found" });
 
-    // 🔻 STOCK ROLLBACK
-    const stock = await Stock.findOneAndUpdate(
-      { productName: purchase.productName },
-      { $inc: { totalQuantity: -purchase.quantity } },
-      { new: true }
-    );
-
-    await Purchase.findByIdAndDelete(req.params.id);
-
+    // Stock rollback logic hata di gayi hai
     res.json({
       success: true,
-      message: "Purchase deleted & Stock roll-back complete ✅",
-      stock
+      message: "Purchase record deleted successfully ✅"
     });
 
   } catch (error) {

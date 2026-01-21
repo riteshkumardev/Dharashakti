@@ -1,92 +1,96 @@
-import Purchase from "../models/Purchase.js";
 import Stock from "../models/Stock.js";
 
-// ➕ Add Purchase and Update Stock
-export const addPurchase = async (req, res) => {
+/**
+ * ➕ CREATE/ADD STOCK (Independent)
+ * Ye function kisi bhi purchase record se link nahi hai.
+ * Ye seedha stock table mein naya item add karega ya existing ko update karega.
+ */
+export const addStockItem = async (req, res) => {
   try {
-    const {
-      date,
-      supplierName,
-      productName,
-      billNo,
-      vehicleNo,
-      quantity = 0,
-      rate = 0,
-      travelingCost = 0,
-      cashDiscount = 0,
-      totalAmount = 0,
-      paidAmount = 0,
-      balanceAmount = 0,
-      remarks
-    } = req.body;
+    const { productName, totalQuantity, remarks } = req.body;
 
-    const purchase = await Purchase.create({
-      date,
-      supplierName,
-      productName,
-      billNo,
-      vehicleNo,
-      quantity: Number(quantity),
-      rate: Number(rate),
-      travelingCost: Number(travelingCost),
-      cashDiscount: Number(cashDiscount),
-      totalAmount: Number(totalAmount),
-      paidAmount: Number(paidAmount),
-      balanceAmount: Number(balanceAmount),
-      remarks
-    });
+    if (!productName) {
+      return res.status(400).json({ success: false, message: "Product Name is required" });
+    }
 
-    // 🔄 STOCK UPDATE
+    // Independent logic: Direct overwrite ya naya create (Manual Entry)
     const stock = await Stock.findOneAndUpdate(
-      { productName },
-      {
-        $inc: { totalQuantity: purchase.quantity },
-        $set: { updatedAt: new Date() }
+      { productName: productName.toUpperCase().trim() },
+      { 
+        $set: { 
+          productName: productName.toUpperCase().trim(),
+          totalQuantity: Number(totalQuantity) || 0, 
+          remarks: remarks || "Manual Entry",
+          updatedAt: new Date()
+        } 
       },
-      { upsert: true, new: true }
+      { new: true, upsert: true, runValidators: true }
     );
 
     res.status(201).json({
       success: true,
-      message: "Purchase saved & Stock updated ✅",
-      purchase,
-      stock
+      message: "Stock item added/updated successfully ✅",
+      data: stock
     });
 
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: error.message
-    });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
-// 📄 Get Inventory (Stock Table ke liye)
+/**
+ * 📄 GET ALL STOCKS
+ * Table mein dikhane ke liye saara data fetch karega.
+ */
 export const getStocks = async (req, res) => {
   try {
-    const stocks = await Stock.find().sort({ updatedAt: -1 });
+    const stocks = await Stock.find().sort({ productName: 1 });
     res.json({ success: true, data: stocks });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// 🛠️ Update Stock Manually
+/**
+ * 🛠️ UPDATE STOCK MANUALLY
+ * Table mein inline edit karne ke liye.
+ */
 export const updateStock = async (req, res) => {
   try {
-    const stock = await Stock.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    res.json({ success: true, data: stock });
+    const { productName, totalQuantity, remarks } = req.body;
+    
+    const stock = await Stock.findByIdAndUpdate(
+      req.params.id,
+      { 
+        $set: { 
+          productName: productName?.toUpperCase().trim(),
+          totalQuantity: Number(totalQuantity), 
+          remarks: remarks,
+          updatedAt: new Date()
+        } 
+      },
+      { new: true, runValidators: true }
+    );
+
+    res.json({ 
+      success: true, 
+      message: "Stock updated independently successfully", 
+      data: stock 
+    });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
 };
 
-// ❌ Delete Stock
+/**
+ * ❌ DELETE STOCK
+ * Database se item hatane ke liye.
+ */
 export const deleteStock = async (req, res) => {
   try {
     await Stock.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: "Deleted" });
+    res.json({ success: true, message: "Stock item deleted from database" });
   } catch (error) {
-    res.status(404).json({ success: false, message: "Not found" });
+    res.status(404).json({ success: false, message: "Item not found" });
   }
 };
