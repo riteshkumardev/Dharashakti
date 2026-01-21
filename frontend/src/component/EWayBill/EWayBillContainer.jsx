@@ -49,10 +49,10 @@ const EWayBillContainer = ({ data }) => {
 
   const uniqueHSNs = invoiceData.goods ? [...new Set(invoiceData.goods.map(item => item.hsn))].filter(h => h) : [];
 
-  // 🔥 MOBILE PRINT FIX: Isolated New Tab Printing with Delay
+  // 🔥 FINAL PRINT FIX: Isolated New Tab Printing with Unified CSS
   const handlePrint = () => {
     const printContent = document.getElementById('printableInvoice').innerHTML;
-    const styleContent = document.getElementById('invoiceStyles').innerHTML;
+    const styleContent = document.getElementById('unifiedInvoiceStyles').innerHTML;
     const printWindow = window.open('', '_blank');
 
     printWindow.document.write(`
@@ -63,23 +63,11 @@ const EWayBillContainer = ({ data }) => {
           <title>Bill No: ${invoiceData.billNo}</title>
           <style>${styleContent}</style>
           <style>
-            @page { size: A4; margin: 5mm; }
-            body { 
-              margin: 0; 
-              padding: 0; 
-              background: #fff; 
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            .invoice-wrapper { 
-              width: 100% !important; 
-              max-width: 210mm;
-              border: none; 
-              box-shadow: none; 
-              padding: 5mm;
-              margin: 0 auto;
-            }
+            /* Mobile Specific Overrides */
             @media print {
+              @page { size: A4; margin: 0; }
+              body { margin: 0; padding: 0; }
+              .invoice-wrapper { width: 100% !important; max-width: none !important; margin: 0 !important; padding: 5mm !important; }
               .no-print { display: none !important; }
             }
           </style>
@@ -88,10 +76,8 @@ const EWayBillContainer = ({ data }) => {
           <div class="invoice-wrapper">${printContent}</div>
           <script>
             window.onload = function() {
-              // Delay for image and style rendering on mobile
               setTimeout(function() {
                 window.print();
-                // Close window after print dialog is closed
                 setTimeout(function() { window.close(); }, 500);
               }, 1000);
             };
@@ -104,9 +90,24 @@ const EWayBillContainer = ({ data }) => {
 
   return (
     <div className="invoice-container-main">
-      <style id="invoiceStyles">
+      {/* 🟢 UNIFIED CSS: Sirf Ek Jagah Saari Styling */}
+      <style id="unifiedInvoiceStyles">
         {`
-          .invoice-wrapper { width: 210mm; min-height: 290mm; padding: 10mm; margin: auto; background: #fff; font-family: 'Arial Narrow', Arial, sans-serif; font-size: 11px; color: #000; line-height: 1.3; box-sizing: border-box; }
+          * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          
+          .invoice-wrapper { 
+            width: 210mm; 
+            min-height: 290mm; 
+            padding: 10mm; 
+            margin: 10px auto; 
+            background: #fff; 
+            font-family: 'Arial Narrow', Arial, sans-serif; 
+            font-size: 11px; 
+            color: #000; 
+            line-height: 1.3;
+            border: 1px solid #ddd;
+          }
+
           .main-border { border: 1.5px solid #000; }
           .title-center { text-align: center; font-weight: bold; border-bottom: 1.5px solid #000; padding: 2px; font-size: 12px; }
           .flex-container { display: flex; width: 100%; }
@@ -114,31 +115,42 @@ const EWayBillContainer = ({ data }) => {
           .right-section { width: 50%; }
           .p-5 { padding: 5px; }
           .border-b { border-bottom: 1px solid #000; }
+          
           .info-row { display: flex; border-bottom: 1px solid #000; min-height: 35px; }
           .info-col { flex: 1; padding: 2px 5px; border-right: 1px solid #000; }
           .info-col:last-child { border-right: none; }
+          
           .items-table { width: 100%; border-collapse: collapse; border-top: 1.5px solid #000; }
           .items-table th, .items-table td { border-right: 1px solid #000; padding: 4px 6px; text-align: center; vertical-align: top; border-bottom: 1px solid #000; }
           .items-table th { font-weight: bold; }
           .items-table .text-left { text-align: left; }
           .items-table .text-right { text-align: right; }
+          
           .spacer-row { height: 160px; }
           .spacer-row td { border-bottom: none !important; }
+          
           .footer-section { border-top: 1.5px solid #000; }
           .hsn-tax-table { width: 100%; border-collapse: collapse; }
           .hsn-tax-table td { border: 1px solid #000; padding: 3px 8px; }
+          
           .bottom-split { display: flex; border-top: 1px solid #000; min-height: 120px; }
           .decl-box { width: 50%; padding: 5px; border-right: 1.5px solid #000; font-size: 10px; text-align: justify; }
           .bank-sig-box { width: 50%; display: flex; flex-direction: column; }
           .bank-inner { padding: 5px; font-size: 10px; border-bottom: 1px solid #000; flex-grow: 1; }
-          .auth-sig-box { padding: 5px; text-align: right; height: 90px; display: flex; flex-direction: column; justify-content: space-between; position: relative; }
-          img { -webkit-print-color-adjust: exact; }
+          .auth-sig-box { padding: 5px; text-align: right; height: 90px; display: flex; flex-direction: column; justify-content: space-between; }
+          
+          .no-print { display: block; margin: 20px auto; padding: 10px; color: white; border: none; border-radius: 5px; cursor: pointer; text-align: center; font-weight: bold; }
+
           @media print {
-            .invoice-wrapper { width: 100% !important; margin: 0 !important; padding: 5mm !important; }
+            body { visibility: visible !important; margin: 0; padding: 0; }
+            .invoice-wrapper { width: 100% !important; border: none !important; margin: 0 !important; padding: 5mm !important; }
+            .no-print { display: none !important; }
+            html, body { height: auto; overflow: visible; }
           }
         `}
       </style>
 
+      {/* Wrapping content in printableInvoice ID */}
       <div id="printableInvoice" className="invoice-wrapper">
         <div className="main-border">
           <div className="title-center">BILL OF SUPPLY (ORIGINAL FOR RECIPIENT)</div>
@@ -305,12 +317,8 @@ const EWayBillContainer = ({ data }) => {
         </div>
       </div>
       
-      <button 
-        className="no-print" 
-        onClick={handlePrint} 
-        style={{marginTop: '10px', padding: '12px 24px', cursor: 'pointer', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', width: '100%'}}
-      >
-        Print Bill
+      <button className="no-print" onClick={handlePrint}>
+        Print Bill (Mobile/Laptop)
       </button>
     </div>
   );
