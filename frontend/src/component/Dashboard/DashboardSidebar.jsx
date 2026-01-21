@@ -54,6 +54,29 @@ const DashboardSidebar = ({ closeSidebar }) => {
             <li onClick={() => handleNavigate("/sales-table")}>➤ Sales Table</li>
           </ul>
         )}
+
+      </div>
+      {/* 🟢 GROUP 2: Purchase & BILLING */}
+      <div className="sidebar-section">
+        <div 
+          className="sidebar-title action-button" 
+          style={getTitleStyle("purchase")}
+          onClick={() => toggleMenu("purchase")}
+        >
+          <span style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "18px" }}>🛒</span> Purchase & Billing
+          </span>
+          <span style={{ fontSize: "12px", opacity: 0.7 }}>
+            {openMenu === "purchase" ? "▲" : "▼"}
+          </span>
+        </div>
+        {openMenu === "purchase" && (
+          <ul className="sidebar-list" style={{ paddingLeft: "15px", animation: "slideIn 0.3s ease" }}>
+                 <li onClick={() => handleNavigate("/purchase-form")}>➤ Purchase Entry</li>
+            <li onClick={() => handleNavigate("/purchase-table")}>➤ Purchase Table</li>
+          </ul>
+        )}
+     
       </div>
 
       {/* 🔵 GROUP 2: INVENTORY & STOCKS */}
@@ -74,8 +97,7 @@ const DashboardSidebar = ({ closeSidebar }) => {
           <ul className="sidebar-list" style={{ paddingLeft: "15px" }}>
             <li onClick={() => handleNavigate("/stock-management")}>➤ Stock View</li>
             {/* <li onClick={() => handleNavigate("/stock-add")}>➤ Add New Stock</li> */}
-            <li onClick={() => handleNavigate("/purchase-form")}>➤ Purchase Entry</li>
-            <li onClick={() => handleNavigate("/purchase-table")}>➤ Purchase Table</li>
+      
             <li onClick={() => handleNavigate("/suppliers")}>➤ Supplier Manager</li>
             <li onClick={() => handleNavigate("/invoice")}>➤ Bill Print</li>
           </ul>
