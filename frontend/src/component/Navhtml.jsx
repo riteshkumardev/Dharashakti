@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "../App.css";
-import dharasakti from "./dharasakti.png";
+// ✅ Import ko ensure karein ki file name folder mein exact 'dharasakti.png' hi ho
+import dharasakti from "./dharasakti.png"; 
 import DashboardSidebar from "./Dashboard/DashboardSidebar";
 
 export default function Navbar({ user, setUser }) {
   const [showSidebar, setShowSidebar] = useState(false);
   const navigate = useNavigate();
 
-  // 🔓 FORCE LOGOUT
   const forceLogout = (reason) => {
     if (reason) alert(reason);
     localStorage.removeItem("user");
@@ -17,21 +17,18 @@ export default function Navbar({ user, setUser }) {
     navigate("/login");
   };
 
-  // 🔐 SESSION CHECK (MongoDB integration ke baad yahan se API call kar sakte hain)
-  useEffect(() => {
-    if (!user) return;
-    
-    // Note: Agar aapko "One ID One Login" feature MongoDB se chahiye, 
-    // toh aapko ek API endpoint banana hoga jo backend par session check kare.
-    // Filhal Firebase remove kar diya gaya hai taaki crash na ho.
-    
-  }, [user]);
+  // ✅ Profile Image Fix for Production (Vercel)
+  const getProfileImage = () => {
+    if (user?.photo && user.photo.startsWith("http")) {
+      return user.photo;
+    }
+    // Default placeholder agar user photo missing ho
+    return "https://i.imgur.com/6VBx3io.png"; 
+  };
 
   return (
     <>
-      {/* 🔷 NAVBAR */}
       <nav className="navbar">
-        {/* LEFT */}
         <div className="nav-left">
           {user ? (
             <div
@@ -48,29 +45,23 @@ export default function Navbar({ user, setUser }) {
               className="logo"
               onClick={() => navigate("/")}
               style={{ cursor: "pointer" }}
+              // ✅ Fallback logic agar image path production mein na mile
+              onError={(e) => { e.target.style.display = 'none'; }} 
             />
           )}
         </div>
 
-        {/* CENTER */}
         <ul className="nav-links">
-          <li>
-            <Link to="/">Home</Link>
-          </li>
-
+          <li><Link to="/">Home</Link></li>
           {user?.role === "Admin" && (
             <li>
-              <Link
-                to="/master-panel"
-                style={{ color: "#fbbf24", fontWeight: "bold" }}
-              >
+              <Link to="/master-panel" style={{ color: "#fbbf24", fontWeight: "bold" }}>
                 🛡️ Master Control
               </Link>
             </li>
           )}
         </ul>
 
-        {/* RIGHT */}
         <div className="nav-right">
           {user ? (
             <div
@@ -80,46 +71,30 @@ export default function Navbar({ user, setUser }) {
               style={{ cursor: "pointer" }}
             >
               <img
-                src={
-                  user.photo || 
-                  "https://i.imgur.com/6VBx3io.png"
-                }
+                src={getProfileImage()}
                 alt="profile"
+                // ✅ Error handling: agar DB ka image URL break ho jaye
+                onError={(e) => { e.target.src = "https://i.imgur.com/6VBx3io.png"; }}
               />
             </div>
           ) : (
-            <button
-              className="nav-btn login"
-              onClick={() => navigate("/login")}
-            >
+            <button className="nav-btn login" onClick={() => navigate("/login")}>
               Login
             </button>
           )}
         </div>
       </nav>
 
-      {/* 🔷 SIDEBAR OVERLAY */}
       <div
         className={`sidebar-overlay ${showSidebar ? "active" : ""}`}
         onClick={() => setShowSidebar(false)}
       >
-        <div
-          className="sidebar-content"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="sidebar-content" onClick={(e) => e.stopPropagation()}>
           <div className="sidebar-header">
             <h3 className="DharashaktiH3">Dharashakti</h3>
-            <button
-              className="close-btn"
-              onClick={() => setShowSidebar(false)}
-            >
-              ✖
-            </button>
+            <button className="close-btn" onClick={() => setShowSidebar(false)}>✖</button>
           </div>
-
-          <DashboardSidebar
-            closeSidebar={() => setShowSidebar(false)}
-          />
+          <DashboardSidebar closeSidebar={() => setShowSidebar(false)} />
         </div>
       </div>
     </>
