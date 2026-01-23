@@ -79,3 +79,13 @@
 .log-entry { padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
 .log-entry p { margin: 5px 0; font-size: 13px; color: #475569; }
 .log-entry small { color: #94a3b8; font-size: 11px; }
+.admin-actions-area {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap; /* Mobile screen ke liye */
+}
+
+.backup-section-wrapper {
+  margin-right: 10px;
+}

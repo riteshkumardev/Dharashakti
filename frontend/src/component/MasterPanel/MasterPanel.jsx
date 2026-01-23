@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios"; 
 import Loader from "../Core_Component/Loader/Loader"; 
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar"; 
+
 import './MasterPanel.css';
+import BackupManager from '../BackupButton/BackupManager';
 
 const MasterPanel = ({ user }) => { 
   const navigate = useNavigate(); 
@@ -17,7 +19,6 @@ const MasterPanel = ({ user }) => {
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-  // 📸 Helper: Fix Photo URL for Backend paths
   const getPhotoURL = (photoPath) => {
     if (!photoPath) return null;
     return photoPath.startsWith('http') ? photoPath : `${API_URL}${photoPath}`;
@@ -47,24 +48,19 @@ const MasterPanel = ({ user }) => {
     fetchData();
   }, [API_URL]);
 
+  // ... (handlePasswordReset aur handleSystemUpdate function wahi rahenge)
   const handlePasswordReset = async (employeeId, targetName) => {
     const newPass = window.prompt(`Enter new password for ${targetName}:`);
     if (!newPass) return;
-    if (newPass.length < 4) return showMsg("Password too short (Min 4 chars)", "error");
-
+    if (newPass.length < 4) return showMsg("Password too short", "error");
     setActionLoading(true);
     try {
-      await axios.put(`${API_URL}/api/profile/password`, {
-        employeeId: employeeId,
-        password: newPass
-      });
-      showMsg(`Password for ${targetName} updated!`, "success");
+      await axios.put(`${API_URL}/api/profile/password`, { employeeId, password: newPass });
+      showMsg(`Password for ${targetName} updated!`);
       fetchData(); 
     } catch (err) {
-      showMsg("Reset Failed: " + (err.response?.data?.message || err.message), "error");
-    } finally {
-      setActionLoading(false);
-    }
+      showMsg("Reset Failed", "error");
+    } finally { setActionLoading(false); }
   };
 
   const handleSystemUpdate = async (employeeId, targetName, field, value) => {
@@ -75,13 +71,11 @@ const MasterPanel = ({ user }) => {
         adminAction: true, 
         adminName: user?.name
       });
-      showMsg(`System Updated: ${field.toUpperCase()} set to ${value}`, "success");
+      showMsg(`System Updated: ${field.toUpperCase()}`);
       fetchData(); 
     } catch (err) {
-      showMsg("System Error: " + err.message, "error");
-    } finally {
-      setActionLoading(false);
-    }
+      showMsg("System Error", "error");
+    } finally { setActionLoading(false); }
   };
 
   const filtered = users.filter(u => 
@@ -102,10 +96,15 @@ const MasterPanel = ({ user }) => {
       <div className="master-hero">
         <div className="hero-text">
           <h1>🛡️ Master Admin Control</h1>
-          <p>Global system management (Live MongoDB Engine)</p>
+          <p>Global system management & Database Backups</p>
         </div>
 
         <div className="admin-actions-area">
+          {/* 📥 BackupManager yahan add kiya hai */}
+          <div className="backup-section-wrapper">
+             <BackupManager />
+          </div>
+
           <input 
             type="text" 
             placeholder="Search System Users..." 
@@ -125,7 +124,6 @@ const MasterPanel = ({ user }) => {
             <div key={userItem._id} className={`user-control-card ${userItem.isBlocked ? 'is-blocked' : ''}`}>
               <div className="card-header">
                 <div className="user-profile-img">
-                   {/* 📸 Photo Fix applied here */}
                    {userItem.photo ? (
                      <img 
                        src={getPhotoURL(userItem.photo)} 
@@ -140,7 +138,6 @@ const MasterPanel = ({ user }) => {
                    <h3>{userItem.name}</h3>
                    <span>Emp ID: {userItem.employeeId}</span>
                 </div>
-                {/* Dynamic Role Badges */}
                 <div className={`role-pill ${userItem.role?.toLowerCase() || 'worker'}`}>
                   {userItem.role || 'Worker'}
                 </div>
@@ -163,13 +160,9 @@ const MasterPanel = ({ user }) => {
                 </div>
 
                 <div className="button-actions-group">
-                    <button 
-                      className="reset-pass-btn"
-                      onClick={() => handlePasswordReset(userItem.employeeId, userItem.name)}
-                    >
+                    <button className="reset-pass-btn" onClick={() => handlePasswordReset(userItem.employeeId, userItem.name)}>
                       🔑 Reset Password
                     </button>
-
                     <button 
                       className={`access-toggle-btn ${userItem.isBlocked ? 'btn-enable' : 'btn-disable'}`}
                       onClick={() => handleSystemUpdate(userItem.employeeId, userItem.name, 'isBlocked', !userItem.isBlocked)}
@@ -181,7 +174,7 @@ const MasterPanel = ({ user }) => {
               </div>
             </div>
           )) : (
-            <div className="no-data-msg">No users found matching your search.</div>
+            <div className="no-data-msg">No users found.</div>
           )}
         </div>
 
