@@ -19,6 +19,7 @@ import purchaseRoutes from "./routes/purchase.routes.js";
 import supplierRoutes from "./routes/supplier.routes.js";
 import aiRoutes from "./routes/ai.routes.js";
 import backupRoutes from "./routes/backup.routes.js";
+import transactionRoutes from "./routes/transaction.routes.js";
 
 // Initialize Config
 dotenv.config();
@@ -57,6 +58,7 @@ app.use("/api/suppliers", supplierRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/salary-payments", salaryRoutes);
 app.use("/api/backup", backupRoutes); 
+app.use('/api/transactions', transactionRoutes);
 
 // ✅ 5. Root Route (Health Check)
 app.get("/", (req, res) => {
