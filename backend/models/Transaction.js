@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const transactionSchema = new mongoose.Schema({
   // partyId: Atlas mein IDs string format mein ho sakti hain
   // Isliye hum ise String ya ObjectId dono ke liye support de rahe hain
-  _Id: { 
+  partyId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'Supplier', 
     required: true 

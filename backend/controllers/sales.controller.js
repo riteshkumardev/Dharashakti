@@ -1,6 +1,6 @@
 import Sale from "../models/Sale.js";
-import Transaction from "../models/Transaction.js"; // ✅ New Import
-import Supplier from "../models/Supplier.js";       // ✅ New Import (Customer/Party logic ke liye)
+import Transaction from "../models/Transaction.js"; 
+import Supplier from "../models/Supplier.js";      
 
 /* =========================================
     🔒 Helper: Number Conversion
@@ -30,7 +30,7 @@ export const addSale = async (req, res) => {
   try {
     const payload = req.body;
     const totalAmount = toSafeNumber(payload.totalPrice);
-    const paidAmount = toSafeNumber(payload.paidAmount); // Ensure frontend sends this
+    const paidAmount = toSafeNumber(payload.paidAmount); 
 
     // 1. Mapping Frontend fields to Backend Schema
     const sanitizedData = {
@@ -44,18 +44,17 @@ export const addSale = async (req, res) => {
     const sale = await Sale.create(sanitizedData);
 
     // 2. ✅ AUTOMATIC LEDGER LOGIC:
-    // Customer ko unke naam se dhundein
     const party = await Supplier.findOne({ name: payload.consigneeName });
 
     if (party) {
-      // Sales se party ki udhaari (Balance) badhti hai (Unhe paisa dena hai humein)
-      const initialBalance = toSafeNumber(party.currentBalance);
+      // Balance Fallback logic: totalOwed ya currentBalance check karein
+      const initialBalance = toSafeNumber(party.totalOwed ?? party.currentBalance);
       const newBalanceAfterSale = initialBalance + totalAmount;
 
-      // A. Transaction Entry (Maal bechne ki entry - Udhaari badhi)
+      // A. Transaction Entry (Debit/Udhaari badhi)
       const saleTransaction = new Transaction({
         partyId: party._id,
-        type: 'OUT', // Humne maal diya, ab paise lene hain
+        type: 'OUT', 
         amount: totalAmount,
         description: `Sale: Invoice No ${payload.billNo || 'N/A'}`,
         remainingBalance: newBalanceAfterSale,
@@ -63,12 +62,12 @@ export const addSale = async (req, res) => {
       });
       await saleTransaction.save();
 
-      // B. Agar customer ne turant kuch payment di hai
+      // B. Payment Entry (Agar payment turant mili hai)
       if (paidAmount > 0) {
         const finalBalance = newBalanceAfterSale - paidAmount;
         const paymentTransaction = new Transaction({
           partyId: party._id,
-          type: 'IN', // Paisa aaya toh unki udhaari kam hui
+          type: 'IN', 
           amount: paidAmount,
           description: `Payment Received for Invoice ${payload.billNo || 'N/A'}`,
           remainingBalance: finalBalance,
@@ -76,8 +75,10 @@ export const addSale = async (req, res) => {
         });
         await paymentTransaction.save();
         
+        party.totalOwed = finalBalance;
         party.currentBalance = finalBalance;
       } else {
+        party.totalOwed = newBalanceAfterSale;
         party.currentBalance = newBalanceAfterSale;
       }
 
@@ -107,12 +108,11 @@ export const getSales = async (req, res) => {
 };
 
 /* =========================================
-    3️⃣ UPDATE: Update Sale Only
+    3️⃣ UPDATE: Update Sale
    ========================================= */
 export const updateSale = async (req, res) => {
   try {
     const { id } = req.params;
-
     const updatedSale = await Sale.findByIdAndUpdate(id, req.body, { 
       new: true, 
       runValidators: true 
@@ -122,28 +122,43 @@ export const updateSale = async (req, res) => {
       return res.status(404).json({ success: false, message: "Sale record nahi mila" });
     }
 
-    res.json({ 
-      success: true, 
-      message: "Sale record updated independently", 
-      data: updatedSale 
-    });
+    res.json({ success: true, message: "Sale updated ✅", data: updatedSale });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
 };
 
 /* =========================================
-    4️⃣ DELETE: Delete Sale Only
+    4️⃣ DELETE: Delete Sale
    ========================================= */
 export const deleteSale = async (req, res) => {
   try {
     const sale = await Sale.findByIdAndDelete(req.params.id);
-    
     if (!sale) {
       return res.status(404).json({ success: false, message: "Sale nahi mili" });
     }
+    res.json({ success: true, message: "Sale deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
-    res.json({ success: true, message: "Sale record deleted successfully" });
+/* =========================================
+    🧹 5️⃣ DATA CLEANUP (Fix for SyntaxError)
+   ========================================= */
+export const migrateSalesData = async (req, res) => {
+  try {
+    const sales = await Sale.find({});
+    let updateCount = 0;
+
+    for (const sale of sales) {
+      if (sale.totalPrice !== undefined && (!sale.totalAmount || sale.totalAmount === 0)) {
+        await Sale.findByIdAndUpdate(sale._id, { $set: { totalAmount: sale.totalPrice } });
+        updateCount++;
+      }
+    }
+
+    res.json({ success: true, message: `${updateCount} records fixed successfully ✅` });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
