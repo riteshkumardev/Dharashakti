@@ -147,6 +147,10 @@ const DashboardSidebar = ({ closeSidebar }) => {
             <li onClick={() => handleNavigate("/expenses")}>➤ Expenses</li>
             <li onClick={() => handleNavigate("/profit-loss")}>➤ Profit & Loss</li>
             <li onClick={() => handleNavigate("/Reports_Printing")}>➤ Reports & Printing</li>
+            <li onClick={() => handleNavigate("/profit-loss")}>➤ Profit & Loss</li>
+            <li onClick={() => handleNavigate("/transaction-history")}>➤ Transaction History</li>
+            <li onClick={() => handleNavigate("/add-transaction")}>➤ Add Transaction</li>
+            
           </ul>
         )}
       </div>

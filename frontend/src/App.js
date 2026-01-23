@@ -26,6 +26,8 @@ import Reports_Printing from "./component/Reports_Printing/Reports_Printing";
 
 import InvoicePage from "./component/Invoice/InvoicePage";
 import SupplierManager from "./component/Supplier/SupplierManager";
+import AddTransaction from "./component/AddTransaction/AddTransaction";
+import TransactionHistory from "./component/AddTransaction/TransactionHistory";
 
 function App() {
   // ✅ SAFE localStorage read (NO JSON crash)
@@ -170,8 +172,11 @@ function App() {
             {/* ADMIN ONLY */}
             <Route path="/master-panel" element={<ProtectedRoute adminOnly><MasterPanel user={user} /></ProtectedRoute>} />
             <Route path="/employee-add" element={<ProtectedRoute adminOnly><EmployeeAdd role={user?.role} /></ProtectedRoute>} />
+            <Route path="/add-transaction" element={<ProtectedRoute adminOnly><AddTransaction user={user} /></ProtectedRoute>} />
+            <Route path="/transaction-history" element={<ProtectedRoute adminOnly><TransactionHistory role={user?.role} /></ProtectedRoute>} />
 
             {/* FALLBACK */}
+            
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
