@@ -1,4 +1,6 @@
 import Sale from "../models/Sale.js";
+import Transaction from "../models/Transaction.js"; // ✅ New Import
+import Supplier from "../models/Supplier.js";       // ✅ New Import (Customer/Party logic ke liye)
 
 /* =========================================
     🔒 Helper: Number Conversion
@@ -22,27 +24,69 @@ export const getLatestBillNo = async (req, res) => {
 };
 
 /* =========================================
-    1️⃣ CREATE: Add Sale (Independent)
+    1️⃣ CREATE: Add Sale (Linked with Ledger)
    ========================================= */
 export const addSale = async (req, res) => {
   try {
     const payload = req.body;
+    const totalAmount = toSafeNumber(payload.totalPrice);
+    const paidAmount = toSafeNumber(payload.paidAmount); // Ensure frontend sends this
 
-    // Mapping Frontend fields to Backend Schema
+    // 1. Mapping Frontend fields to Backend Schema
     const sanitizedData = {
       ...payload,
       freight: toSafeNumber(payload.travelingCost),
       buyerOrderDate: payload.orderDate || "-",
       dispatchDate: payload.deliveryNoteDate || "-",
-      totalAmount: toSafeNumber(payload.totalPrice),
+      totalAmount: totalAmount,
     };
 
-    // Sirf Sale record create hoga, Stock deduction logic hata di gayi hai
     const sale = await Sale.create(sanitizedData);
+
+    // 2. ✅ AUTOMATIC LEDGER LOGIC:
+    // Customer ko unke naam se dhundein
+    const party = await Supplier.findOne({ name: payload.consigneeName });
+
+    if (party) {
+      // Sales se party ki udhaari (Balance) badhti hai (Unhe paisa dena hai humein)
+      const initialBalance = toSafeNumber(party.currentBalance);
+      const newBalanceAfterSale = initialBalance + totalAmount;
+
+      // A. Transaction Entry (Maal bechne ki entry - Udhaari badhi)
+      const saleTransaction = new Transaction({
+        partyId: party._id,
+        type: 'OUT', // Humne maal diya, ab paise lene hain
+        amount: totalAmount,
+        description: `Sale: Invoice No ${payload.billNo || 'N/A'}`,
+        remainingBalance: newBalanceAfterSale,
+        paymentMethod: "Credit"
+      });
+      await saleTransaction.save();
+
+      // B. Agar customer ne turant kuch payment di hai
+      if (paidAmount > 0) {
+        const finalBalance = newBalanceAfterSale - paidAmount;
+        const paymentTransaction = new Transaction({
+          partyId: party._id,
+          type: 'IN', // Paisa aaya toh unki udhaari kam hui
+          amount: paidAmount,
+          description: `Payment Received for Invoice ${payload.billNo || 'N/A'}`,
+          remainingBalance: finalBalance,
+          paymentMethod: payload.paymentMethod || "Cash"
+        });
+        await paymentTransaction.save();
+        
+        party.currentBalance = finalBalance;
+      } else {
+        party.currentBalance = newBalanceAfterSale;
+      }
+
+      await party.save();
+    }
 
     res.status(201).json({ 
       success: true, 
-      message: "Sale recorded successfully (No stock adjustment)", 
+      message: "Sale recorded & Ledger updated successfully ✅", 
       data: sale 
     });
   } catch (error) {
@@ -69,7 +113,6 @@ export const updateSale = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Stock re-adjustment ka pura code yahan se remove kar diya gaya hai
     const updatedSale = await Sale.findByIdAndUpdate(id, req.body, { 
       new: true, 
       runValidators: true 
@@ -100,37 +143,7 @@ export const deleteSale = async (req, res) => {
       return res.status(404).json({ success: false, message: "Sale nahi mili" });
     }
 
-    // Restore Stock ka code yahan se hata diya gaya hai
     res.json({ success: true, message: "Sale record deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-/* =========================================
-    🧹 DATA CLEANUP: One-Time Data Migration
-   ========================================= */
-export const migrateSalesData = async (req, res) => {
-  try {
-    const sales = await Sale.find({});
-    let updateCount = 0;
-
-    for (const sale of sales) {
-      const updateData = {};
-      let needsUpdate = false;
-
-      if (sale.totalPrice !== undefined && sale.totalAmount === 0) {
-        updateData.totalAmount = sale.totalPrice;
-        needsUpdate = true;
-      }
-
-      if (needsUpdate) {
-        await Sale.findByIdAndUpdate(sale._id, { $set: updateData });
-        updateCount++;
-      }
-    }
-
-    res.json({ success: true, message: `${updateCount} records fixed successfully` });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
