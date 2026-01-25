@@ -4,7 +4,8 @@ import Loader from "./Core_Component/Loader/Loader";
 import { useNavigate } from "react-router-dom";
 import "../App.css";
 import OverdueAlerts from "./Core_Component/Alert/OverdueAlerts";
-import BackupRestoreBot from "./BackupButton/BackupRestoreBot";
+
+import MasterSmartBot from "./Bot/MasterSmartBot";
 
 const Home = ({ user }) => {
   const navigate = useNavigate();
@@ -133,7 +134,7 @@ const Home = ({ user }) => {
         </div>
 
       </section>
-  <BackupRestoreBot />
+  <MasterSmartBot />
     </div>
   );
 };
