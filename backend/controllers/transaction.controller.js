@@ -4,32 +4,34 @@ import Sale from '../models/Sale.js';
 import Purchase from '../models/Purchase.js';
 import mongoose from 'mongoose';
 
-/* =============================================
-    1️⃣ CREATE: Smart Transaction with Full Sync
-   ============================================= */
+/**
+ * ✅ CREATE: Smart Transaction with Precise Sync
+ * Supplier Balance, Ledger, aur Sales/Purchases teeno ko sync karta hai.
+ */
 export const addTransaction = async (req, res) => {
   const session = await mongoose.startSession();
-  session.startTransaction(); // ✅ Data Integrity ke liye Transaction shuru karein
+  session.startTransaction(); 
 
   try {
     const { partyId, amount, type, description, paymentMethod, linkTo } = req.body;
-    const amt = Number(amount);
+    const transactionAmount = Number(amount);
 
-    // 1. Party/Supplier ko session ke saath dhoondein
-    const party = await Supplier.findById(partyId).session(session);
-    if (!party) {
-      throw new Error("Party database mein nahi mili");
+    if (!partyId || transactionAmount <= 0) {
+      throw new Error("Invalid Party ID or Amount");
     }
 
-    // 2. Balance Calculation Logic
-    // IN (Payment Received) -> Udhaari kam | OUT (Payment Given) -> Udhaari badhi
-    let currentBal = party.totalOwed ?? party.currentBalance ?? 0;
-    let newBalance = type === 'IN' ? Number(currentBal) - amt : Number(currentBal) + amt;
+    // 1. Party Fetch (Session ke saath)
+    const party = await Supplier.findById(partyId).session(session);
+    if (!party) throw new Error("Party database mein nahi mili");
 
-    // 3. Save Transaction Entry (Ledger Passbook)
-    const [transaction] = await Transaction.create([{
+    // 2. Precise Balance Calculation
+    const currentBalance = Number(party.totalOwed || party.currentBalance || 0);
+    const newBalance = type === 'IN' ? currentBalance - transactionAmount : currentBalance + transactionAmount;
+
+    // 3. Create Ledger Entry
+    await Transaction.create([{
       partyId: party._id,
-      amount: amt,
+      amount: transactionAmount,
       type,
       description: description || `Manual Entry (${linkTo || 'General'})`,
       paymentMethod: paymentMethod || "Cash",
@@ -37,54 +39,51 @@ export const addTransaction = async (req, res) => {
       date: new Date()
     }], { session });
 
-    // 4. ✅ SMART SYNC: Sale ya Purchase table update karein (Schema Fields Fix)
+    // 4. ✅ MASTER SYNC: Aapke provided JSON data fields ke mutabiq
+    
+    // A. SALE TABLE SYNC (customerName match hona chahiye)
     if (linkTo === 'sale' && type === 'IN') {
-      // Latest pending sale dhundein jiska balance bacha ho
       const latestSale = await Sale.findOne({ 
-        $or: [{ customerName: party.name }, { consigneeName: party.name }],
-        $expr: { $gt: ["$totalAmount", "$amountReceived"] } // Check if amountReceived < totalAmount
+        customerName: party.name, 
+        $expr: { $gt: ["$totalAmount", "$amountReceived"] } 
       }).sort({ createdAt: -1 }).session(session);
 
       if (latestSale) {
-        // Aapke Sale Schema ke fields update karein
-        latestSale.amountReceived = (Number(latestSale.amountReceived) || 0) + amt;
+        latestSale.amountReceived = (Number(latestSale.amountReceived) || 0) + transactionAmount;
+        // recalculation middleware (pre-save hook) ke liye automated logic
         latestSale.paymentDue = Number(latestSale.totalAmount) - latestSale.amountReceived;
         await latestSale.save({ session });
       }
     } 
+    // B. PURCHASE TABLE SYNC (supplierName match hona chahiye)
     else if (linkTo === 'purchase' && type === 'OUT') {
-      // Latest pending purchase dhundein
       const latestPurchase = await Purchase.findOne({ 
-        supplierName: party.name,
+        supplierName: party.name, 
         $expr: { $gt: ["$totalAmount", "$paidAmount"] }
       }).sort({ createdAt: -1 }).session(session);
 
       if (latestPurchase) {
-        // Purchase Schema ke fields update karein
-        latestPurchase.paidAmount = (Number(latestPurchase.paidAmount) || 0) + amt;
+        latestPurchase.paidAmount = (Number(latestPurchase.paidAmount) || 0) + transactionAmount;
         latestPurchase.balanceAmount = Number(latestPurchase.totalAmount) - latestPurchase.paidAmount;
         await latestPurchase.save({ session });
       }
     }
 
-    // 5. Supplier Balance Fields ko Sync karein
+    // 5. Supplier Master Balance Update
     party.totalOwed = newBalance;
-    party.currentBalance = newBalance; // Dono fields update karna zaroori hai
+    party.currentBalance = newBalance;
     if (party.currentBillsTotal !== undefined) party.currentBillsTotal = newBalance;
     
     await party.save({ session });
 
-    // ✅ Commit all changes
     await session.commitTransaction();
-    
     res.status(201).json({ 
       success: true, 
-      message: `Transaction saved and ${linkTo || 'Ledger'} updated successfully ✅`,
+      message: `Transaction saved and ${linkTo} updated ✅`,
       updatedBalance: newBalance 
     });
 
   } catch (error) {
-    // ❌ Error aane par saara badlav cancel karein
     await session.abortTransaction();
     console.error("Smart Sync Error:", error.message);
     res.status(500).json({ success: false, message: error.message });
@@ -93,17 +92,15 @@ export const addTransaction = async (req, res) => {
   }
 };
 
-/* =============================================
-    2️⃣ READ: Get Transaction History
-   ============================================= */
+/**
+ * ✅ READ: Get Transaction History
+ */
 export const getTransactionHistory = async (req, res) => {
   try {
     const { id } = req.params; 
-    // Party-wise history descending date order mein
     const history = await Transaction.find({ partyId: id }).sort({ date: -1 });
     res.status(200).json(history);
   } catch (error) {
-    console.error("History Fetch Error:", error.message);
     res.status(500).json({ success: false, message: "History load nahi ho saki" });
   }
 };
