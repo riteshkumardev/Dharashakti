@@ -6,6 +6,7 @@ import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 
 import './MasterPanel.css';
 import BackupManager from '../BackupButton/BackupManager';
+import BackupRestoreBot from '../Bot/BackupRestoreBot';
 
 const MasterPanel = ({ user }) => { 
   const navigate = useNavigate(); 
@@ -198,6 +199,7 @@ const MasterPanel = ({ user }) => {
         severity={snackbar.severity} 
         onClose={() => setSnackbar({ ...snackbar, open: false })} 
       />
+      <BackupRestoreBot />
     </div>
   );
 };
