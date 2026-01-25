@@ -182,7 +182,7 @@
 .neo-wrapper {
   display: flex;
   justify-content: center;
-  padding: 40px;
+  /* padding: 40px; */
   background: #e0e5ec; /* Classic Neo color */
 }
 
@@ -283,4 +283,22 @@
 .neo-submit:active {
   box-shadow: inset 4px 4px 8px #2b44a8, inset -4px -4px 8px #5d88ff;
   transform: translateY(2px);
+}
+/* Add this to your existing AddTransaction.css */
+
+.neo-input[type="date"] {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #4466f2; /* Professional blue for date text */
+  cursor: pointer;
+}
+
+/* Specific styling for the date picker icon (Chrome/Edge) */
+.neo-input::-webkit-calendar-picker-indicator {
+  filter: invert(30%) sepia(80%) saturate(500%) hue-rotate(220deg);
+  cursor: pointer;
+}
+
+.neo-input:focus {
+  box-shadow: inset 2px 2px 5px #bec3c9, inset -2px -2px 5px #ffffff;
+  border: 1px solid rgba(68, 102, 242, 0.3);
 }

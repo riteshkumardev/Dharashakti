@@ -5,11 +5,16 @@ import './AddTransaction.css';
 const AddTransaction = ({ onTransactionAdded }) => {
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(false);
+  
+  // Today's date as default (YYYY-MM-DD format)
+  const today = new Date().toISOString().split('T')[0];
+
   const [formData, setFormData] = useState({
     partyId: '',
     amount: '',
     description: '',
-    linkTo: 'sale' // Default sale rakha hai
+    linkTo: 'sale',
+    date: today // ✅ Default date set to today
   });
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -55,10 +60,9 @@ const AddTransaction = ({ onTransactionAdded }) => {
 
       if (response.data.success) {
         alert(`✅ Success! ${formData.linkTo.toUpperCase()} Updated.`);
-        // Form Reset
-        setFormData({ partyId: '', amount: '', description: '', linkTo: 'sale' });
+        setFormData({ partyId: '', amount: '', description: '', linkTo: 'sale', date: today });
         
-        // 🔄 Refresh Data: Dono fetch call trigger honge
+        // 🔄 Refresh Data
         fetchParties(); 
         if (onTransactionAdded) onTransactionAdded();
       }
@@ -78,6 +82,19 @@ const AddTransaction = ({ onTransactionAdded }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="neo-form">
+          {/* ✅ New: Date Input Field */}
+          <div className="neo-input-group">
+            <label>Transaction Date</label>
+            <input 
+              name="date"
+              type="date"
+              className="neo-input"
+              value={formData.date}
+              onChange={handleInputChange}
+              required
+            />
+          </div>
+
           <div className="neo-input-group">
             <label>Choose Party</label>
             <select 
