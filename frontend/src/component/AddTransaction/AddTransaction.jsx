@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import './AddTransaction.css';
 
@@ -7,47 +7,59 @@ const AddTransaction = ({ onTransactionAdded }) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     partyId: '',
-    type: 'IN', 
     amount: '',
-    paymentMethod: 'Cash',
     description: '',
-    linkTo: 'none' // ✅ New: konsi table update karni hai
+    linkTo: 'sale' // Default sale rakha hai
   });
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-  useEffect(() => {
-    const fetchParties = async () => {
-      try {
-        setLoading(true);
-        const res = await axios.get(`${API_BASE_URL}/api/suppliers/list`); 
-        if (res.data && res.data.success) {
-          setParties(res.data.data);
-        }
-      } catch (err) {
-        console.error("Suppliers load error:", err);
-      } finally {
-        setLoading(false);
+  const fetchParties = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API_BASE_URL}/api/suppliers/list`); 
+      if (res.data?.success) {
+        setParties(res.data.data);
       }
-    };
-    fetchParties();
+    } catch (err) {
+      console.error("Suppliers load error:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [API_BASE_URL]);
+
+  useEffect(() => {
+    fetchParties();
+  }, [fetchParties]);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.partyId || !formData.amount) return alert("Please fill all details");
+    const amt = Number(formData.amount);
+    if (!formData.partyId || amt <= 0) return alert("Sahi Party aur Amount bharein");
+
+    // Fix Logic: Sale hai toh IN, Purchase hai toh OUT
+    const transactionType = formData.linkTo === 'sale' ? 'IN' : 'OUT';
 
     try {
       setLoading(true);
-      // ✅ Backend call jo Supplier, Ledger, aur Sale/Purchase teeno ko update karega
       const response = await axios.post(`${API_BASE_URL}/api/transactions/add-with-sync`, {
         ...formData,
-        amount: Number(formData.amount)
+        type: transactionType,
+        amount: amt
       });
 
       if (response.data.success) {
-        alert(`✅ Success! Party Balance & ${formData.linkTo} records updated.`);
-        setFormData({ partyId: '', type: 'IN', amount: '', paymentMethod: 'Cash', description: '', linkTo: 'none' });
+        alert(`✅ Success! ${formData.linkTo.toUpperCase()} Updated.`);
+        // Form Reset
+        setFormData({ partyId: '', amount: '', description: '', linkTo: 'sale' });
+        
+        // 🔄 Refresh Data: Dono fetch call trigger honge
+        fetchParties(); 
         if (onTransactionAdded) onTransactionAdded();
       }
     } catch (err) {
@@ -58,76 +70,77 @@ const AddTransaction = ({ onTransactionAdded }) => {
   };
 
   return (
-    <div className="ledger-wrapper">
-      <div className="ledger-card shadow-2xl border-t-4 border-blue-600 p-6 bg-white rounded-2xl">
-        <h2 className="text-xl font-black mb-6 text-gray-800 uppercase tracking-tight flex items-center gap-2">
-          <span>💸</span> Smart Payment Sync
-        </h2>
+    <div className="neo-wrapper">
+      <div className="neo-card">
+        <div className="neo-header">
+          <span className="neo-icon">💎</span>
+          <h2>3D Smart Sync</h2>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            
-            {/* Party Selection */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-gray-400 uppercase">Party Name</label>
-              <select 
-                className="w-full border-2 border-gray-100 rounded-xl p-3 font-bold text-gray-700 bg-gray-50"
-                value={formData.partyId}
-                onChange={(e) => setFormData({...formData, partyId: e.target.value})}
-                required
-              >
-                <option value="">-- Select Party --</option>
-                {parties.map(p => (
-                  <option key={p._id} value={p._id}>{p.name} (Bal: ₹{p.totalOwed || 0})</option>
-                ))}
-              </select>
-            </div>
+        <form onSubmit={handleSubmit} className="neo-form">
+          <div className="neo-input-group">
+            <label>Choose Party</label>
+            <select 
+              name="partyId"
+              className="neo-select"
+              value={formData.partyId}
+              onChange={handleInputChange}
+              required
+            >
+              <option value="">Select Party</option>
+              {parties.map(p => (
+                <option key={p._id} value={p._id}>
+                  {p.name} (Bal: ₹{p.totalOwed || 0})
+                </option>
+              ))}
+            </select>
+          </div>
 
-            {/* ✅ Sync Target Selection */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-blue-500 uppercase">Sync with Table?</label>
-              <select 
-                className="w-full border-2 border-blue-100 rounded-xl p-3 font-bold text-blue-700 bg-blue-50"
-                value={formData.linkTo}
-                onChange={(e) => setFormData({...formData, linkTo: e.target.value})}
-              >
-                <option value="none">Ledger Only (General)</option>
-                <option value="sale">Update Sales Balance</option>
-                <option value="purchase">Update Purchase Balance</option>
-              </select>
+          <div className="neo-input-group">
+            <label>Transaction Category</label>
+            <div className="neo-radio-group">
+              <label className={`neo-radio ${formData.linkTo === 'sale' ? 'active-sale' : ''}`}>
+                <input 
+                  type="radio" 
+                  name="linkTo" 
+                  value="sale" 
+                  checked={formData.linkTo === 'sale'} 
+                  onChange={handleInputChange} 
+                />
+                Sales (Money In)
+              </label>
+              <label className={`neo-radio ${formData.linkTo === 'purchase' ? 'active-pur' : ''}`}>
+                <input 
+                  type="radio" 
+                  name="linkTo" 
+                  value="purchase" 
+                  checked={formData.linkTo === 'purchase'} 
+                  onChange={handleInputChange} 
+                />
+                Purchase (Money Out)
+              </label>
             </div>
+          </div>
 
-            {/* Type & Amount */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-gray-400 uppercase">Type</label>
-              <select 
-                className={`w-full border-2 rounded-xl p-3 font-bold ${formData.type === 'IN' ? 'text-green-600 bg-green-50 border-green-200' : 'text-red-600 bg-red-50 border-red-200'}`}
-                value={formData.type}
-                onChange={(e) => setFormData({...formData, type: e.target.value})}
-              >
-                <option value="IN">Received (IN)</option>
-                <option value="OUT">Paid (OUT)</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-gray-400 uppercase">Amount (₹)</label>
-              <input 
-                type="number" 
-                className="w-full border-2 border-gray-100 rounded-xl p-3 font-black text-lg"
-                value={formData.amount}
-                onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                required 
-              />
-            </div>
+          <div className="neo-input-group">
+            <label>Amount (₹)</label>
+            <input 
+              name="amount"
+              type="number" 
+              className="neo-input"
+              placeholder="Enter Amount"
+              value={formData.amount}
+              onChange={handleInputChange}
+              required 
+            />
           </div>
 
           <button 
             type="submit" 
-            className={`w-full py-4 rounded-xl font-black text-white transition-all shadow-lg ${loading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'}`}
+            className={`neo-submit ${loading ? 'loading' : ''}`}
             disabled={loading}
           >
-            {loading ? 'SYNCING ALL TABLES...' : 'SAVE & SYNC EVERYWHERE'}
+            {loading ? 'SYNCING...' : 'CONFIRM TRANSACTION'}
           </button>
         </form>
       </div>
