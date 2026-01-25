@@ -1,102 +1,116 @@
-import Employee from "../models/epmloyee.js"; // Fixed typo to match your file name
+import Employee from "../models/epmloyee.js"; 
 import ActivityLog from "../models/activityLog.js";
-
-/**   
- * ✅ 1. Get All Employees for Master Panel
- */
-export const getAllEmployees = async (req, res) => {
-  try {
-    const employees = await Employee.find().sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: employees });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Error fetching employees" });
-  }
-};
+import bcrypt from "bcryptjs"; // Password security ke liye
 
 /**
- * ✅ 2. Admin Update: Change Role or Block Status
- */
-export const updateEmployeeStatus = async (req, res) => {
-  try {
-    const { employeeId } = req.params;
-    const { role, isBlocked, adminName } = req.body;
-
-    const updatedEmployee = await Employee.findOneAndUpdate(
-      { employeeId: employeeId },
-      { role, isBlocked },
-      { new: true }
-    );
-
-    if (!updatedEmployee) {
-      return res.status(404).json({ success: false, message: "Employee not found" });
-    }
-
-    // Record admin activity
-    await ActivityLog.create({
-      adminName: adminName || "Admin",
-      action: `Updated ${updatedEmployee.name}: Role to ${role}, Blocked: ${isBlocked}`,
-      targetEmployeeId: employeeId
-    });
-
-    res.status(200).json({ success: true, data: updatedEmployee });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Update failed" });
-  }
-};
-export const deleteEmployee = async (req, res) => {
-  try {
-    const { id } = req.params;
-   await Employee.findByIdAndDelete(id);
-    res.status(200).json({ success: true, message: "Employee Deleted" });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Delete failed" });
-  }
-};
-
-/**
- * ✅ 3. Create New Employee (Registration)
- */
+ * ✅ 1. CREATE: Naya Employee Registration (With Security)
+ */
 export const createEmployee = async (req, res) => {
-  try {
-    const {
-      name, fatherName, phone, emergencyPhone, aadhar, address,
-      designation, joiningDate, salary, bankName, accountNo,
-      ifscCode, photo, password, role
-    } = req.body;
+  try {
+    const {
+      name, aadhar, salary, password, role, designation
+    } = req.body;
 
-    if (!name || !aadhar || !salary || !password) {
-      return res.status(400).json({ success: false, message: "Required fields missing" });
-    }
+    // Validation
+    if (!name || !aadhar || !salary || !password) {
+      return res.status(400).json({ success: false, message: "Required fields missing" });
+    }
 
-    const existing = await Employee.findOne({ aadhar });
-    if (existing) {
-      return res.status(409).json({ success: false, message: "Aadhar already exists" });
-    }
+    // Check Duplicate Aadhar
+    const existing = await Employee.findOne({ aadhar });
+    if (existing) {
+      return res.status(409).json({ success: false, message: "Aadhar already exists" });
+    }
 
-    let employeeId;
-    let exists = true;
-    while (exists) {
-      employeeId = Math.floor(10000000 + Math.random() * 90000000).toString();
-      exists = await Employee.findOne({ employeeId });
-    }
+    // 🔒 Password Hashing (Security Update)
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    const employee = await Employee.create({
-      employeeId, name, fatherName, phone, emergencyPhone, aadhar,
-      address, designation, joiningDate, salary, bankName,
-      accountNo, ifscCode, photo, password,
-      // FIX: Use the designation as the role if role is not provided
-      role: role || designation || "Worker", 
-      isBlocked: false,
-    });
+    // Unique Employee ID Generator
+    let employeeId;
+    let exists = true;
+    while (exists) {
+      employeeId = Math.floor(10000000 + Math.random() * 90000000).toString();
+      exists = await Employee.findOne({ employeeId });
+    }
 
-    res.status(201).json({
-      success: true,
-      message: "Employee registered successfully",
-      employeeId: employee.employeeId,
-      data: employee,
-    });
-  } catch (error) {
-    console.error("Employee Create Error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
+    const employee = await Employee.create({
+      ...req.body,
+      employeeId,
+      password: hashedPassword, // Secure password
+      salary: Number(salary),
+      role: role || designation || "Worker", 
+      isBlocked: false,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Employee registered successfully ✅",
+      employeeId: employee.employeeId,
+      data: employee
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error: " + error.message });
+  }
+};
+
+/**
+ * ✅ 2. READ: Get All Employees
+ */
+export const getAllEmployees = async (req, res) => {
+  try {
+    const employees = await Employee.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: employees });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error fetching employees" });
+  }
+};
+
+/**
+ * ✅ 3. UPDATE: Admin Control (Role/Block Status)
+ */
+export const updateEmployeeStatus = async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const { role, isBlocked, adminName } = req.body;
+
+    const updatedEmployee = await Employee.findOneAndUpdate(
+      { employeeId: employeeId },
+      { role, isBlocked },
+      { new: true }
+    );
+
+    if (!updatedEmployee) {
+      return res.status(404).json({ success: false, message: "Employee not found" });
+    }
+
+    // Record Activity Log
+    await ActivityLog.create({
+      adminName: adminName || "Admin",
+      action: `Update: ${updatedEmployee.name} -> Role: ${role}, Blocked: ${isBlocked}`,
+      targetEmployeeId: employeeId
+    });
+
+    res.status(200).json({ success: true, data: updatedEmployee });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Update failed" });
+  }
+};
+
+/**
+ * ✅ 4. DELETE: Remove Employee
+ */
+export const deleteEmployee = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const employee = await Employee.findByIdAndDelete(id);
+    
+    if (!employee) {
+        return res.status(404).json({ success: false, message: "Employee not found" });
+    }
+
+    res.status(200).json({ success: true, message: "Employee Deleted Successfully 🗑️" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Delete failed" });
+  }
 };

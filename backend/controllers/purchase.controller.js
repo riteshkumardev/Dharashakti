@@ -1,83 +1,82 @@
+import mongoose from "mongoose";
 import Purchase from "../models/Purchase.js";
-import Transaction from "../models/Transaction.js"; // ✅ New Import
-import Supplier from "../models/Supplier.js";       // ✅ New Import
+import Transaction from "../models/Transaction.js"; 
+import Supplier from "../models/Supplier.js";      
 
 /* =============================================
-    ➕ ADD PURCHASE (With Automatic Ledger Link)
+    ➕ ADD PURCHASE (With Atomic Transaction)
 ============================================= */
 export const addPurchase = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const {
-      date, supplierName, gstin, mobile, address, productName,
-      billNo, vehicleNo, quantity = 0, rate = 0, travelingCost = 0,
-      cashDiscount = 0, totalAmount = 0, paidAmount = 0, balanceAmount = 0, remarks
-    } = req.body;
+    const payload = req.body;
+    const totalAmount = Number(payload.totalAmount || 0);
+    const paidAmount = Number(payload.paidAmount || 0);
 
-    // 1. Purchase record create karein
-    const purchase = await Purchase.create({
-      date, supplierName, gstin, mobile, address, productName,
-      billNo, vehicleNo,
-      quantity: Number(quantity),
-      rate: Number(rate),
-      travelingCost: Number(travelingCost),
-      cashDiscount: Number(cashDiscount),
-      totalAmount: Number(totalAmount),
-      paidAmount: Number(paidAmount),
-      balanceAmount: Number(balanceAmount),
-      remarks
-    });
+    // 1. Purchase record create karein session ke saath
+    const [purchase] = await Purchase.create([{
+      ...payload,
+      quantity: Number(payload.quantity || 0),
+      rate: Number(payload.rate || 0),
+      totalAmount: totalAmount,
+      paidAmount: paidAmount,
+    }], { session });
 
-    // 2. ✅ AUTOMATIC LEDGER LOGIC:
-    // Supplier ko unke naam ya mobile se dhundein
+    // 2. Supplier Find & Ledger Update
     const supplier = await Supplier.findOne({ 
-      $or: [{ name: supplierName }, { mobile: mobile }] 
-    });
+      $or: [{ name: payload.supplierName }, { mobile: payload.mobile }] 
+    }).session(session);
 
     if (supplier) {
-      // Naya balance calculate karein (Total Bill Amount udhaari badhayega)
-      const newBalance = Number(supplier.currentBalance || 0) + Number(totalAmount);
+      const initialBalance = Number(supplier.currentBalance || 0);
+      const newBalanceAfterPurchase = initialBalance + totalAmount;
 
-      // A. Transaction Entry (Maal khareedne ki entry)
-      const purchaseTransaction = new Transaction({
+      const transactions = [];
+
+      // A. Purchase Transaction (OUT - Udhaari Badhi)
+      transactions.push({
         partyId: supplier._id,
-        type: 'OUT', // Maal aaya matlab paisa dena banta hai
-        amount: Number(totalAmount),
-        description: `Purchase: Bill No ${billNo} (${productName})`,
-        remainingBalance: newBalance,
-        paymentMethod: "Credit"
+        purchaseId: purchase._id, // Reference link tracking ke liye
+        type: 'OUT', 
+        amount: totalAmount,
+        description: `Purchase: Bill No ${payload.billNo || 'N/A'} (${payload.productName || 'Goods'})`,
+        remainingBalance: newBalanceAfterPurchase,
+        paymentMethod: "Credit",
+        date: payload.date || new Date()
       });
-      await purchaseTransaction.save();
 
-      // B. Agar kuch Cash Payment di hai, toh uski bhi entry karein
-      if (Number(paidAmount) > 0) {
-        const finalBalance = newBalance - Number(paidAmount);
-        const paymentTransaction = new Transaction({
+      let finalBalance = newBalanceAfterPurchase;
+
+      // B. Payment Transaction (IN - Agar cash/bank se payment di)
+      if (paidAmount > 0) {
+        finalBalance = newBalanceAfterPurchase - paidAmount;
+        transactions.push({
           partyId: supplier._id,
-          type: 'IN', // Paisa diya toh udhaari kam hui
-          amount: Number(paidAmount),
-          description: `Paid for Bill No ${billNo}`,
+          purchaseId: purchase._id,
+          type: 'IN', 
+          amount: paidAmount,
+          description: `Paid for Bill No ${payload.billNo || 'N/A'}`,
           remainingBalance: finalBalance,
-          paymentMethod: "Cash/Bank"
+          paymentMethod: payload.paymentMethod || "Cash/Bank",
+          date: payload.date || new Date()
         });
-        await paymentTransaction.save();
-        
-        // Supplier ka main balance update karein
-        supplier.currentBalance = finalBalance;
-      } else {
-        supplier.currentBalance = newBalance;
       }
 
-      await supplier.save();
+      await Transaction.insertMany(transactions, { session });
+      supplier.currentBalance = finalBalance;
+      await supplier.save({ session });
     }
 
-    res.status(201).json({
-      success: true,
-      message: "Purchase saved & Ledger updated successfully ✅",
-      purchase
-    });
+    await session.commitTransaction();
+    res.status(201).json({ success: true, message: "Purchase & Ledger updated ✅", data: purchase });
 
   } catch (error) {
+    await session.abortTransaction();
     res.status(400).json({ success: false, message: error.message });
+  } finally {
+    session.endSession();
   }
 };
 
@@ -98,52 +97,91 @@ export const getPurchases = async (req, res) => {
 };
 
 /* =============================================
-    🛠 UPDATE PURCHASE (Linked with Ledger)
+    🛠 UPDATE PURCHASE (Linked with Ledger Adjustment)
 ============================================= */
 export const updatePurchase = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const { id } = req.params;
-    const oldPurchase = await Purchase.findById(id);
+    const oldPurchase = await Purchase.findById(id).session(session);
     
-    if (!oldPurchase)
-      return res.status(404).json({ success: false, message: "Record not found" });
+    if (!oldPurchase) throw new Error("Record not found");
 
-    // Note: Update logic mein ledger balance adjust karna complex hota hai. 
-    // Isliye best practice hai ki aap purani entries ko 'Daily Cashbook' se manage karein.
+    // Supplier balance reverse karein naye update se pehle
+    const supplier = await Supplier.findOne({ 
+        $or: [{ name: oldPurchase.supplierName }, { mobile: oldPurchase.mobile }] 
+    }).session(session);
+
+    if (supplier) {
+        supplier.currentBalance = (supplier.currentBalance || 0) - Number(oldPurchase.totalAmount) + Number(oldPurchase.paidAmount);
+        await supplier.save({ session });
+    }
     
-    const updatedPurchase = await Purchase.findByIdAndUpdate(
-      id,
-      { ...req.body },
-      { new: true, runValidators: true }
-    );
+    const updatedPurchase = await Purchase.findByIdAndUpdate(id, req.body, { new: true, session });
 
-    res.json({
-      success: true,
-      message: "Purchase record updated ✅",
-      data: updatedPurchase
-    });
+    // Naya balance apply karein
+    if (supplier) {
+        supplier.currentBalance = (supplier.currentBalance || 0) + Number(updatedPurchase.totalAmount) - Number(updatedPurchase.paidAmount);
+        await supplier.save({ session });
+
+        // Ledger Adjustment Entry
+        await Transaction.create([{
+            partyId: supplier._id,
+            purchaseId: id,
+            type: 'OUT',
+            amount: 0,
+            description: `Purchase Updated: Bill No ${updatedPurchase.billNo}`,
+            remainingBalance: supplier.currentBalance,
+            date: new Date()
+        }], { session });
+    }
+
+    await session.commitTransaction();
+    res.json({ success: true, message: "Purchase updated and balance adjusted ✅", data: updatedPurchase });
 
   } catch (error) {
+    await session.abortTransaction();
     res.status(400).json({ success: false, message: error.message });
+  } finally {
+    session.endSession();
   }
 };
 
 /* =========================
-    ❌ DELETE PURCHASE
+    ❌ DELETE PURCHASE (Reverse Ledger Logic)
 ========================= */
 export const deletePurchase = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
-    const purchase = await Purchase.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+    const purchase = await Purchase.findById(id).session(session);
 
-    if (!purchase)
-      return res.status(404).json({ success: false, message: "Record not found" });
+    if (!purchase) throw new Error("Record not found");
 
-    res.json({
-      success: true,
-      message: "Purchase record deleted successfully ✅"
-    });
+    // Reverse Supplier Balance
+    const supplier = await Supplier.findOne({ 
+        $or: [{ name: purchase.supplierName }, { mobile: purchase.mobile }] 
+    }).session(session);
+
+    if (supplier) {
+        // Calculation: Purana Balance = Current - Bill Total + Paid Amount
+        supplier.currentBalance = (supplier.currentBalance || 0) - Number(purchase.totalAmount) + Number(purchase.paidAmount);
+        await supplier.save({ session });
+    }
+
+    // Delete related transactions
+    await Transaction.deleteMany({ purchaseId: id }).session(session);
+    await Purchase.findByIdAndDelete(id).session(session);
+
+    await session.commitTransaction();
+    res.json({ success: true, message: "Purchase deleted & Ledger reversed ✅" });
 
   } catch (error) {
+    await session.abortTransaction();
     res.status(500).json({ success: false, message: error.message });
+  } finally {
+    session.endSession();
   }
 };
