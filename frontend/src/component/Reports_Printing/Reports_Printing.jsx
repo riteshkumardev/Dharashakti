@@ -4,6 +4,7 @@ import './Reports_Printing.css';
 import Loader from "../Core_Component/Loader/Loader";
 import CustomSnackbar from "../Core_Component/Snackbar/CustomSnackbar";
 import SinghImage from '../rkSig.png';
+
 const Reports_Printing = () => {
     const [loading, setLoading] = useState(false);
     const [category, setCategory] = useState("sales"); 
@@ -73,7 +74,6 @@ const Reports_Printing = () => {
         setSnackbar({ open: true, message: `${temp.length} Records Found!`, severity: "success" });
     };
 
-    // --- Dynamic Data Helpers ---
     const getPaidVal = (item) => {
         return category === "sales" ? Number(item.amountReceived || 0) : Number(item.paidAmount || 0);
     };
@@ -83,11 +83,9 @@ const Reports_Printing = () => {
     };
 
     const getFreightVal = (item) => {
-        // Mapping freight (Sales) and travelingCost (Purchases)
         return category === "sales" ? Number(item.freight || 0) : Number(item.travelingCost || 0);
     };
 
-    // --- Totals Calculation Logic ---
     const calculateTotalQty = () => {
         return filteredData.reduce((total, item) => {
             if (category === "sales") {
@@ -183,6 +181,7 @@ const Reports_Printing = () => {
                                 <th>Product Name</th>
                                 <th>Last Updated</th>
                                 <th className="text-right">Available Stock (Qty)</th>
+                                <th>Remarks</th>
                             </tr>
                         ) : (
                             <tr>
@@ -196,6 +195,7 @@ const Reports_Printing = () => {
                                 <th className="text-right">Total Amount</th>
                                 <th className="text-right">Paid</th>
                                 <th className="text-right">Due</th>
+                                <th>Remarks</th>
                             </tr>
                         )}
                     </thead>
@@ -214,6 +214,7 @@ const Reports_Printing = () => {
                                         <td className="text-right">{gIdx === 0 ? `₹${Number(item.totalAmount || 0).toLocaleString()}` : ""}</td>
                                         <td className="text-right">{gIdx === 0 ? `₹${getPaidVal(item).toLocaleString()}` : ""}</td>
                                         <td className="text-right red-text">{gIdx === 0 ? `₹${getDueVal(item).toLocaleString()}` : ""}</td>
+                                        <td style={{fontSize: '10px'}}>{gIdx === 0 ? (item.remarks || item.note || "-") : ""}</td>
                                     </tr>
                                 ))}
                                 {category === "purchases" && (
@@ -228,6 +229,7 @@ const Reports_Printing = () => {
                                         <td className="text-right">₹{Number(item.totalAmount || 0).toLocaleString()}</td>
                                         <td className="text-right">₹{getPaidVal(item).toLocaleString()}</td>
                                         <td className="text-right red-text">₹{getDueVal(item).toLocaleString()}</td>
+                                        <td style={{fontSize: '10px'}}>{item.remarks || item.note || "-"}</td>
                                     </tr>
                                 )}
                                 {category === "stock" && (
@@ -237,6 +239,7 @@ const Reports_Printing = () => {
                                         <td className="text-right">
                                             {Number(item.totalQuantity).toLocaleString()} kg
                                         </td>
+                                        <td style={{fontSize: '10px'}}>{item.remarks || "-"}</td>
                                     </tr>
                                 )}
                             </React.Fragment>
@@ -247,33 +250,29 @@ const Reports_Printing = () => {
                             <tr>
                                 <td colSpan="2" className="text-right">TOTAL INVENTORY QTY:</td>
                                 <td className="text-right">{calculateTotalQty().toLocaleString()} kg</td>
+                                <td></td>
                             </tr>
                         ) : (
-                            <>
-                                <tr style={{backgroundColor: '#f9f9f9', fontWeight: 'bold'}}>
-                                    <td colSpan="5" className="text-right">GRAND TOTAL:</td>
-                                    <td>{calculateTotalQty().toLocaleString()}</td>
-                                    <td className="text-right">₹{calculateFreightTotal().toLocaleString()}</td>
-                                    <td className="text-right">₹{calculateGrandTotalVal().toLocaleString()}</td>
-                                    <td className="text-right">₹{calculatePaidTotal().toLocaleString()}</td>
-                                    <td className="text-right red-text">₹{calculateDueTotal().toLocaleString()}</td>
-                                </tr>
-                            </>
+                            <tr style={{backgroundColor: '#f9f9f9', fontWeight: 'bold'}}>
+                                <td colSpan="5" className="text-right">GRAND TOTAL:</td>
+                                <td>{calculateTotalQty().toLocaleString()}</td>
+                                <td className="text-right">₹{calculateFreightTotal().toLocaleString()}</td>
+                                <td className="text-right">₹{calculateGrandTotalVal().toLocaleString()}</td>
+                                <td className="text-right">₹{calculatePaidTotal().toLocaleString()}</td>
+                                <td className="text-right red-text">₹{calculateDueTotal().toLocaleString()}</td>
+                                <td></td>
+                            </tr>
                         )}
                     </tfoot>
                 </table>
 
                 <div className="signature-section">
                     <div className="sig-box"><div className="sig-line"></div><p>Prepared By</p></div>
-
                     <div className="sig-box">
-      <img src={SinghImage} alt="Singh" style={{ width: '80px', height: '40px',marginTop: 'auto' }} />
-                        <div className="sig-line">
-                             {/* Variable ko src mein pass karein */}
-                            </div>
-                            <p>Authorized Signatory</p>
-                            
-                            </div>
+                        <img src={SinghImage} alt="Singh" style={{ width: '80px', height: '40px', marginTop: 'auto' }} />
+                        <div className="sig-line"></div>
+                        <p>Authorized Signatory</p>
+                    </div>
                 </div>
             </div>
 
