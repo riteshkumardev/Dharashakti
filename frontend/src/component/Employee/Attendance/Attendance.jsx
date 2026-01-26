@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios'; 
 import './Attendanc.css';
 import Loader from '../../Core_Component/Loader/Loader';
@@ -12,11 +12,10 @@ const Attendance = ({ role }) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   
-  // 🆕 Bulk Mode & Selection States
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [bulkStartDate, setBulkStartDate] = useState('');
   const [bulkEndDate, setBulkEndDate] = useState('');
-  const [selectedEmployees, setSelectedEmployees] = useState([]); // List of IDs
+  const [selectedEmployees, setSelectedEmployees] = useState([]);
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -31,8 +30,7 @@ const Attendance = ({ role }) => {
       const res = await axios.get(`${API_URL}/api/employees`);
       if (res.data.success) {
         setEmployees(res.data.data);
-        // Default: Select all in the list initially
-        setSelectedEmployees(res.data.data.map(e => e.employeeId));
+        setSelectedEmployees(res.data.data.map(e => e.employeeId.toString()));
       }
     } catch (err) {
       console.error("Error fetching employees:", err);
@@ -41,21 +39,28 @@ const Attendance = ({ role }) => {
     }
   };
 
-  const fetchAttendance = async () => {
+  // Memoized fetchAttendance to avoid unnecessary re-renders
+  const fetchAttendance = useCallback(async () => {
     try {
       const res = await axios.get(`${API_URL}/api/attendance/${date}`);
-      if (res.data.success) {
+      if (res.data.success && Array.isArray(res.data.data)) {
         const attObj = {};
-        res.data.data.forEach(item => { attObj[item.employeeId] = item; });
+        res.data.data.forEach(item => { 
+          // employeeId ko hamesha string key ki tarah save karein
+          attObj[item.employeeId.toString()] = item; 
+        });
         setAttendance(attObj);
+      } else {
+        setAttendance({});
       }
-    } catch (err) { setAttendance({}); }
-  };
+    } catch (err) { 
+      setAttendance({}); 
+    }
+  }, [API_URL, date]);
 
   useEffect(() => { fetchEmployees(); }, [API_URL]);
-  useEffect(() => { if (!isBulkMode) fetchAttendance(); }, [date, API_URL, isBulkMode]);
+  useEffect(() => { if (!isBulkMode) fetchAttendance(); }, [fetchAttendance, isBulkMode]);
 
-  // 1️⃣ MARK SINGLE ATTENDANCE
   const markAttendance = async (empId, empName, status) => {
     if (!isAuthorized) return alert("Permission denied.");
     try {
@@ -63,53 +68,22 @@ const Attendance = ({ role }) => {
         employeeId: empId, name: empName, status: status, date: date
       });
       if (res.data.success) {
+        // UI mein immediate update dikhane ke liye
         setAttendance(prev => ({
-          ...prev, [empId]: { status, time: new Date().toLocaleTimeString() }
+          ...prev, 
+          [empId.toString()]: { status, time: new Date().toLocaleTimeString() }
         }));
       }
-    } catch (err) { alert("Error: " + (err.response?.data?.message || err.message)); }
-  };
-
-  // 2️⃣ MANUAL SELECTION LOGIC
-  const toggleSelect = (id) => {
-    setSelectedEmployees(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
-  };
-
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedEmployees(filteredEmployees.map(e => e.employeeId));
-    } else {
-      setSelectedEmployees([]);
+    } catch (err) { 
+        alert("Error: " + (err.response?.data?.message || err.message)); 
     }
   };
 
-  // 3️⃣ MARK BULK ATTENDANCE (Range & Filtered List)
-  const handleBulkAttendance = async (status) => {
-    if (!bulkStartDate || !bulkEndDate) return alert("Pehle Start aur End date chuniye.");
-    if (selectedEmployees.length === 0) return alert("Kam se kam ek employee select karein.");
-    
-    if (!window.confirm(`Selected ${selectedEmployees.length} employees ko ${bulkStartDate} se ${bulkEndDate} tak '${status}' mark karein?`)) return;
-
-    setLoading(true);
-    try {
-      const payload = {
-        employeeIds: selectedEmployees, 
-        startDate: bulkStartDate,
-        endDate: bulkEndDate,
-        status: status
-      };
-
-      const res = await axios.post(`${API_URL}/api/attendance/bulk`, payload);
-      if (res.data.success) {
-        alert(`Success: Updated ${selectedEmployees.length} records!`);
-        setIsBulkMode(false);
-        fetchAttendance();
-      }
-    } catch (err) {
-      alert("Bulk Update failed. Backend route '/api/attendance/bulk' exists?");
-    } finally { setLoading(false); }
+  const toggleSelect = (id) => {
+    const strId = id.toString();
+    setSelectedEmployees(prev => 
+      prev.includes(strId) ? prev.filter(item => item !== strId) : [...prev, strId]
+    );
   };
 
   const filteredEmployees = employees.filter(emp => {
@@ -117,8 +91,35 @@ const Attendance = ({ role }) => {
     return (emp.name?.toLowerCase().includes(searchTerm) || emp.employeeId?.toString().includes(searchTerm));
   });
 
-  if (loading) return <Loader />;
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedEmployees(filteredEmployees.map(e => e.employeeId.toString()));
+    } else {
+      setSelectedEmployees([]);
+    }
+  };
 
+  const handleBulkAttendance = async (status) => {
+    if (!bulkStartDate || !bulkEndDate) return alert("Pehle Start aur End date chuniye.");
+    if (selectedEmployees.length === 0) return alert("Kam se kam ek employee select karein.");
+    
+    if (!window.confirm(`Selected ${selectedEmployees.length} employees ko update karein?`)) return;
+
+    setLoading(true);
+    try {
+      const payload = { employeeIds: selectedEmployees, startDate: bulkStartDate, endDate: bulkEndDate, status: status };
+      const res = await axios.post(`${API_URL}/api/attendance/bulk`, payload);
+      if (res.data.success) {
+        alert("Bulk Update Successful!");
+        setIsBulkMode(false);
+        fetchAttendance();
+      }
+    } catch (err) {
+      alert("Bulk Update failed. Check if API route exists.");
+    } finally { setLoading(false); }
+  };
+
+  if (loading) return <Loader />;
   return (
     <div className="table-container-wide">
       <div className="table-card-wide">
