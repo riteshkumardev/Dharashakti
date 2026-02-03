@@ -7,6 +7,79 @@ import Loader from "../../Core_Component/Loader/Loader";
 import ProfessionalPayslip from './Payslip/ProfessionalPayslip';
 import EmployeeIDCard from './EmployeeIDCard/EmployeeIDCard';
 
+// Internal Passbook Component (ताकि आपको अलग फाइल न बनानी पड़े, या आप इसे अलग भी रख सकते हैं)
+const EmployeePassbook = ({ selectedEmp, availableMonths, fullAttendanceData, allPayments }) => {
+  let runningBalance = 0;
+
+  const calculateMonthData = (month) => {
+    const salary = Number(selectedEmp.salary) || 0;
+    const dayRate = salary / 30;
+
+    let p = 0, h = 0;
+    Object.keys(fullAttendanceData).forEach(date => {
+      if (date.startsWith(month)) {
+        if (fullAttendanceData[date] === "Present") p++;
+        else if (fullAttendanceData[date] === "Half-Day") h++;
+      }
+    });
+
+    const workedDays = p + (h * 0.5);
+    const earned = Math.round(workedDays * dayRate);
+    const advance = allPayments
+      .filter(pay => pay.date.substring(0, 7) === month)
+      .reduce((sum, pay) => sum + Number(pay.amount), 0);
+
+    const monthlyNet = earned - advance;
+    return { month, workedDays, earned, advance, monthlyNet };
+  };
+
+  // डेटा को पुराने से नए (Old to New) के क्रम में प्रोसेस करना पासबुक के लिए बेहतर है
+  const passbookData = [...availableMonths].reverse().map(m => calculateMonthData(m));
+
+  return (
+    <div className="passbook-print-area" style={{ marginTop: '30px', padding: '20px', background: '#fff', borderRadius: '12px', border: '2px solid #e2e8f0' }}>
+      <h3 style={{ textAlign: 'center', color: '#1e293b', textTransform: 'uppercase', marginBottom: '20px' }}>
+        📒 Employee Passbook: {selectedEmp.name}
+      </h3>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+        <thead>
+          <tr style={{ background: '#4d47f3', color: 'white' }}>
+            <th style={{ padding: '10px', border: '1px solid #ddd' }}>Month</th>
+            <th style={{ padding: '10px', border: '1px solid #ddd' }}>Worked Days</th>
+            <th style={{ padding: '10px', border: '1px solid #ddd' }}>Earnings (Cr)</th>
+            <th style={{ padding: '10px', border: '1px solid #ddd' }}>Advance (Dr)</th>
+            <th style={{ padding: '10px', border: '1px solid #ddd' }}>Closing Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {passbookData.map((d) => {
+            runningBalance += d.monthlyNet;
+            if (d.workedDays === 0 && d.advance === 0) return null;
+            return (
+              <tr key={d.month} style={{ textAlign: 'center' }}>
+                <td style={{ padding: '8px', border: '1px solid #ddd', fontWeight: 'bold' }}>
+                    {new Date(d.month + "-01").toLocaleString('default', { month: 'short', year: 'numeric' })}
+                </td>
+                <td style={{ padding: '8px', border: '1px solid #ddd' }}>{d.workedDays}</td>
+                <td style={{ padding: '8px', border: '1px solid #ddd', color: 'green' }}>₹{d.earned.toLocaleString()}</td>
+                <td style={{ padding: '8px', border: '1px solid #ddd', color: 'red' }}>₹{d.advance.toLocaleString()}</td>
+                <td style={{ padding: '8px', border: '1px solid #ddd', fontWeight: '800', background: '#f8fafc' }}>
+                    ₹{runningBalance.toLocaleString()}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div style={{marginTop: '15px', display: 'flex', gap: '10px'}} className="no-print">
+         <button className="view-btn-small" onClick={() => window.print()} style={{ flex: 1, background: '#1e293b', color: 'white', padding: '10px', borderRadius: '8px', cursor: 'pointer' }}>
+            🖨️ Print Full Passbook
+         </button>
+      </div>
+    </div>
+  );
+};
+
 const EmployeeLedger = ({ role, user }) => {
   const isAuthorized = role === "Admin" || role === "Accountant";
   const isBoss = role === "Admin" || role === "Manager";
@@ -14,6 +87,7 @@ const EmployeeLedger = ({ role, user }) => {
   const [employees, setEmployees] = useState([]);
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [paymentHistory, setPaymentHistory] = useState([]);
+  const [allPayments, setAllPayments] = useState([]); // For Passbook
   const [attendanceStats, setAttendanceStats] = useState({ present: 0, absent: 0, halfDay: 0 });
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [overtimeHours, setOvertimeHours] = useState('');
@@ -21,11 +95,11 @@ const EmployeeLedger = ({ role, user }) => {
   const [showCalendar, setShowCalendar] = useState(false);
   const [showPayslip, setShowPayslip] = useState(false);
   const [showIDCard, setShowIDCard] = useState(false);
+  const [showPassbook, setShowPassbook] = useState(false); // Passbook Toggle
 
   const [fullAttendanceData, setFullAttendanceData] = useState({});
   const [loading, setLoading] = useState(true); 
   const [fetchingDetail, setFetchingDetail] = useState(false);
-
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
 
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -75,20 +149,18 @@ const EmployeeLedger = ({ role, user }) => {
     setSelectedEmp(emp);
     setShowPayslip(false); 
     setShowIDCard(false); 
+    setShowPassbook(false); 
     
-    // कर्मचारी की ID (employeeId को प्राथमिकता दें)
     const empId = emp.employeeId || emp._id;
 
     try {
-      // 1. एडवांस पेमेंट हिस्ट्री प्राप्त करना
       const payRes = await axios.get(`${API_URL}/api/salary-payments/${empId}`);
       if (payRes.data.success) {
-        // फ़िल्टरिंग सुधार: सुनिश्चित करें कि चुनी गई माह का ही एडवांस दिखे
+        setAllPayments(payRes.data.data); // Store everything for passbook
         const filteredPay = payRes.data.data.filter(p => p.date.substring(0, 7) === month);
         setPaymentHistory(filteredPay.reverse());
       }
 
-      // 2. अटेंडेंस रिपोर्ट प्राप्त करना
       const attRes = await axios.get(`${API_URL}/api/attendance/report/${empId}`);
       if (attRes.data.success) {
         const history = attRes.data.data; 
@@ -124,10 +196,7 @@ const EmployeeLedger = ({ role, user }) => {
   };
 
   const grossEarned = Math.round(dayRate * stats.effectiveDaysWorked);
-  
-  // एडवांस पेमेंट्स का योग (Deductions)
   const totalAdvance = paymentHistory.reduce((sum, p) => sum + Number(p.amount), 0);
-  
   const otEarning = (Number(overtimeHours) || 0) * (dayRate / 8);
   const totalEarnings = Math.round(grossEarned + otEarning + (Number(incentive) || 0));
   const netPayable = totalEarnings - totalAdvance;
@@ -142,7 +211,6 @@ const EmployeeLedger = ({ role, user }) => {
     if (!isAuthorized || !advanceAmount) return;
 
     try {
-      // सुनिश्चित करें कि एडवांस उसी महीने में रिकॉर्ड हो जिसे आप अभी देख रहे हैं
       const currentMonthStr = new Date().toISOString().slice(0, 7);
       const paymentDate = selectedMonth === currentMonthStr 
         ? new Date().toISOString().split('T')[0] 
@@ -158,7 +226,6 @@ const EmployeeLedger = ({ role, user }) => {
       if (res.data.success) {
         setAdvanceAmount('');
         alert(`✅ Payment Recorded for ${selectedMonth}!`);
-        // डेटा रिफ्रेश करें
         viewLedger(selectedEmp, selectedMonth);
       }
     } catch (err) { 
@@ -240,13 +307,22 @@ const EmployeeLedger = ({ role, user }) => {
                 <div className="summary-item green">P: <b>{stats.present}</b></div>
                 <div className="summary-item yellow">H/D: <b>{stats.halfDay}</b></div>
                 <div className="summary-item red">A: <b>{stats.absent}</b></div>
-                
+            
                 <div className="action-buttons-group" style={{display: 'flex', gap: '8px'}}>
                     <button className="view-btn-small" onClick={() => setShowCalendar(true)}>🗓️ History</button>
                     
+                    {/* New Passbook Button */}
+                    <button 
+                      className="view-btn-small" 
+                      onClick={() => { setShowPassbook(!showPassbook); setShowPayslip(false); setShowIDCard(false); }}
+                      style={{background: '#8b5cf6', color: 'white'}}
+                    >
+                      {showPassbook ? "❌ Close Ledger" : "📒 Full Passbook"}
+                    </button>
+
                     <button 
                       className="view-btn-small id-card-btn" 
-                      onClick={() => { setShowIDCard(!showIDCard); setShowPayslip(false); }}
+                      onClick={() => { setShowIDCard(!showIDCard); setShowPayslip(false); setShowPassbook(false); }}
                       style={{background: '#0ea5e9'}}
                     >
                       {showIDCard ? "❌ Close ID" : "🪪 View ID Card"}
@@ -254,50 +330,62 @@ const EmployeeLedger = ({ role, user }) => {
 
                     <button 
                       className="view-btn-small print-btn" 
-                      onClick={() => { setShowPayslip(!showPayslip); setShowIDCard(false); }}
+                      onClick={() => { setShowPayslip(!showPayslip); setShowIDCard(false); setShowPassbook(false); }}
                     >
                       {showPayslip ? "❌ Close Slip" : "📄 View Payslip"}
                     </button>
                 </div>
               </div>
 
-              <div className="pro-payroll-grid">
-                <div className="pro-card earnings-card">
-                  <h4 className="card-header-text">💰 Earnings ({new Date(selectedMonth + "-01").toLocaleString('default', { month: 'short' })})</h4>
-                  <div className="pay-row"><span>Base Salary:</span> <b>₹{monthlySalary.toLocaleString()}</b></div>
-                  <div className="pay-row"><span>Gross Earned:</span> <b className="text-green">₹{grossEarned.toLocaleString()}</b></div>
-                  <div className="pay-input-group">
-                    <div className="pro-input-field">
-                      <label>Incentive/Bonus</label>
-                      <input type="number" value={incentive} onChange={(e)=>setIncentive(e.target.value)} placeholder="₹" />
-                    </div>
-                    <div className="pro-input-field">
-                      <label>Overtime (Hrs)</label>
-                      <input type="number" value={overtimeHours} onChange={(e)=>setOvertimeHours(e.target.value)} placeholder="Hrs" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pro-card deductions-card">
-                  <h4 className="card-header-text">📉 Deductions</h4>
-                  <div className="pay-row highlight"><span>Advances Taken:</span> <b className="text-red">- ₹{totalAdvance.toLocaleString()}</b></div>
-                  <div className="net-payable-box">
-                    <div className="net-label">NET TAKE-HOME</div>
-                    <div className="net-amount">₹{netPayable.toLocaleString()}</div>
-                  </div>
-                </div>
-              </div>
-
-              {isAuthorized && (
-                <form onSubmit={handlePayment} className="pro-action-bar">
-                  <input 
-                    type="number" 
-                    placeholder="Enter Advance Amount..." 
-                    value={advanceAmount} 
-                    onChange={(e)=>setAdvanceAmount(e.target.value)} 
+              {/* Passbook View Rendering */}
+              {showPassbook ? (
+                  <EmployeePassbook 
+                    selectedEmp={selectedEmp} 
+                    availableMonths={availableMonths} 
+                    fullAttendanceData={fullAttendanceData} 
+                    allPayments={allPayments} 
                   />
-                  <button type="submit">RECORD DISBURSEMENT</button>
-                </form>
+              ) : (
+                <>
+                  <div className="pro-payroll-grid">
+                    <div className="pro-card earnings-card">
+                      <h4 className="card-header-text">💰 Earnings ({new Date(selectedMonth + "-01").toLocaleString('default', { month: 'short' })})</h4>
+                      <div className="pay-row"><span>Base Salary:</span> <b>₹{monthlySalary.toLocaleString()}</b></div>
+                      <div className="pay-row"><span>Gross Earned:</span> <b className="text-green">₹{grossEarned.toLocaleString()}</b></div>
+                      <div className="pay-input-group">
+                        <div className="pro-input-field">
+                          <label>Incentive/Bonus</label>
+                          <input type="number" value={incentive} onChange={(e)=>setIncentive(e.target.value)} placeholder="₹" />
+                        </div>
+                        <div className="pro-input-field">
+                          <label>Overtime (Hrs)</label>
+                          <input type="number" value={overtimeHours} onChange={(e)=>setOvertimeHours(e.target.value)} placeholder="Hrs" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pro-card deductions-card">
+                      <h4 className="card-header-text">📉 Deductions</h4>
+                      <div className="pay-row highlight"><span>Advances Taken:</span> <b className="text-red">- ₹{totalAdvance.toLocaleString()}</b></div>
+                      <div className="net-payable-box">
+                        <div className="net-label">NET TAKE-HOME</div>
+                        <div className="net-amount">₹{netPayable.toLocaleString()}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {isAuthorized && (
+                    <form onSubmit={handlePayment} className="pro-action-bar">
+                      <input 
+                        type="number" 
+                        placeholder="Enter Advance Amount..." 
+                        value={advanceAmount} 
+                        onChange={(e)=>setAdvanceAmount(e.target.value)} 
+                      />
+                      <button type="submit">RECORD DISBURSEMENT</button>
+                    </form>
+                  )}
+                </>
               )}
             </div>
           )}
